@@ -3,30 +3,6 @@
 #include "clang/Analysis/CallGraph.h"
 
 /** Used in prototyping.  */
-static bool Is_Record_Reachable(Decl *decl)
-{
-  RecordDecl *recdecl = dynamic_cast<RecordDecl *>(decl);
-  while (recdecl) {
-    if (recdecl && recdecl->isReferenced()) {
-      return true;
-    }
-    recdecl = recdecl->getPreviousDecl();
-  }
-
-  return false;
-}
-
-/** Used in prototyping.  */
-static bool Is_Typedef_Reachable(Decl *decl)
-{
-  TypedefDecl *typedecl = dynamic_cast<TypedefDecl *>(decl);
-  if (typedecl /*&& typedecl->isReferenced()*/) {
-    return true;
-  }
-  return false;
-}
-
-/** Used in prototyping.  */
 static bool Is_Global_Var_Reachable(Decl *decl)
 {
   VarDecl *vardecl = dynamic_cast<VarDecl *>(decl);
@@ -115,7 +91,7 @@ void FunctionDependencyFinder::Mark_Required_Functions(CallGraphNode *node)
   }
 }
 
-void FunctionDependencyFinder::Find_Records_Required(void)
+void FunctionDependencyFinder::Find_Types_Required(void)
 {
 
   size_t n = 0;
@@ -134,60 +110,151 @@ void FunctionDependencyFinder::Find_Records_Required(void)
      RecordDecl dependency tracker.  */
   for (size_t i = 0; i < n; i++) {
     FunctionDecl *decl = dependencies[i]->getAsFunction();
-    Mark_Records_In_Function_Body(decl->getBody());
+    Mark_Types_In_Function_Body(decl->getBody());
   }
 }
 
-static const Type *PointerType_Deference(const Type *type)
+bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
 {
-  if (type->isAnyPointerType()) {
-    return PointerType_Deference(type->getPointeeType().getTypePtr());
-  } else if (type->isElaboratedTypeSpecifier()) {
-    const ElaboratedType *t = (const ElaboratedType *) type;
-    return PointerType_Deference(t->desugar().getTypePtr());
-  } else if (type->isArrayType()) {
-    const ArrayType *t = (const ArrayType *) type;
-    return PointerType_Deference(t->getElementType().getTypePtr());
+  if (!type)
+    return false;
+
+  bool inserted = false;
+
+  /* Check type to the correct type and handle it accordingly.  */
+  if (TagType::classof(type)) {
+    /* Handle case where type is a struct, union, or enum.  */
+
+    const TagType *t = type->getAs<const TagType>();
+    return Handle_TypeDecl(t->getAsTagDecl());
   }
 
-  return type;
+  if (type->isTypedefNameType()) {
+    /* Handle case where type is a typedef.  */
+
+    const TypedefType *t = type->getAs<const TypedefType>();
+    inserted = Handle_TypeDecl(t->getDecl());
+
+    /* Typedefs can be typedef'ed in a chain, for example:
+         typedef int __int32_t;
+         typedef __int32_t int32_t;
+
+         int f(int32_t);
+
+         In this case we must also include the first typedef.
+
+         Also only do this if something was inserted, else there is
+         no point in continuing this analysis because the decl
+         was already marked for output.
+    */
+
+    if (inserted)
+      Add_Type_And_Depends(t->desugar().getTypePtr());
+
+    return inserted;
+  }
+
+  if (type->isFunctionProtoType()) {
+    /* Handle function prototypes.  Can appear in typedefs or struct keys
+       in ways like this: 
+
+        typedef int (*GEN_SESSION_CB)(int *, unsigned char *, unsigned int *);
+
+       */
+    const FunctionProtoType *prototype = type->getAs<const FunctionProtoType>();
+    int n = prototype->getNumParams();
+
+    /* Add function return type.  */
+    inserted |= Add_Type_And_Depends(prototype->getReturnType().getTypePtr());
+
+    /* Add function parameters.  */
+    for (int i = 0; i < n; i++) {
+      inserted |= Add_Type_And_Depends(prototype->getParamType(i).getTypePtr());
+    }
+
+    return inserted;
+  }
+
+  if (type->isElaboratedTypeSpecifier()) {
+    /* For some reason clang add some ElaboratedType types, which is not clear
+       of their purpose.  But handle them as well.  */
+
+    const ElaboratedType *t = type->getAs<const ElaboratedType>();
+
+    return Add_Type_And_Depends(t->desugar().getTypePtr());
+  }
+  if (type->isPointerType() || type->isArrayType()) {
+    /* Handle case where type is a pointer or array.  */
+
+    return Add_Type_And_Depends(type->getPointeeOrArrayElementType());
+  }
+
+  return false;
 }
 
-void FunctionDependencyFinder::Mark_Records_In_Function_Body(Stmt *stmt)
+bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
+{
+  bool inserted = false;
+
+  /* If decl was already inserted then quickly return.  */
+  if (Is_Decl_Marked(decl))
+    return false;
+
+  /* Add current decl.  */
+  inserted = Add_Decl_And_Prevs(decl);
+
+  if (RecordDecl *rdecl = dynamic_cast<RecordDecl *>(decl)) {
+    /* RecordDecl may have nested records, for example:
+
+      struct A {
+        int a;
+      };
+
+      struct B {
+        struct A a;
+        int b;
+      };
+
+      in this case we have to recursively analyze the nested types as well.  */
+    clang::RecordDecl::field_iterator it;
+    for (it = rdecl->field_begin(); it != rdecl->field_end(); ++it) {
+      ValueDecl *valuedecl = *it;
+
+      Add_Type_And_Depends(valuedecl->getType().getTypePtr());
+    }
+  }
+
+  return inserted;
+}
+
+void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 {
   if (!stmt)
     return;
 
   /* For some akward reason we can't use dynamic_cast<>() on Stmt.  So
      we poke in this classof which seems to work.  */
-  DeclStmt *declstmt = nullptr;
-  TagDecl *tagdecl = nullptr;
+  const Type *type = nullptr;
 
   if (DeclStmt::classof(stmt)) {
-    //Print_Stmt(stmt);
-    declstmt = (DeclStmt *) stmt;
+    DeclStmt *declstmt = (DeclStmt *) stmt;
 
     /* Get Decl object from DeclStmt.  */
     Decl *decl = declstmt->getSingleDecl();
 
     /* Look into the type for a RecordDecl.  */
     ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl);
-    const Type *type = PointerType_Deference(valuedecl->getType().getTypePtr());
-    tagdecl = type->getAsTagDecl();
+    type = valuedecl->getType().getTypePtr();
 
   } else if (Expr::classof(stmt)) {
     Expr *expr = (Expr *) stmt;
 
-    const Type *type = PointerType_Deference(expr->getType().getTypePtr());
-    tagdecl = type->getAsTagDecl();
+    type = expr->getType().getTypePtr();
   }
 
-  /* If this is a valid RecordDecl or enum (for example, the type is not a 
-     primitive type such as `int`, then we mark this Decl in the Dependencies
-     set.  */
-  if (tagdecl) {
-    Add_TagDecl_And_Nested(tagdecl);
-  } 
+  if (type) {
+    Add_Type_And_Depends(type);
+  }
 
   /* Iterate through the list of all children Statements and repeat the
      process.  */
@@ -196,7 +263,7 @@ void FunctionDependencyFinder::Mark_Records_In_Function_Body(Stmt *stmt)
       it != it_end; ++it) {
 
     Stmt *child = *it;
-    Mark_Records_In_Function_Body(child);
+    Mark_Types_In_Function_Body(child);
   }
 }
 
@@ -226,46 +293,6 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
   return inserted;
 }
 
-bool FunctionDependencyFinder::Add_TagDecl_And_Nested(TagDecl *decl)
-{
-  bool inserted = false;
-
-  if (!decl)
-    return false;
-
-  /* If decl was already inserted then quickly return.  */
-  if (Is_Decl_Marked(decl))
-    return false;
-
-  /* Add current decl.  */
-  inserted = Add_Decl_And_Prevs(decl);
-
-  if (RecordDecl *rdecl = dynamic_cast<RecordDecl *>(decl)) {
-    /* RecordDecl may have nested records, for example:
-
-      struct A {
-        int a;
-      };
-
-      struct B {
-        struct A a;
-        int b;
-      };
-
-      in this case we have to recursively analyze the nested types as well.  */
-    clang::RecordDecl::field_iterator it;
-    for (it = rdecl->field_begin(); it != rdecl->field_end(); ++it) {
-      ValueDecl *valuedecl = *it;
-      const Type *type = PointerType_Deference(valuedecl->getType().getTypePtr());
-      TagDecl *tagdecl = type->getAsTagDecl();
-
-      inserted |= Add_TagDecl_And_Nested(tagdecl);
-    }
-  }
-
-  return inserted;
-}
-
 /** Pretty print all nodes were marked to output.  */
 void FunctionDependencyFinder::Print()
 {
@@ -276,11 +303,7 @@ void FunctionDependencyFinder::Print()
 #ifdef ECHO_FILE
     PrettyPrint::Print_Decl(decl);
 #else
-    /*if (Is_Record_Reachable(decl)) {
-      PrettyPrint::Print_Decl(decl);
-    } else if (Is_Typedef_Reachable(decl)) {
-      PrettyPrint::Print_Decl(decl);
-    } else */if (Is_Global_Var_Reachable(decl)) {
+    if (Is_Global_Var_Reachable(decl)) {
       PrettyPrint::Print_Decl(decl);
     } else if (Is_Decl_Marked(decl)) {
       PrettyPrint::Print_Decl(decl);
@@ -297,8 +320,8 @@ void FunctionDependencyFinder::Run_Analysis(std::string const &function)
   /* Step 2: Find all functions that depends from `function`.  */
   Find_Functions_Required(cg, function);
 
-  /* Step 3: Find all RecordDecls that is reachable from the found functions.  */
-  Find_Records_Required();
+  /* Step 3: Find all Types that is reachable from the found functions.  */
+  Find_Types_Required();
 
   delete cg;
 }

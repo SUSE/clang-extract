@@ -54,12 +54,20 @@ class FunctionDependencyFinder
     /** Mark function represented by `node` and all its callees.  */
     void Mark_Required_Functions(CallGraphNode *node);
 
-    /** Find all RecordDecls that are reachable from Dependencies function.  */
-    void Find_Records_Required(void);
+    /** Find all Types that are reachable from Dependencies function.  */
+    void Find_Types_Required(void);
 
-    void Mark_Records_In_Function_Body(Stmt *stmt);
+    /** Mark all types reachable from a function body or statement chain.  */
+    void Mark_Types_In_Function_Body(Stmt *stmt);
 
-    bool Add_TagDecl_And_Nested(TagDecl *);
+    /** Add Type to the list of dependencies. Types are objects that in
+        some way represent a variable type.  For example, a type can be
+        a RecordDecl (struct, union), a enum, a TypedefNamedDecl (typedefs)
+        or even complicated function pointers.  */
+    bool Add_Type_And_Depends(const Type *);
+
+    /* Add TypeDecl to the list of dependencies.  */
+    bool Handle_TypeDecl(TypeDecl *decl);
 
     /** Datastructure holding all Decls required for the functions. This is
         then used to mark which Decls we need to output.
