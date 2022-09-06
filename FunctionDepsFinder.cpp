@@ -2,17 +2,6 @@
 #include "PrettyPrint.hh"
 #include "clang/Analysis/CallGraph.h"
 
-/** Used in prototyping.  */
-static bool Is_Global_Var_Reachable(Decl *decl)
-{
-  VarDecl *vardecl = dynamic_cast<VarDecl *>(decl);
-  if (vardecl && vardecl->isReferenced()) {
-    return true;
-  }
-  return false;
-}
-
-
 /** Build CallGraph from AST.
  *
  * The CallGraph is a datastructure in which nodes are functions and edges
@@ -91,7 +80,7 @@ void FunctionDependencyFinder::Mark_Required_Functions(CallGraphNode *node)
   }
 }
 
-void FunctionDependencyFinder::Find_Types_Required(void)
+void FunctionDependencyFinder::Compute_Closure(void)
 {
 
   size_t n = 0;
@@ -246,6 +235,20 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl);
     type = valuedecl->getType().getTypePtr();
 
+  } else if (DeclRefExpr::classof(stmt)) {
+    /* Handle global variables.  */
+    DeclRefExpr *expr = (DeclRefExpr *) stmt;
+    VarDecl *decl = dynamic_cast<VarDecl *>(expr->getDecl());
+
+    if (decl && decl->hasGlobalStorage()) {
+      /* Add type of the global variable.  */
+      type = decl->getType().getTypePtr();
+
+      /* Add the global variable itself if not already marked.  */
+      if (!Is_Decl_Marked(decl))
+        Add_Decl_And_Prevs(decl);
+    }
+
   } else if (Expr::classof(stmt)) {
     Expr *expr = (Expr *) stmt;
 
@@ -303,9 +306,7 @@ void FunctionDependencyFinder::Print()
 #ifdef ECHO_FILE
     PrettyPrint::Print_Decl(decl);
 #else
-    if (Is_Global_Var_Reachable(decl)) {
-      PrettyPrint::Print_Decl(decl);
-    } else if (Is_Decl_Marked(decl)) {
+    if (Is_Decl_Marked(decl)) {
       PrettyPrint::Print_Decl(decl);
     }
 #endif
@@ -320,8 +321,9 @@ void FunctionDependencyFinder::Run_Analysis(std::string const &function)
   /* Step 2: Find all functions that depends from `function`.  */
   Find_Functions_Required(cg, function);
 
-  /* Step 3: Find all Types that is reachable from the found functions.  */
-  Find_Types_Required();
+  /* Step 3: Find all Global variables and Types required by the functions
+     that are currently in the Dependencies set..  */
+  Compute_Closure();
 
   delete cg;
 }

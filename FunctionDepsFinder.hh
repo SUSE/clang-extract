@@ -54,8 +54,9 @@ class FunctionDependencyFinder
     /** Mark function represented by `node` and all its callees.  */
     void Mark_Required_Functions(CallGraphNode *node);
 
-    /** Find all Types that are reachable from Dependencies function.  */
-    void Find_Types_Required(void);
+    /** Find all Types and Global variables that are reachable from
+        Dependencies function.  */
+    void Compute_Closure(void);
 
     /** Mark all types reachable from a function body or statement chain.  */
     void Mark_Types_In_Function_Body(Stmt *stmt);
