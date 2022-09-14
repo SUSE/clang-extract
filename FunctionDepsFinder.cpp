@@ -274,8 +274,9 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 
 FunctionDependencyFinder::FunctionDependencyFinder(std::unique_ptr<ASTUnit> ast,
                                                    std::string const &function)
+  : AST(std::move(ast)),
+    MDF(AST->getPreprocessor())
 {
-  AST = std::move(ast);
   Run_Analysis(function);
 }
 
@@ -299,18 +300,29 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
 /** Pretty print all nodes were marked to output.  */
 void FunctionDependencyFinder::Print()
 {
-  clang::ASTUnit::top_level_iterator it;
+  SourceLocation last_decl_loc;
+  bool first = true;
+
+  clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
-//#define ECHO_FILE
-#ifdef ECHO_FILE
-    PrettyPrint::Print_Decl(decl);
-#else
+
     if (Is_Decl_Marked(decl)) {
+      /* In the first decl we don't have a last source location, hence we have
+         to handle this special case.  */
+      if (first) {
+        MDF.Print_Macros_Before(decl->getBeginLoc());
+        first = false;
+      } else {
+        MDF.Print_Macros_Between(last_decl_loc, decl->getBeginLoc());
+      }
+      last_decl_loc = decl->getEndLoc();
       PrettyPrint::Print_Decl(decl);
     }
-#endif
   }
+
+  /* Print remaining macros.  */
+  MDF.Print_Macros_After(last_decl_loc);
 }
 
 void FunctionDependencyFinder::Run_Analysis(std::string const &function)
@@ -324,6 +336,9 @@ void FunctionDependencyFinder::Run_Analysis(std::string const &function)
   /* Step 3: Find all Global variables and Types required by the functions
      that are currently in the Dependencies set..  */
   Compute_Closure();
+
+  /* Step 4: Find all preprocessor directives reachable by this boundary.  */
+  MDF.Find_Macros_Required(AST.get());
 
   delete cg;
 }

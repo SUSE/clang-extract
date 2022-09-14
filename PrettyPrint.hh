@@ -17,13 +17,52 @@ class PrettyPrint
   /** Print a Decl node into ostream `Out`.  */
   static void Print_Decl(Decl *decl);
 
+  /** Print Decl node as is, without any kind of processing.  */
+  static void Print_Decl_Raw(Decl *decl);
+
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
+
+  /** Print a Macro Defintion into ostream `Out`.  */
+  static void Print_Macro_Def(MacroDefinitionRecord *rec);
+
+  static inline void Set_Source_Manager(SourceManager *sm)
+  {
+    SM = sm;
+  }
+
+  static inline SourceManager *Get_Source_Manager(void)
+  {
+    return SM;
+  }
+
+  /** Gets the portion of the code that corresponds to given SourceRange, including the
+      last token. Returns expanded macros.
+     
+      @see get_source_text_raw().  */
+  static StringRef Get_Source_Text(const SourceRange &range);
+
+  /** Gets the portion of the code that corresponds to given SourceRange exactly as
+      the range is given.
+   
+      @warning The end location of the SourceRange returned by some Clang functions 
+      (such as clang::Expr::getSourceRange) might actually point to the first character
+      (the "location") of the last token of the expression, rather than the character
+      past-the-end of the expression like clang::Lexer::getSourceText expects.
+      get_source_text_raw() does not take this into account. Use get_source_text()
+      instead if you want to get the source text including the last token.
+   
+      @warning This function does not obtain the source of a macro/preprocessor expansion.
+      Use get_source_text() for that.   */
+  static StringRef Get_Source_Text_Raw(const SourceRange &range);
+
+  static bool Is_Before(const SourceLocation &a, const SourceLocation &b);
 
   /* This class can not be initialized.  */
   PrettyPrint() = delete;
 
   private:
+
   /** Output object to where this class will output to.  Current default is the
       same as llvm::outs().  */
   static raw_ostream &Out;
@@ -34,6 +73,10 @@ class PrettyPrint
 
   /** Policy for printing.  We use the default for now.  */
   static PrintingPolicy PPolicy;
+
+  /** SourceManager built when parsing the AST.  Must be set after constructing
+      the ast by calling Set_Source_Manager.  */
+  static SourceManager *SM;
 };
 
 /** Since writing PrettyPrint::Print_Decl can be bothering and result in
@@ -46,4 +89,9 @@ static inline void Print_Decl(Decl *decl)
 static inline void Print_Stmt(Stmt *stmt)
 {
   PrettyPrint::Print_Stmt(stmt);
+}
+
+static inline bool Is_Loc_Before(const SourceLocation &a, const SourceLocation &b)
+{
+  return PrettyPrint::Is_Before(a, b);
 }

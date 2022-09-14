@@ -1,8 +1,9 @@
 #pragma once
 
+#include "MacroDepsFinder.hh"
+
 #include <clang/Tooling/Tooling.h>
 #include <clang/Analysis/CallGraph.h>
-#include <vector>
 #include <unordered_set>
 
 using namespace clang;
@@ -77,9 +78,13 @@ class FunctionDependencyFinder
         may be (?) the ideal datastructure for this.  */
     std::unordered_set<Decl*> Dependencies;
 
-    /* The AST that are being used in our analysis.  */
+    /** The AST that are being used in our analysis.  */
     std::unique_ptr<ASTUnit> AST;
 
+    /** Object holding information about analyzed macros.  */
+    MacroDependencyFinder MDF;
+
+    /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)
     { return Dependencies.find(decl) != Dependencies.end(); }
 };

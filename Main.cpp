@@ -39,18 +39,21 @@ int main(int argc, char **argv)
        "-I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/libopenssl1_1/1.1.1l-150400.7.7.1/src/openssl-1.1.1l/include",
        "-I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/libopenssl1_1/1.1.1l-150400.7.7.1/src/openssl-1.1.1l/",
        "-I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/libopenssl1_1/1.1.1l-150400.7.7.1/src/openssl-1.1.1l/ssl",
-
        "-fno-builtin", // clang interposes some glibc functions and then it fails to find the declaration of them.
+       "-Xclang", "-detailed-preprocessing-record",
     };
 
     std::unique_ptr<ASTUnit> ast = clang::tooling::buildASTFromCodeWithArgs
       (source_code, args);
     std::string funcname(argv[2]);
 
+    /* Set SourceManager to PrettyPrinter.  */
+    PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
+
     //FunctionDependencyFinder(std::move(ast), funcname);
     FunctionDependencyFinder(std::move(ast), funcname).Print();
 
-    delete (char *) source_code;
+    delete[] (char *) source_code;
   }
 
   return 0;
