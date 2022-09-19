@@ -18,7 +18,38 @@ void PrettyPrint::Print_Decl(Decl *decl)
     Out << "\n";
   } else if (t && t->getName() == "") {
     /* If the RecordType doesn't have a name, then don't print it.  */
-  } else if (!SM && td) {
+  } else if (td) {
+    if (SM) {
+    /* The Get_Source_Text will hang in the following case:
+      struct A {
+        int a;
+      }
+
+      typedef struct A A;
+
+      It generates the following code:
+
+      struct A {
+        int a;
+      }
+
+      typedef struct A {
+        int a;
+      } A;
+
+      which is a redefinition of struct A. Therefore we output the typedef manually.  */
+
+      TagDecl *tagdecl = td->getAnonDeclWithTypedefName();
+
+      if (tagdecl && tagdecl->getName() == "") {
+        Print_Decl_Raw(decl);
+        Out << ";\n";
+      } else {
+        decl->print(Out, PPolicy);
+        Out << ";\n";
+      }
+
+    } else {
 
     /* The AST dump will hang on the following case:
 
@@ -42,20 +73,21 @@ void PrettyPrint::Print_Decl(Decl *decl)
        This problem does not seem to show up if we are printing
        from source location.  */
 
-    TagDecl *tagdecl = td->getAnonDeclWithTypedefName();
-    StringRef tagname = "";
+      TagDecl *tagdecl = td->getAnonDeclWithTypedefName();
 
-    if (tagdecl) {
-      tagname = tagdecl->getName();
-      if (tagname == "") {
+      if (tagdecl && tagdecl->getName() == "") {
         Out << "typedef ";
         tagdecl->getDefinition()->print(Out, PPolicy);
         Out << " " << td->getName() << ";\n";
+      } else {
+        decl->print(Out, PPolicy);
+        Out << ";\n";
       }
-    } else {
-      Print_Decl_Raw(decl);
-      Out << ";\n";
     }
+
+  } else if (!SM && td) {
+
+
   } else {
     Print_Decl_Raw(decl);
     Out << ";\n";
