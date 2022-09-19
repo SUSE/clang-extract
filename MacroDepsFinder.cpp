@@ -6,48 +6,62 @@ MacroDependencyFinder::MacroDependencyFinder(Preprocessor &p)
 {
 }
 
-void MacroDependencyFinder::Print_Macros_Before(const SourceLocation &loc)
+void MacroDependencyFinder::Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc)
 {
-  return;
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */
   assert(rec && "PreprocessingRecord wasn't generated");
 
-  for (PreprocessedEntity *entity : *rec) {
-    if (MacroDefinitionRecord *macro = dyn_cast<MacroDefinitionRecord>(entity)) {
+  for (; it != rec->end(); ++it) {
+    MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(*it);
 
-      /* If we already passed the loc then quickly return.  */
-      if (PrettyPrint::Is_Before(loc, macro->getLocation())) {
-        return;
-      }
-
-      if (PrettyPrint::Is_Before(macro->getLocation(), loc)) {
-        if (Is_Macro_Marked(macro)) {
-          PrettyPrint::Print_Macro_Def(macro);
-        }
-      }
+    if (!entity || PrettyPrint::Is_Before(entity->getLocation(), loc)) {
+      continue;
+    } else {
+      /* We passed the location marker loc.  */
+      break;
     }
   }
 }
 
-void MacroDependencyFinder::Print_Macros_Between(const SourceLocation &begin, const SourceLocation &end)
+void MacroDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLocation &loc)
 {
-  SourceRange range(begin, end);
-  Print_Macros_Between(range);
-}
-
-void MacroDependencyFinder::Print_Macros_Between(const SourceRange &range)
-{
-  return;
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */
   assert(rec && "PreprocessingRecord wasn't generated");
 
-  for (PreprocessedEntity *entity : rec->getPreprocessedEntitiesInRange(range)) {
-    MacroDefinitionRecord *macro;
-    if (entity && (macro = dyn_cast<MacroDefinitionRecord>(entity))) {
+  for (; it != rec->end(); ++it) {
+    MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(*it);
+
+    /* If entity is not a vailid MacroDefinitionRecord then skip to next.  */
+    if (!entity) {
+      continue;
+    }
+
+    if (PrettyPrint::Is_Before(entity->getLocation(), loc)) {
+      if (Is_Macro_Marked(entity)) {
+        PrettyPrint::Print_Macro_Def(entity);
+      }
+    } else {
+      /* We passed the location marker loc.  */
+      break;
+    }
+  }
+}
+
+void MacroDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
+{
+  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
+
+  /* Ensure that PreprocessingRecord is avaialable.  */
+  assert(rec && "PreprocessingRecord wasn't generated");
+
+  for (; it != rec->end(); ++it) {
+    PreprocessedEntity *entity = *it;
+
+    if (MacroDefinitionRecord *macro = dyn_cast<MacroDefinitionRecord>(entity)) {
       if (Is_Macro_Marked(macro)) {
         PrettyPrint::Print_Macro_Def(macro);
       }
@@ -55,27 +69,14 @@ void MacroDependencyFinder::Print_Macros_Between(const SourceRange &range)
   }
 }
 
-void MacroDependencyFinder::Print_Macros_After(const SourceLocation &loc)
-{
-  return;
-  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
-
-  /* Ensure that PreprocessingRecord is avaialable.  */
-  assert(rec && "PreprocessingRecord wasn't generated");
-
-  for (PreprocessedEntity *entity : *rec) {
-    if (MacroDefinitionRecord *macro = dyn_cast<MacroDefinitionRecord>(entity)) {
-      if (PrettyPrint::Is_Before(loc, macro->getLocation())) {
-        if (Is_Macro_Marked(macro)) {
-          PrettyPrint::Print_Macro_Def(macro);
-        }
-      }
-    }
-  }
-}
-
 void MacroDependencyFinder::Find_Macros_Required(ASTUnit *ast)
 {
+  /* If a SourceManager wasn't passed to the PrettyPrint class we cannot
+     continue.  */
+  if (PrettyPrint::Get_Source_Manager() == nullptr) {
+    return;
+  }
+
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */

@@ -91,7 +91,10 @@ void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
 
 /** Private stuff.  */
 
-StringRef PrettyPrint::Get_Source_Text(const SourceRange &range) {
+StringRef PrettyPrint::Get_Source_Text(const SourceRange &range)
+{
+    /* Calling this function supposes that a SourceManager was given to this class.  */
+    assert(SM && "A SourceManager wasn't passed to PrettyPrint.");
 
     // NOTE: sm.getSpellingLoc() used in case the range corresponds to a macro/preprocessed source.
     // NOTE2: getSpellingLoc() breaks in the case where a macro was asigned to be expanded to typedef.
@@ -114,6 +117,15 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
   BeforeThanCompare<SourceLocation> is_before(*SM);
   return is_before(a, b);
 }
+
+/** Compare if SourceLocation a is after SourceLocation b in the source code.  */
+bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
+{
+  assert(SM && "No SourceManager were given");
+  BeforeThanCompare<SourceLocation> is_before(*SM);
+  return is_before(b, a);
+}
+
 
 
 /* See PrettyPrint.hh for what they do.  */

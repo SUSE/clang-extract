@@ -303,26 +303,39 @@ void FunctionDependencyFinder::Print()
   SourceLocation last_decl_loc;
   bool first = true;
 
+  /* We can only print macros if we have a SourceManager.  */
+  bool can_print_macros = (PrettyPrint::Get_Source_Manager() != nullptr);
+
+  MacroIterator macro_it = MDF.Get_Macro_Iterator();
   clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
 
     if (Is_Decl_Marked(decl)) {
-      /* In the first decl we don't have a last source location, hence we have
-         to handle this special case.  */
-      if (first) {
-        MDF.Print_Macros_Before(decl->getBeginLoc());
-        first = false;
-      } else {
-        MDF.Print_Macros_Between(last_decl_loc, decl->getBeginLoc());
+      if (can_print_macros) {
+        /* In the first decl we don't have a last source location, hence we have
+           to handle this special case.  */
+        if (first) {
+          MDF.Print_Macros_Until(macro_it, decl->getBeginLoc());
+          first = false;
+        } else {
+          /* Macros defined inside a function is printed together with the function,
+             so we must skip them.  */
+          MDF.Skip_Macros_Until(macro_it, last_decl_loc);
+
+          MDF.Print_Macros_Until(macro_it, decl->getBeginLoc());
+        }
       }
       last_decl_loc = decl->getEndLoc();
       PrettyPrint::Print_Decl(decl);
     }
   }
 
-  /* Print remaining macros.  */
-  MDF.Print_Macros_After(last_decl_loc);
+  if (can_print_macros) {
+    MDF.Skip_Macros_Until(macro_it, last_decl_loc);
+    /* Print remaining macros.  */
+    MDF.Print_Remaining_Macros(macro_it);
+  }
 }
 
 void FunctionDependencyFinder::Run_Analysis(std::string const &function)

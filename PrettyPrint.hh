@@ -38,25 +38,29 @@ class PrettyPrint
 
   /** Gets the portion of the code that corresponds to given SourceRange, including the
       last token. Returns expanded macros.
-     
+
       @see get_source_text_raw().  */
   static StringRef Get_Source_Text(const SourceRange &range);
 
   /** Gets the portion of the code that corresponds to given SourceRange exactly as
       the range is given.
-   
-      @warning The end location of the SourceRange returned by some Clang functions 
+
+      @warning The end location of the SourceRange returned by some Clang functions
       (such as clang::Expr::getSourceRange) might actually point to the first character
       (the "location") of the last token of the expression, rather than the character
       past-the-end of the expression like clang::Lexer::getSourceText expects.
       get_source_text_raw() does not take this into account. Use get_source_text()
       instead if you want to get the source text including the last token.
-   
+
       @warning This function does not obtain the source of a macro/preprocessor expansion.
       Use get_source_text() for that.   */
   static StringRef Get_Source_Text_Raw(const SourceRange &range);
 
+  /** Check if SourceLocation a is located before than b in the SourceCode.  */
   static bool Is_Before(const SourceLocation &a, const SourceLocation &b);
+
+  /** Check if SourceLocation a is located after than b in the SourceCode.  */
+  static bool Is_After(const SourceLocation &a, const SourceLocation &b);
 
   /* This class can not be initialized.  */
   PrettyPrint() = delete;
