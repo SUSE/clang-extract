@@ -47,7 +47,8 @@ int main(int argc, char **argv)
       (source_code, args);
     std::string funcname(argv[2]);
 
-    /* Set SourceManager to PrettyPrinter.  */
+    /* Set SourceManager to PrettyPrinter.  This is important to get Macro
+       support working.  */
     PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
 
     //FunctionDependencyFinder(std::move(ast), funcname);

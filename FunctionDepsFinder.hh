@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MacroDepsFinder.hh"
+#include "EnumConstTbl.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Analysis/CallGraph.h>
@@ -71,6 +72,18 @@ class FunctionDependencyFinder
     /* Add TypeDecl to the list of dependencies.  */
     bool Handle_TypeDecl(TypeDecl *decl);
 
+  /* Handle the corner case where an array was declared as something like
+
+    enum {
+      const1 = 1,
+    };
+
+    int var[const1];
+
+    in which clang will unfortunatelly expands const1 to 1 and lose the
+    EnumConstantDecl in this case, forcing us to reparse this declaration.  */
+    bool Handle_Array_Size(ValueDecl *decl);
+
     /** Datastructure holding all Decls required for the functions. This is
         then used to mark which Decls we need to output.
 
@@ -83,6 +96,11 @@ class FunctionDependencyFinder
 
     /** Object holding information about analyzed macros.  */
     MacroDependencyFinder MDF;
+
+    /** Object holding information about constant enum symbols and a mapping to
+        they original enum object.  */
+    EnumConstantTable EnumTable;
+
 
     /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)

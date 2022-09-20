@@ -85,9 +85,6 @@ void PrettyPrint::Print_Decl(Decl *decl)
       }
     }
 
-  } else if (!SM && td) {
-
-
   } else {
     Print_Decl_Raw(decl);
     Out << ";\n";

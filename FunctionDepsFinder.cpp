@@ -1,6 +1,7 @@
 #include "FunctionDepsFinder.hh"
 #include "PrettyPrint.hh"
 #include "clang/Analysis/CallGraph.h"
+#include "clang/Sema/IdentifierResolver.h"
 
 /** Build CallGraph from AST.
  *
@@ -95,11 +96,28 @@ void FunctionDependencyFinder::Compute_Closure(void)
     }
   }
 
-  /* Finally iterate through all function definitions and trigger the
+  /* Iterate through all function definitions and trigger the
      RecordDecl dependency tracker.  */
   for (size_t i = 0; i < n; i++) {
     FunctionDecl *decl = dependencies[i]->getAsFunction();
     Mark_Types_In_Function_Body(decl->getBody());
+  }
+
+  /* Handle the corner case where an global array was declared as
+
+    enum {
+      const1 = 1,
+    }
+
+    int var[cost1];
+
+    in which clang will unfortunatelly expands const1 to 1 and lose the
+    EnumConstantDecl in this case, forcing us to reparse this declaration.  */
+  for (Decl *decl: Dependencies) {
+    VarDecl *vardecl = dynamic_cast<VarDecl *>(decl);
+    if (vardecl) {
+      Handle_Array_Size(vardecl);
+    }
   }
 }
 
@@ -145,7 +163,7 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
 
   if (type->isFunctionProtoType()) {
     /* Handle function prototypes.  Can appear in typedefs or struct keys
-       in ways like this: 
+       in ways like this:
 
         typedef int (*GEN_SESSION_CB)(int *, unsigned char *, unsigned int *);
 
@@ -208,6 +226,7 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
     clang::RecordDecl::field_iterator it;
     for (it = rdecl->field_begin(); it != rdecl->field_end(); ++it) {
       ValueDecl *valuedecl = *it;
+      Handle_Array_Size(valuedecl);
 
       Add_Type_And_Depends(valuedecl->getType().getTypePtr());
     }
@@ -236,17 +255,23 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     type = valuedecl->getType().getTypePtr();
 
   } else if (DeclRefExpr::classof(stmt)) {
-    /* Handle global variables.  */
+    /* Handle global variables and references to an enum.  */
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
-    VarDecl *decl = dynamic_cast<VarDecl *>(expr->getDecl());
+    ValueDecl *decl = expr->getDecl();
 
-    if (decl && decl->hasGlobalStorage()) {
-      /* Add type of the global variable.  */
+    if (decl) {
       type = decl->getType().getTypePtr();
+      Decl *to_mark = decl;
 
-      /* Add the global variable itself if not already marked.  */
-      if (!Is_Decl_Marked(decl))
-        Add_Decl_And_Prevs(decl);
+      /* If the decl is a reference to an enum field then we must add the
+         enum declaration instead.  */
+      if (EnumConstantDecl *ecdecl = dynamic_cast<EnumConstantDecl *>(decl)) {
+        to_mark = EnumTable.Get(ecdecl);
+        assert(to_mark && "Reference to EnumDecl not in EnumTable.");
+      }
+
+      if (!Is_Decl_Marked(to_mark))
+        Add_Decl_And_Prevs(to_mark);
     }
 
   } else if (Expr::classof(stmt)) {
@@ -275,7 +300,8 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 FunctionDependencyFinder::FunctionDependencyFinder(std::unique_ptr<ASTUnit> ast,
                                                    std::string const &function)
   : AST(std::move(ast)),
-    MDF(AST->getPreprocessor())
+    MDF(AST->getPreprocessor()),
+    EnumTable(AST.get())
 {
   Run_Analysis(function);
 }
@@ -336,6 +362,46 @@ void FunctionDependencyFinder::Print()
     /* Print remaining macros.  */
     MDF.Print_Remaining_Macros(macro_it);
   }
+}
+
+bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
+{
+  if (decl == nullptr)
+    return false;
+
+  /* We can't continue if no SourceManager was provided to the PrettyPrint
+     class.  */
+  if (PrettyPrint::Get_Source_Manager() == nullptr) {
+    return false;
+  }
+
+  /* If the type is not an Array Type then there is no point in doing this
+     analysis.  */
+  const Type *type = decl->getType().getTypePtr();
+  if (!type->isConstantArrayType()) {
+    return false;
+  }
+
+
+  StringRef str = PrettyPrint::Get_Source_Text(decl->getSourceRange());
+  size_t first_openbrk = str.find("[");
+  size_t first_closebrk = str.find("]", first_openbrk);
+  long str_size = first_closebrk - first_openbrk - 1;
+
+  assert(str_size >= 0);
+
+  StringRef substr = str.substr(first_openbrk + 1, str_size);
+
+  /* FIXME: Don't assume that the entire substring is the identifier. Instead
+     do some tokenization, either by using something similar to strtok or
+     implementing a small Recursive-Descent parser on the classical LL(1)
+     arithmetic grammar which is able to parse arithmetic expressions.  */
+  EnumDecl *enum_decl = EnumTable.Get(substr);
+  if (enum_decl && !Is_Decl_Marked(enum_decl)) {
+    Add_Decl_And_Prevs(enum_decl);
+  }
+
+  return true;
 }
 
 void FunctionDependencyFinder::Run_Analysis(std::string const &function)
