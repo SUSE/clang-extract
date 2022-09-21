@@ -26,7 +26,8 @@ using namespace clang;
  *
 */
 
-class EnumConstantTable {
+class EnumConstantTable
+{
   public:
 
   /* Construct with empty table.  */

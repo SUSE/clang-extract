@@ -26,6 +26,8 @@ class PrettyPrint
   /** Print a Macro Defintion into ostream `Out`.  */
   static void Print_Macro_Def(MacroDefinitionRecord *rec);
 
+  static void Print_MacroInfo(MacroInfo *info);
+
   static inline void Set_Source_Manager(SourceManager *sm)
   {
     SM = sm;

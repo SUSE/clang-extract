@@ -51,7 +51,6 @@ int main(int argc, char **argv)
        support working.  */
     PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
 
-    //FunctionDependencyFinder(std::move(ast), funcname);
     FunctionDependencyFinder(std::move(ast), funcname).Print();
 
     delete[] (char *) source_code;

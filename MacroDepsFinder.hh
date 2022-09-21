@@ -2,6 +2,7 @@
 
 #include <clang/Tooling/Tooling.h>
 #include <unordered_set>
+#include <unordered_map>
 
 using namespace clang;
 
@@ -55,13 +56,52 @@ class MacroDependencyFinder
 
   private:
 
+  /** Macros can expand into other macros, which must be expanded as well in a tree
+      like fashion.  We don't implement such tree, so we track every macro that
+      should be expanded as well by analyzing the sequence of tokens it produces.  */
+  bool Backtrack_Macro_Expansion(MacroExpansion *macroexp);
+
+  /** Use the name of the macro as argument, as well as the expansion location.
+      Macros can be redefined in weird ways such as:
+
+      #define MAX(a, b) ((a) > (b) ? (a) : (b))
+      #define A 3
+      #define U MAX(A, 2)
+
+      int f() {
+        return U;
+      }
+
+      #define A 2
+
+      int g() {
+        return U;
+      }
+
+      One may think that functions f and g produce the same result, but actually
+      they don't. Since macro A is redefined, the expansion of MAX(A, 2) will
+      will have its value changed.  We take this into account by looking at the
+      location where the macro is expanded. In `f` it will discard the last
+      definition of A and get the last one above the expansion of U.  */
+  bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
+
+  /** The object which holds the macro arguments is the MacroInfo.  Get the
+      MacroInfo being extra careful to not pick the last definition, since
+      macros can be redefined.  */
+  MacroInfo *Get_Macro_Info(MacroDefinitionRecord *record);
+  MacroInfo *Get_Macro_Info(MacroExpansion *macroexp);
+  MacroInfo *Get_Macro_Info(const IdentifierInfo *id, const SourceLocation &loc);
+
   /** Preprocessor object used to parse the source file.  */
   Preprocessor &PProcessor;
 
   /* Hash containing the macros that are marked for output.  */
-  std::unordered_set<MacroDefinitionRecord*> Dependencies;
+  std::unordered_set<MacroInfo*> Dependencies;
+
+  /** Dump the Dependencies set for debug purposes.  */
+  void Dump_Dependencies(void);
 
   /* Determine if a macro that are marked for output.  */
-  inline bool Is_Macro_Marked(MacroDefinitionRecord *prerec)
-  { return Dependencies.find(prerec) != Dependencies.end(); }
+  inline bool Is_Macro_Marked(MacroInfo *x)
+  { return Dependencies.find(x) != Dependencies.end(); }
 };

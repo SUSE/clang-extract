@@ -118,6 +118,12 @@ void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
   Out << "#define  " << Get_Source_Text(rec->getSourceRange()) << "\n";
 }
 
+void PrettyPrint::Print_MacroInfo(MacroInfo *info)
+{
+  SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
+  Out << " info: " << Get_Source_Text(range) << '\n';
+}
+
 /** Private stuff.  */
 
 StringRef PrettyPrint::Get_Source_Text(const SourceRange &range)
@@ -154,7 +160,6 @@ bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
   BeforeThanCompare<SourceLocation> is_before(*SM);
   return is_before(b, a);
 }
-
 
 
 /* See PrettyPrint.hh for what they do.  */

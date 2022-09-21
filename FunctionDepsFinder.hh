@@ -105,4 +105,6 @@ class FunctionDependencyFinder
     /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)
     { return Dependencies.find(decl) != Dependencies.end(); }
+
+    friend class MacroDependencyFinder;
 };
