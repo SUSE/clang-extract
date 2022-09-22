@@ -69,6 +69,8 @@ class PrettyPrint
 
   private:
 
+  static bool Is_Range_Valid(const SourceRange &loc);
+
   /** Output object to where this class will output to.  Current default is the
       same as llvm::outs().  */
   static raw_ostream &Out;

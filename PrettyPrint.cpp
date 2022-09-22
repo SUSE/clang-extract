@@ -91,15 +91,32 @@ void PrettyPrint::Print_Decl(Decl *decl)
   }
 }
 
+bool PrettyPrint::Is_Range_Valid(const SourceRange &range)
+{
+  const SourceLocation begin = range.getBegin();
+  const SourceLocation end = range.getEnd();
+
+  return Is_Before(begin, end) && (begin != end);
+}
+
 void PrettyPrint::Print_Decl_Raw(Decl *decl)
 {
   SourceRange decl_range = decl->getSourceRange();
 
   /* If a SourceManager was specified and the decl source range seems valid,
      then output based on the original source code.  */
-  if (SM && Is_Before(decl_range.getBegin(), decl_range.getEnd())) {
+  if (SM && Is_Range_Valid(decl_range)) {
     StringRef decl_source = Get_Source_Text(decl_range);
-    Out << decl_source;
+
+    /* If for some reason Get_Source_Text is unable to find the source range
+       which comes this declaration because it is very complex, then fall back
+       to AST dump.  */
+    if (decl_source.equals("")) {
+      /* TODO: warn user that we had to fallback to AST dump.  */
+      decl->print(Out, LangOpts);
+    } else {
+      Out << decl_source;
+    }
   } else {
     /* Else, we fallback to AST Dumping.  */
     decl->print(Out, LangOpts);

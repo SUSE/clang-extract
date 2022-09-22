@@ -1,6 +1,8 @@
 #include "MacroDepsFinder.hh"
+#include "FunctionDepsFinder.hh"
 #include "PrettyPrint.hh"
 #include <iostream>
+
 
 MacroDependencyFinder::MacroDependencyFinder(Preprocessor &p)
   : PProcessor(p)
@@ -185,7 +187,7 @@ MacroInfo *MacroDependencyFinder::Get_Macro_Info(const IdentifierInfo *id, const
   return nullptr;
 }
 
-void MacroDependencyFinder::Find_Macros_Required(ASTUnit *ast)
+void MacroDependencyFinder::Find_Macros_Required(FunctionDependencyFinder *fdf, ASTUnit *ast)
 {
   /* If a SourceManager wasn't passed to the PrettyPrint class we cannot
      continue.  */
@@ -202,12 +204,29 @@ void MacroDependencyFinder::Find_Macros_Required(ASTUnit *ast)
      in the given ast.  */
   assert(&PProcessor == &ast->getPreprocessor());
 
-  /* For now add all macros that are expanded.  We need a proper analysis about
-     which macros are necessary.  */
-  for (PreprocessedEntity *entity : *rec) {
-    if (MacroExpansion *macroexp = dyn_cast<MacroExpansion>(entity)) {
-      Backtrack_Macro_Expansion(macroexp);
+  clang::ASTUnit::top_level_iterator it = ast->top_level_begin();
+  clang::PreprocessingRecord::iterator macro_it = rec->begin();
+
+  while (it != ast->top_level_end()) {
+    Decl *decl = *it;
+
+    if (decl && fdf->Is_Decl_Marked(decl)) {
+      PreprocessedEntity *entity = *macro_it;
+
+      /* While the macro is before the end limit of the decl range, then:  */
+      while (entity && PrettyPrint::Is_Before(entity->getSourceRange().getBegin(), decl->getEndLoc())) {
+        /* If the macro location is in the Decl (function, variable, ...) range,
+           then analyze this macro and its dependencies.  */
+        if (decl->getSourceRange().fullyContains(entity->getSourceRange())) {
+          if (MacroExpansion *macroexp = dyn_cast<MacroExpansion>(entity)) {
+            Backtrack_Macro_Expansion(macroexp);
+          }
+        }
+
+        entity = *(++macro_it);
+      }
     }
+    it++;
   }
 }
 

@@ -4,6 +4,8 @@
 #include <unordered_set>
 #include <unordered_map>
 
+class FunctionDependencyFinder;
+
 using namespace clang;
 
 /** Shorthand to an iterator for the PreprocessingRecord.  */
@@ -48,7 +50,7 @@ class MacroDependencyFinder
   void Print_Remaining_Macros(MacroIterator &it);
 
   /** Run the analysis to find which preprocessed directives are needed.  */
-  void Find_Macros_Required(ASTUnit *ast);
+  void Find_Macros_Required(FunctionDependencyFinder *fdf, ASTUnit *ast);
 
   /** Return a new MacroIterator.  */
   inline MacroIterator Get_Macro_Iterator()

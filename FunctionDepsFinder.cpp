@@ -248,12 +248,15 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     DeclStmt *declstmt = (DeclStmt *) stmt;
 
     /* Get Decl object from DeclStmt.  */
-    Decl *decl = declstmt->getSingleDecl();
+    const DeclGroupRef decl_group = declstmt->getDeclGroup();
+    for (Decl *decl : decl_group) {
+      /* Look into the type for a RecordDecl.  */
+      ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl);
+      type = valuedecl->getType().getTypePtr();
+      Add_Type_And_Depends(type);
+    }
 
-    /* Look into the type for a RecordDecl.  */
-    ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl);
-    type = valuedecl->getType().getTypePtr();
-
+    type = nullptr;
   } else if (DeclRefExpr::classof(stmt)) {
     /* Handle global variables and references to an enum.  */
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
@@ -417,7 +420,7 @@ void FunctionDependencyFinder::Run_Analysis(std::string const &function)
   Compute_Closure();
 
   /* Step 4: Find all preprocessor directives reachable by this boundary.  */
-  MDF.Find_Macros_Required(AST.get());
+  MDF.Find_Macros_Required(this, AST.get());
 
   delete cg;
 }
