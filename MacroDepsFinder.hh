@@ -3,13 +3,17 @@
 #include <clang/Tooling/Tooling.h>
 #include <unordered_set>
 #include <unordered_map>
+#include <vector>
 
 class FunctionDependencyFinder;
 
 using namespace clang;
 
-/** Shorthand to an iterator for the PreprocessingRecord.  */
-typedef clang::PreprocessingRecord::iterator MacroIterator;
+struct MacroIterator
+{
+  clang::PreprocessingRecord::iterator macro_it;
+  int undef_it;
+};
 
 /** Macro Dependency Finder.
  *
@@ -43,7 +47,7 @@ class MacroDependencyFinder
 
   /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
       printing all macros reached in this path.  */
-  void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc);
+  void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print = true);
 
   /** Iterate on the PreprocessingRecord through `it` until the end of the
       PreprocessingRecord is reached, printing all macros reached in this path.  */
@@ -53,8 +57,7 @@ class MacroDependencyFinder
   void Find_Macros_Required(FunctionDependencyFinder *fdf, ASTUnit *ast);
 
   /** Return a new MacroIterator.  */
-  inline MacroIterator Get_Macro_Iterator()
-  { return PProcessor.getPreprocessingRecord()->begin(); };
+  MacroIterator Get_Macro_Iterator(void);
 
   private:
 
@@ -94,11 +97,21 @@ class MacroDependencyFinder
   MacroInfo *Get_Macro_Info(MacroExpansion *macroexp);
   MacroInfo *Get_Macro_Info(const IdentifierInfo *id, const SourceLocation &loc);
 
+  MacroDirective* Get_Macro_Directive(MacroDefinitionRecord *record);
+
+  /* Populate the NeedsUndef vector whith macros that needs to be undefined
+     somewhere in the code.  */
+  int Populate_Need_Undef(void);
+
   /** Preprocessor object used to parse the source file.  */
   Preprocessor &PProcessor;
 
   /* Hash containing the macros that are marked for output.  */
   std::unordered_set<MacroInfo*> Dependencies;
+
+  /* Vector of MacroDirective of macros that needs to be undefined somewhere in
+     the code.  */
+  std::vector<MacroDirective*> NeedsUndef;
 
   /** Dump the Dependencies set for debug purposes.  */
   void Dump_Dependencies(void);

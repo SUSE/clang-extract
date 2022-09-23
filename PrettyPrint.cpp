@@ -135,6 +135,13 @@ void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
   Out << "#define  " << Get_Source_Text(rec->getSourceRange()) << "\n";
 }
 
+void PrettyPrint::Print_Macro_Undef(MacroDirective *directive)
+{
+  SourceLocation loc = directive->getDefinition().getUndefLocation();
+  assert(loc.isValid() && "Undefine location is invalid");
+  Out << "#undef " << Get_Source_Text(loc) << '\n';
+}
+
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());

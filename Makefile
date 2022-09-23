@@ -1,5 +1,5 @@
 CXX=clang++
-CXXFLAGS=-Wall -g
+CXXFLAGS=-Wall -g -fsanitize=address
 LDFLAGS=-lclang-cpp -lclang -lLLVM
 
 OBJECTS=Main.o PrettyPrint.o FunctionDepsFinder.o MacroDepsFinder.o EnumConstTbl.o
