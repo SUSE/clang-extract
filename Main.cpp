@@ -1,5 +1,6 @@
 #include "PrettyPrint.hh"
 #include "FunctionDepsFinder.hh"
+#include "MacroDepsFinder.hh"
 
 #include "clang/Tooling/Tooling.h"
 #include "clang/Analysis/CallGraph.h"
@@ -47,11 +48,16 @@ int main(int argc, char **argv)
       (source_code, args);
     std::string funcname(argv[2]);
 
-    /* Set SourceManager to PrettyPrinter.  This is important to get Macro
-       support working.  */
-    PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
 
-    FunctionDependencyFinder(std::move(ast), funcname).Print();
+    const bool macros_enabled = true;
+    if (macros_enabled) {
+      /* Set SourceManager to PrettyPrinter.  This is important to get Macro
+         support working.  */
+      PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
+      MacroDependencyFinder(std::move(ast), funcname).Print();
+    } else {
+      FunctionDependencyFinder(std::move(ast), funcname).Print();
+    }
 
     delete[] (char *) source_code;
   }

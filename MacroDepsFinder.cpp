@@ -3,10 +3,14 @@
 #include "PrettyPrint.hh"
 #include <iostream>
 
+#define PProcessor (AST->getPreprocessor())
 
-MacroDependencyFinder::MacroDependencyFinder(Preprocessor &p)
-  : PProcessor(p)
+MacroDependencyFinder::MacroDependencyFinder(std::unique_ptr<ASTUnit> ast, std::string const &function) 
+  : FunctionDependencyFinder(std::move(ast), function)
 {
+  /* The call to the parent constructor builds the dependency set of functions
+     and types.  Now build the macro dependency list.  */
+  Find_Macros_Required();
 }
 
 MacroIterator MacroDependencyFinder::Get_Macro_Iterator(void)
@@ -85,6 +89,46 @@ void MacroDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
   Print_Macros_Until(it, loc, true);
 }
 
+void MacroDependencyFinder::Print(void)
+{
+  SourceLocation last_decl_loc;
+  bool first = true;
+
+  /* We can only print macros if we have a SourceManager.  */
+  bool can_print_macros = (PrettyPrint::Get_Source_Manager() != nullptr);
+
+  MacroIterator macro_it = Get_Macro_Iterator();
+  clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    Decl *decl = *it;
+
+    if (Is_Decl_Marked(decl)) {
+      if (can_print_macros) {
+        /* In the first decl we don't have a last source location, hence we have
+           to handle this special case.  */
+        if (first) {
+          Print_Macros_Until(macro_it, decl->getBeginLoc());
+          first = false;
+        } else {
+          /* Macros defined inside a function is printed together with the function,
+             so we must skip them.  */
+          Skip_Macros_Until(macro_it, last_decl_loc);
+
+          Print_Macros_Until(macro_it, decl->getBeginLoc());
+        }
+      }
+      last_decl_loc = decl->getEndLoc();
+      PrettyPrint::Print_Decl(decl);
+    }
+  }
+
+  if (can_print_macros) {
+    Skip_Macros_Until(macro_it, last_decl_loc);
+    /* Print remaining macros.  */
+    Print_Remaining_Macros(macro_it);
+  }
+}
+
 bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
 {
   MacroInfo *info = Get_Macro_Info(macroexp);
@@ -116,7 +160,7 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
   /* If this MacroInfo object with the macro contents wasn't marked for output
      then mark it now.  */
   if (!Is_Macro_Marked(info)) {
-    Dependencies.insert(info);
+    MacroDependencies.insert(info);
     inserted = true;
   }
 
@@ -231,30 +275,24 @@ int MacroDependencyFinder::Populate_Need_Undef(void)
   return count;
 }
 
-void MacroDependencyFinder::Find_Macros_Required(FunctionDependencyFinder *fdf, ASTUnit *ast)
+void MacroDependencyFinder::Find_Macros_Required(void)
 {
   /* If a SourceManager wasn't passed to the PrettyPrint class we cannot
      continue.  */
-  if (PrettyPrint::Get_Source_Manager() == nullptr) {
-    return;
-  }
+  assert(PrettyPrint::Get_Source_Manager() != nullptr);
 
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */
   assert(rec && "PreprocessingRecord wasn't generated");
 
-  /* Ensure that the Preprocessor object in this class is the same as the one
-     in the given ast.  */
-  assert(&PProcessor == &ast->getPreprocessor());
-
-  clang::ASTUnit::top_level_iterator it = ast->top_level_begin();
+  clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
   clang::PreprocessingRecord::iterator macro_it = rec->begin();
 
-  while (it != ast->top_level_end()) {
+  while (it != AST->top_level_end()) {
     Decl *decl = *it;
 
-    if (decl && fdf->Is_Decl_Marked(decl)) {
+    if (decl && Is_Decl_Marked(decl)) {
       PreprocessedEntity *entity = *macro_it;
 
       /* While the macro is before the end limit of the decl range, then:  */
@@ -280,7 +318,7 @@ void MacroDependencyFinder::Find_Macros_Required(FunctionDependencyFinder *fdf, 
 void MacroDependencyFinder::Dump_Dependencies(void)
 {
   std::unordered_set<MacroInfo*>::iterator itr;
-  for (itr = Dependencies.begin(); itr != Dependencies.end(); itr++) {
+  for (itr = MacroDependencies.begin(); itr != MacroDependencies.end(); itr++) {
     PrettyPrint::Print_MacroInfo(*itr);
     std::cout << '\n';
   }

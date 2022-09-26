@@ -1,6 +1,5 @@
 #pragma once
 
-#include "MacroDepsFinder.hh"
 #include "EnumConstTbl.hh"
 
 #include <clang/Tooling/Tooling.h>
@@ -42,7 +41,7 @@ class FunctionDependencyFinder
     /** Print the marked nodes as they appear in the AST.  */
     void Print();
 
-  private:
+  protected:
     /** Run the analysis on function `function`*/
     void Run_Analysis(std::string const &function);
 
@@ -94,9 +93,6 @@ class FunctionDependencyFinder
     /** The AST that are being used in our analysis.  */
     std::unique_ptr<ASTUnit> AST;
 
-    /** Object holding information about analyzed macros.  */
-    MacroDependencyFinder MDF;
-
     /** Object holding information about constant enum symbols and a mapping to
         they original enum object.  */
     EnumConstantTable EnumTable;
@@ -105,6 +101,4 @@ class FunctionDependencyFinder
     /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)
     { return Dependencies.find(decl) != Dependencies.end(); }
-
-    friend class MacroDependencyFinder;
 };

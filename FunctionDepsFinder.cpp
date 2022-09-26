@@ -303,7 +303,6 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 FunctionDependencyFinder::FunctionDependencyFinder(std::unique_ptr<ASTUnit> ast,
                                                    std::string const &function)
   : AST(std::move(ast)),
-    MDF(AST->getPreprocessor()),
     EnumTable(AST.get())
 {
   Run_Analysis(function);
@@ -329,41 +328,13 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
 /** Pretty print all nodes were marked to output.  */
 void FunctionDependencyFinder::Print()
 {
-  SourceLocation last_decl_loc;
-  bool first = true;
-
-  /* We can only print macros if we have a SourceManager.  */
-  bool can_print_macros = (PrettyPrint::Get_Source_Manager() != nullptr);
-
-  MacroIterator macro_it = MDF.Get_Macro_Iterator();
   clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
 
     if (Is_Decl_Marked(decl)) {
-      if (can_print_macros) {
-        /* In the first decl we don't have a last source location, hence we have
-           to handle this special case.  */
-        if (first) {
-          MDF.Print_Macros_Until(macro_it, decl->getBeginLoc());
-          first = false;
-        } else {
-          /* Macros defined inside a function is printed together with the function,
-             so we must skip them.  */
-          MDF.Skip_Macros_Until(macro_it, last_decl_loc);
-
-          MDF.Print_Macros_Until(macro_it, decl->getBeginLoc());
-        }
-      }
-      last_decl_loc = decl->getEndLoc();
       PrettyPrint::Print_Decl(decl);
     }
-  }
-
-  if (can_print_macros) {
-    MDF.Skip_Macros_Until(macro_it, last_decl_loc);
-    /* Print remaining macros.  */
-    MDF.Print_Remaining_Macros(macro_it);
   }
 }
 
@@ -418,9 +389,6 @@ void FunctionDependencyFinder::Run_Analysis(std::string const &function)
   /* Step 3: Find all Global variables and Types required by the functions
      that are currently in the Dependencies set..  */
   Compute_Closure();
-
-  /* Step 4: Find all preprocessor directives reachable by this boundary.  */
-  MDF.Find_Macros_Required(this, AST.get());
 
   delete cg;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FunctionDepsFinder.hh"
+
 #include <clang/Tooling/Tooling.h>
 #include <unordered_set>
 #include <unordered_map>
@@ -34,27 +36,28 @@ struct MacroIterator
  * `-Xclang -detailed-preprocessing-record` must be passed do clang.
  *
  */
-class MacroDependencyFinder
+class MacroDependencyFinder : public FunctionDependencyFinder
 {
   public:
+  MacroDependencyFinder(std::unique_ptr<ASTUnit> ast, std::string const &function);
 
-  /** Constructor which must take the Preprocessor used to parse the source
-      file.  From an ASTUnit, one can provide the AST->getPreprocessor().  */
-  MacroDependencyFinder(Preprocessor &p);
+  void Print(void);
+
+  protected:
 
   /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
   void Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc);
 
   /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
       printing all macros reached in this path.  */
-  void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print = true);
+  void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print=true);
 
   /** Iterate on the PreprocessingRecord through `it` until the end of the
       PreprocessingRecord is reached, printing all macros reached in this path.  */
   void Print_Remaining_Macros(MacroIterator &it);
 
   /** Run the analysis to find which preprocessed directives are needed.  */
-  void Find_Macros_Required(FunctionDependencyFinder *fdf, ASTUnit *ast);
+  void Find_Macros_Required(void);
 
   /** Return a new MacroIterator.  */
   MacroIterator Get_Macro_Iterator(void);
@@ -103,11 +106,8 @@ class MacroDependencyFinder
      somewhere in the code.  */
   int Populate_Need_Undef(void);
 
-  /** Preprocessor object used to parse the source file.  */
-  Preprocessor &PProcessor;
-
   /* Hash containing the macros that are marked for output.  */
-  std::unordered_set<MacroInfo*> Dependencies;
+  std::unordered_set<MacroInfo*> MacroDependencies;
 
   /* Vector of MacroDirective of macros that needs to be undefined somewhere in
      the code.  */
@@ -118,5 +118,5 @@ class MacroDependencyFinder
 
   /* Determine if a macro that are marked for output.  */
   inline bool Is_Macro_Marked(MacroInfo *x)
-  { return Dependencies.find(x) != Dependencies.end(); }
+  { return MacroDependencies.find(x) != MacroDependencies.end(); }
 };
