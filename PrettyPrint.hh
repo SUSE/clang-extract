@@ -20,6 +20,9 @@ class PrettyPrint
   /** Print Decl node as is, without any kind of processing.  */
   static void Print_Decl_Raw(Decl *decl);
 
+  static inline void Print_Decl_Tree(Decl *decl)
+  { decl->print(Out, PPolicy); Out << '\n'; }
+
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
 
@@ -39,6 +42,11 @@ class PrettyPrint
   static inline SourceManager *Get_Source_Manager(void)
   {
     return SM;
+  }
+
+  static inline LangOptions &Get_Lang_Options(void)
+  {
+    return LangOpts;
   }
 
   /** Gets the portion of the code that corresponds to given SourceRange, including the

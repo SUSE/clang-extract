@@ -5,8 +5,8 @@
 
 #define PProcessor (AST->getPreprocessor())
 
-MacroDependencyFinder::MacroDependencyFinder(std::unique_ptr<ASTUnit> ast, std::string const &function) 
-  : FunctionDependencyFinder(std::move(ast), function)
+MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::string const &function) 
+  : FunctionDependencyFinder(ast, function)
 {
   /* The call to the parent constructor builds the dependency set of functions
      and types.  Now build the macro dependency list.  */
@@ -168,7 +168,11 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
      which this macro depends on may have been redefined in meanwhile, and
      we don't implement some dependency tracking so far, so redo the analysis.  */
 
+#ifdef libclang13
   clang::MacroInfo::tokens_iterator it;
+#else
+  clang::MacroInfo::const_tokens_iterator it;
+#endif
   /* Iterate on the expansion tokens of this macro to find if it references other
      macros.  */
   for (it = info->tokens_begin(); it != info->tokens_end(); ++it) {
@@ -306,7 +310,7 @@ void MacroDependencyFinder::Find_Macros_Required(void)
           }
         }
 
-        entity = *(++macro_it);
+        entity = *(macro_it++);
       }
     }
     it++;

@@ -300,10 +300,10 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 
 /** FunctionDependencyFinder class methods implementation.  */
 
-FunctionDependencyFinder::FunctionDependencyFinder(std::unique_ptr<ASTUnit> ast,
+FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
                                                    std::string const &function)
-  : AST(std::move(ast)),
-    EnumTable(AST.get())
+  : AST(ast),
+    EnumTable(AST)
 {
   Run_Analysis(function);
 }
@@ -381,7 +381,7 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
 void FunctionDependencyFinder::Run_Analysis(std::string const &function)
 {
   /* Step 1: Build the CallGraph.  */
-  CallGraph *cg = Build_CallGraph_From_AST(AST.get());
+  CallGraph *cg = Build_CallGraph_From_AST(AST);
 
   /* Step 2: Find all functions that depends from `function`.  */
   Find_Functions_Required(cg, function);

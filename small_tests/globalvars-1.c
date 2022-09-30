@@ -1,4 +1,4 @@
-int global;
+int global = 1;
 
 int f(void)
 {

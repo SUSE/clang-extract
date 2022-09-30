@@ -36,7 +36,7 @@ using namespace clang;
 class FunctionDependencyFinder
 {
   public:
-    FunctionDependencyFinder(std::unique_ptr<ASTUnit> ast, std::string const &function);
+    FunctionDependencyFinder(ASTUnit *ast, std::string const &function);
 
     /** Print the marked nodes as they appear in the AST.  */
     void Print();
@@ -91,7 +91,7 @@ class FunctionDependencyFinder
     std::unordered_set<Decl*> Dependencies;
 
     /** The AST that are being used in our analysis.  */
-    std::unique_ptr<ASTUnit> AST;
+    ASTUnit* AST;
 
     /** Object holding information about constant enum symbols and a mapping to
         they original enum object.  */

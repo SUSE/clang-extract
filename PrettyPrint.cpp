@@ -174,6 +174,10 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
 {
   assert(SM && "No SourceManager were given");
   BeforeThanCompare<SourceLocation> is_before(*SM);
+  if (!a.isValid())
+    return false;
+  if (!b.isValid())
+    return false;
   return is_before(a, b);
 }
 

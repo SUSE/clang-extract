@@ -39,7 +39,7 @@ struct MacroIterator
 class MacroDependencyFinder : public FunctionDependencyFinder
 {
   public:
-  MacroDependencyFinder(std::unique_ptr<ASTUnit> ast, std::string const &function);
+  MacroDependencyFinder(ASTUnit *ast, std::string const &function);
 
   void Print(void);
 

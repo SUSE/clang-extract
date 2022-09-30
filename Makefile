@@ -1,8 +1,9 @@
-CXX=clang++
+CXX=g++
 CXXFLAGS=-Wall -g -fsanitize=address
-LDFLAGS=-lclang-cpp -lclang -lLLVM
+LDPATH=#-L/tmp/clang/lib/ -Wl,--rpath=/tmp/clang/lib/
+LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM
 
-OBJECTS=Main.o PrettyPrint.o FunctionDepsFinder.o MacroDepsFinder.o EnumConstTbl.o
+OBJECTS=Main.o PrettyPrint.o FunctionDepsFinder.o MacroDepsFinder.o EnumConstTbl.o FunctionExternalizer.o
 
 clang-extract: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
