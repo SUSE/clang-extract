@@ -14,7 +14,7 @@ using namespace clang;
 struct MacroIterator
 {
   clang::PreprocessingRecord::iterator macro_it;
-  int undef_it;
+  unsigned undef_it;
 };
 
 /** Macro Dependency Finder.

@@ -174,11 +174,47 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
 {
   assert(SM && "No SourceManager were given");
   BeforeThanCompare<SourceLocation> is_before(*SM);
-  if (!a.isValid())
-    return false;
-  if (!b.isValid())
-    return false;
+
+  assert(a.isValid());
+  assert(b.isValid());
+
   return is_before(a, b);
+}
+
+bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
+{
+
+  if (a.fullyContains(b)) {
+    return true;
+  }
+
+  PresumedLoc a_begin = SM->getPresumedLoc(a.getBegin());
+  PresumedLoc a_end   = SM->getPresumedLoc(a.getEnd());
+  PresumedLoc b_begin = SM->getPresumedLoc(b.getBegin());
+  PresumedLoc b_end   = SM->getPresumedLoc(b.getEnd());
+
+  assert(a_begin.getFileID() == a_end.getFileID());
+  assert(b_begin.getFileID() == b_end.getFileID());
+
+  if (a_begin.getFileID() != b_begin.getFileID()) {
+    /* Files are distinct, thus we can't easily determine which comes first.  */
+    return false;
+  }
+
+  bool a_begin_smaller = false;
+  bool b_end_smaller = false;
+
+  if ((a_begin.getLine() < b_begin.getLine()) ||
+      (a_begin.getLine() == b_begin.getLine() && a_begin.getColumn() <= b_begin.getColumn())) {
+    a_begin_smaller = true;
+  }
+
+  if ((b_end.getLine() < a_end.getLine()) ||
+      (b_end.getLine() == a_end.getLine() && b_end.getColumn() <= a_end.getColumn())) {
+    b_end_smaller = true;
+  }
+
+  return a_begin_smaller && b_end_smaller;
 }
 
 /** Compare if SourceLocation a is after SourceLocation b in the source code.  */

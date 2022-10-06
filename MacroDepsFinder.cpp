@@ -62,7 +62,7 @@ void MacroDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLo
     }
 
     /* Check if we did not past the loc marker where we should stop printing.  */
-    if (PrettyPrint::Is_Before(curr_loc, loc)) {
+    if (curr_loc.isValid() && PrettyPrint::Is_Before(curr_loc, loc)) {
       if (should_print_undef) {
         if (print)
           PrettyPrint::Print_Macro_Undef(undef);
@@ -86,12 +86,13 @@ void MacroDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLo
 void MacroDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
 {
   SourceLocation loc = SourceLocation::getFromRawEncoding(UINT_MAX);
+  assert(loc.isValid());
   Print_Macros_Until(it, loc, true);
 }
 
 void MacroDependencyFinder::Print(void)
 {
-  SourceLocation last_decl_loc;
+  SourceLocation last_decl_loc = SourceLocation::getFromRawEncoding(0U);
   bool first = true;
 
   /* We can only print macros if we have a SourceManager.  */
@@ -167,7 +168,7 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
   /* We can not quickly return if the macro is already marked.  Other macros
      which this macro depends on may have been redefined in meanwhile, and
      we don't implement some dependency tracking so far, so redo the analysis.  */
-
+#define libclang13
 #ifdef libclang13
   clang::MacroInfo::tokens_iterator it;
 #else
@@ -217,6 +218,12 @@ MacroInfo *MacroDependencyFinder::Get_Macro_Info(const IdentifierInfo *id, const
   MacroDirective *directive = PProcessor.getLocalMacroDirectiveHistory(id);
   while (directive) {
     MacroInfo *macroinfo = directive->getMacroInfo();
+
+    if (!macroinfo->getDefinitionLoc().isValid()) {
+      /* Skip if macro expansion seems to not have a valid location.  */
+      directive = directive->getPrevious();
+      continue;
+    }
 
     /* If this MacroInfo object location is defined AFTER the given loc, then
        it means we are looking for a macro that was later redefined.  So we
@@ -297,20 +304,18 @@ void MacroDependencyFinder::Find_Macros_Required(void)
     Decl *decl = *it;
 
     if (decl && Is_Decl_Marked(decl)) {
-      PreprocessedEntity *entity = *macro_it;
 
       /* While the macro is before the end limit of the decl range, then:  */
-      while (macro_it != rec->end() && PrettyPrint::Is_Before(entity->getSourceRange().getBegin(), decl->getEndLoc())) {
+      while (macro_it != rec->end() && PrettyPrint::Is_Before((*macro_it)->getSourceRange().getBegin(), decl->getEndLoc())) {
 
         /* If the macro location is in the Decl (function, variable, ...) range,
            then analyze this macro and its dependencies.  */
-        if (decl->getSourceRange().fullyContains(entity->getSourceRange())) {
-          if (MacroExpansion *macroexp = dyn_cast<MacroExpansion>(entity)) {
+        if (PrettyPrint::Contains(decl->getSourceRange(), (*macro_it)->getSourceRange())) {
+          if (MacroExpansion *macroexp = dyn_cast<MacroExpansion>(*macro_it)) {
             Backtrack_Macro_Expansion(macroexp);
           }
         }
-
-        entity = *(macro_it++);
+        macro_it++;
       }
     }
     it++;
