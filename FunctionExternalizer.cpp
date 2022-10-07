@@ -220,6 +220,25 @@ void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
 
         std::string new_name = "klp_" + decl->getName().str();
         new_decl = Create_Externalized_Var(decl, new_name);
+
+        /* Create a string with the new variable type and name.  */
+        std::string o;
+        llvm::raw_string_ostream outstr(o);
+        new_decl->print(outstr, AST->getLangOpts());
+
+        /* Get source location of old function declaration.  */
+        SourceLocation decl_start = decl->getSourceRange().getBegin();
+        SourceLocation decl_end = Lexer::getLocForEndOfToken(
+            decl->getSourceRange().getEnd(),
+            0,
+            AST->getSourceManager(),
+            AST->getLangOpts());
+
+        SourceRange decl_range(decl_start, decl_end);
+
+        /* Replace text content of old declaration.  */
+        RW.ReplaceText(decl_range, outstr.str());
+
         must_update = true;
 
         /* Slaps the new node into the position of where was the function
