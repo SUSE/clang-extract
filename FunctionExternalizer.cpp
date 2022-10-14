@@ -201,8 +201,21 @@ void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
       /* If we externalized this function, then all further delcarations of
          this function shall be discarded.  */
       if (must_update) {
-        topleveldecls->erase(it);
 
+        /* Get source location of old function declaration.  */
+        SourceLocation decl_start = decl->getSourceRange().getBegin();
+        SourceLocation decl_end = Lexer::getLocForEndOfToken(
+            decl->getSourceRange().getEnd(),
+            0,
+            AST->getSourceManager(),
+            AST->getLangOpts());
+
+        SourceRange decl_range(decl_start, decl_end);
+
+        /* Remove the text.  */
+        RW.RemoveText(decl_range);
+
+        topleveldecls->erase(it);
         /* We must decrease the iterator because we deleted an element from the
            vector.  */
         it--;
@@ -225,6 +238,7 @@ void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
         std::string o;
         llvm::raw_string_ostream outstr(o);
         new_decl->print(outstr, AST->getLangOpts());
+        outstr << ";\n";
 
         /* Get source location of old function declaration.  */
         SourceLocation decl_start = decl->getSourceRange().getBegin();

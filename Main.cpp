@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
   const std::vector<std::string> args = {
      "--language=c",
-     "-I/usr/lib64/clang/13.0.1/include",
+     "-I/usr/lib64/clang/15.0.2/include/",
      "-I/usr/local/include",
      "-I/usr/bin/../lib64/gcc/x86_64-suse-linux/11/../../../../x86_64-suse-linux/include",
      "-I/usr/include",
@@ -71,11 +71,12 @@ int main(int argc, char **argv)
     FunctionExternalizer externalizer(ast.get());
     externalizer.Externalize_Symbol(func_externalize_name);
 
-    //llvm::vfs::FileSystem &fs = ast->getFileManager().getVirtualFileSystem();
-    //auto shared_fs = llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>(&fs);
+    llvm::vfs::FileSystem &fs = ast->getFileManager().getVirtualFileSystem();
+    auto shared_fs = llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>(&fs);
 
+    ast->Reparse(std::make_shared< PCHContainerOperations >(), None, shared_fs, /*KeepFileMgr=*/true);
     //ast->Reparse(std::make_shared< PCHContainerOperations >(), None, shared_fs);
-    //PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
+    PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
   }
 
   const bool macros_enabled = true;
