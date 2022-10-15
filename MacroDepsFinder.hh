@@ -40,6 +40,7 @@ class MacroDependencyFinder : public FunctionDependencyFinder
 {
   public:
   MacroDependencyFinder(ASTUnit *ast, std::string const &function);
+  MacroDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions);
 
   void Print(void);
 

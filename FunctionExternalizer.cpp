@@ -178,7 +178,7 @@ bool FunctionExternalizer::Commit_Changes_To_Source(void)
   return modified;
 }
 
-void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
+void FunctionExternalizer::_Externalize_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
   VarDecl *new_decl = nullptr;
@@ -260,6 +260,23 @@ void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
         *it = new_decl;
       }
     }
+  }
+}
+
+void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
+{
+  _Externalize_Symbol(to_externalize);
+
+  /* Update the source file buffer, else when we output based on the original
+     source we would still get references to the old symbol.  */
+  Commit_Changes_To_Source();
+}
+
+void FunctionExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
+{
+
+  for (const std::string &to_externalize : to_externalize_array) {
+    _Externalize_Symbol(to_externalize);
   }
 
   /* Update the source file buffer, else when we output based on the original

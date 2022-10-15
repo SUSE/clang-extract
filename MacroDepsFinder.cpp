@@ -5,11 +5,17 @@
 
 #define PProcessor (AST->getPreprocessor())
 
-MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::string const &function) 
+MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::string const &function)
   : FunctionDependencyFinder(ast, function)
 {
   /* The call to the parent constructor builds the dependency set of functions
      and types.  Now build the macro dependency list.  */
+  Find_Macros_Required();
+}
+
+MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions)
+  : FunctionDependencyFinder(ast, functions)
+{
   Find_Macros_Required();
 }
 

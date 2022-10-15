@@ -70,6 +70,7 @@ class FunctionExternalizer
       pointer, or an global variable into a variable pointer.  */
   void Externalize_Symbol(DeclaratorDecl *to_externalize);
   void Externalize_Symbol(const std::string &to_externalize);
+  void Externalize_Symbols(std::vector<std::string> const &to_externalize_array);
 
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
@@ -77,6 +78,8 @@ class FunctionExternalizer
   bool Commit_Changes_To_Source(void);
 
   private:
+
+  void _Externalize_Symbol(const std::string &to_externalize);
 
   /** AST in analysis.  */
   ASTUnit *AST;

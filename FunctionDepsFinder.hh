@@ -37,20 +37,21 @@ class FunctionDependencyFinder
 {
   public:
     FunctionDependencyFinder(ASTUnit *ast, std::string const &function);
+    FunctionDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions);
 
     /** Print the marked nodes as they appear in the AST.  */
     void Print();
 
   protected:
     /** Run the analysis on function `function`*/
-    void Run_Analysis(std::string const &function);
+    void Run_Analysis(std::vector<std::string> const &function);
 
     /** Mark decl as dependencies and all its previous decls versions.  */
     bool Add_Decl_And_Prevs(Decl *decl);
 
     /** Given function with name `funcname`, recursively find which functions
         are required by such function.  */
-    void Find_Functions_Required(CallGraph *, std::string const &funcname);
+    void Find_Functions_Required(CallGraph *, std::vector<std::string> const &funcnames);
 
     /** Mark function represented by `node` and all its callees.  */
     void Mark_Required_Functions(CallGraphNode *node);

@@ -39,23 +39,24 @@ static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
 }
 
 void FunctionDependencyFinder::Find_Functions_Required
-            (CallGraph *cg, std::string const& funcname)
+            (CallGraph *cg, std::vector<std::string> const& funcnames)
 {
-  /* Find the node which name matches our funcname.  */
-  clang::CallGraph::iterator it;
-  for (it = cg->begin(); it != cg->end(); ++it) {
-    CallGraphNode *node = (*it).second.get();
+  assert(funcnames.size() > 0);
 
-    /* Get Declaration as a NamedDecl to query its name.  */
-    NamedDecl *ndecl = dynamic_cast<NamedDecl *>(node->getDecl());
+  for (const std::string &funcname : funcnames) {
+    /* Find the node which name matches our funcname.  */
+    clang::CallGraph::iterator it;
+    for (it = cg->begin(); it != cg->end(); ++it) {
+      CallGraphNode *node = (*it).second.get();
 
-    if (ndecl && ndecl->getNameAsString() == funcname) {
-      // Now iterate through all nodes reachable from begin_node and mark all
-      // of them for output.
-      Mark_Required_Functions(node);
+      /* Get Declaration as a NamedDecl to query its name.  */
+      NamedDecl *ndecl = dynamic_cast<NamedDecl *>(node->getDecl());
 
-      /* Return now, we don't need to check for any other node here.  */
-      return;
+      if (ndecl && ndecl->getNameAsString() == funcname) {
+        // Now iterate through all nodes reachable from begin_node and mark all
+        // of them for output.
+        Mark_Required_Functions(node);
+      }
     }
   }
 }
@@ -305,7 +306,17 @@ FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
   : AST(ast),
     EnumTable(AST)
 {
-  Run_Analysis(function);
+  std::vector<std::string> functions{ function };
+  Run_Analysis(functions);
+}
+
+
+FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
+                                                   std::vector<std::string> const &functions)
+  : AST(ast),
+    EnumTable(AST)
+{
+  Run_Analysis(functions);
 }
 
 /** Add a decl to the Dependencies set and all its previous declarations in the
@@ -378,13 +389,13 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
   return true;
 }
 
-void FunctionDependencyFinder::Run_Analysis(std::string const &function)
+void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions)
 {
   /* Step 1: Build the CallGraph.  */
   CallGraph *cg = Build_CallGraph_From_AST(AST);
 
   /* Step 2: Find all functions that depends from `function`.  */
-  Find_Functions_Required(cg, function);
+  Find_Functions_Required(cg, functions);
 
   /* Step 3: Find all Global variables and Types required by the functions
      that are currently in the Dependencies set..  */
