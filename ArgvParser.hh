@@ -40,6 +40,11 @@ class ArgvParser
     return SymbolsToExternalize;
   }
 
+  inline std::string &Get_Output_File(void)
+  {
+    return OutputFile;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -50,4 +55,5 @@ class ArgvParser
 
   std::vector<std::string> FunctionsToExtract;
   std::vector<std::string> SymbolsToExternalize;
+  std::string OutputFile;
 };

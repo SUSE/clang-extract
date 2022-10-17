@@ -34,6 +34,26 @@ static std::unique_ptr<ASTUnit> Create_ASTUnit(const ArgvParser &args)
   return AU;
 }
 
+static StringRef Get_Input_File(const SourceManager &sm)
+{
+  const FileEntry *main_file = sm.getFileEntryForID(sm.getMainFileID());
+  StringRef path = sm.getFileManager().getCanonicalName(main_file);
+
+  return path;
+}
+
+static std::string Get_Output_From_Input_File(const SourceManager &sm)
+{
+  StringRef input = Get_Input_File(sm);
+  std::string work = input.str();
+
+  size_t last_dot = work.find_last_of(".");
+  std::string no_extension = work.substr(0, last_dot);
+  std::string extension = work.substr(last_dot, work.length());
+
+  return no_extension + ".CE" + extension;
+}
+
 void Free_String_Pool(void);
 
 int main(int argc, char **argv)
@@ -64,6 +84,13 @@ int main(int argc, char **argv)
     ast->Reparse(std::make_shared< PCHContainerOperations >(), None, nullptr, /*KeepFileMgr=*/true);
     PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
   }
+
+  std::string output_path = Args.Get_Output_File();
+  if (output_path == "") {
+    output_path = Get_Output_From_Input_File(ast->getSourceManager());
+  }
+
+  PrettyPrint::Set_Output_To(output_path);
 
   const bool macros_enabled = true;
   if (macros_enabled) {

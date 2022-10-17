@@ -26,6 +26,18 @@ static std::vector<std::string> Extract_Args(const char *str)
   return arg_list;
 }
 
+static std::string Extract_Single_Arg(const char *str)
+{
+  const char *params = strchr(str, '=') + 1;
+  char buf[strlen(params) + 1];
+  const char *tok;
+
+  strcpy(buf, params);
+  tok = strtok(buf, ",");
+
+  return std::string(tok);
+}
+
 ArgvParser::ArgvParser(int argc, char **argv)
 {
   for (int i = 0; i < argc; i++) {
@@ -61,6 +73,9 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     SymbolsToExternalize = Extract_Args(str);
 
     return true;
+  }
+  if (prefix("-DCE_OUTPUT_FILE=", str)) {
+    OutputFile = Extract_Single_Arg(str);
   }
 
   return false;

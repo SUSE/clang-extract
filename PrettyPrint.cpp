@@ -2,6 +2,8 @@
 
 /** Public methods.  */
 
+#define Out (*Out)
+
 void PrettyPrint::Print_Decl(Decl *decl)
 {
 
@@ -225,9 +227,19 @@ bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
   return is_before(b, a);
 }
 
+#undef Out
+
+/** Set output to file.  */
+void PrettyPrint::Set_Output_To(const std::string &path)
+{
+  std::error_code ec;
+  static llvm::raw_fd_ostream out(path, ec);
+
+  Set_Output_Ostream(&out);
+}
 
 /* See PrettyPrint.hh for what they do.  */
-raw_ostream &PrettyPrint::Out = llvm::outs();
+raw_ostream *PrettyPrint::Out = &llvm::outs();
 LangOptions PrettyPrint::LangOpts;
 PrintingPolicy PrettyPrint::PPolicy(LangOpts);
 SourceManager *PrettyPrint::SM;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <clang/Tooling/Tooling.h>
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 
@@ -21,7 +22,7 @@ class PrettyPrint
   static void Print_Decl_Raw(Decl *decl);
 
   static inline void Print_Decl_Tree(Decl *decl)
-  { decl->print(Out, PPolicy); Out << '\n'; }
+  { decl->print(*Out, PPolicy); *Out << '\n'; }
 
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
@@ -51,6 +52,11 @@ class PrettyPrint
     return LangOpts;
   }
 
+  static void Set_Output_Ostream(llvm::raw_fd_ostream *out)
+  {
+    Out = out;
+  }
+
   /** Gets the portion of the code that corresponds to given SourceRange, including the
       last token. Returns expanded macros.
 
@@ -77,6 +83,9 @@ class PrettyPrint
   /** Check if SourceLocation a is located after than b in the SourceCode.  */
   static bool Is_After(const SourceLocation &a, const SourceLocation &b);
 
+  /** Set output to file.  */
+  static void Set_Output_To(const std::string &path);
+
   /* This class can not be initialized.  */
   PrettyPrint() = delete;
 
@@ -86,7 +95,7 @@ class PrettyPrint
 
   /** Output object to where this class will output to.  Current default is the
       same as llvm::outs().  */
-  static raw_ostream &Out;
+  static raw_ostream *Out;
 
   /** Language options used by clang's internal PrettyPrinter.  We use the
       default options for now.  */
