@@ -1,7 +1,7 @@
 #include "PrettyPrint.hh"
 #include "FunctionDepsFinder.hh"
 #include "MacroDepsFinder.hh"
-#include "FunctionExternalizer.hh"
+#include "SymbolExternalizer.hh"
 #include "ArgvParser.hh"
 
 #include "clang/Frontend/ASTUnit.h"
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
   PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
 
   if (syms_externalize.size() > 0) {
-    FunctionExternalizer externalizer(ast.get());
+    SymbolExternalizer externalizer(ast.get());
     externalizer.Externalize_Symbols(syms_externalize);
 
     ast->Reparse(std::make_shared< PCHContainerOperations >(), None, nullptr, /*KeepFileMgr=*/true);

@@ -1,4 +1,4 @@
-#include "FunctionExternalizer.hh"
+#include "SymbolExternalizer.hh"
 #include "PrettyPrint.hh"
 
 #include <unordered_set>
@@ -44,7 +44,7 @@ void Free_String_Pool(void)
   StringPool.clear();
 }
 
-bool FunctionExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
+bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
 {
   if (!stmt)
     return false;
@@ -66,8 +66,20 @@ bool FunctionExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *st
       /* Ensure that we indeed got the old symbol.  */
       assert(str == OldSymbolName);
 
+      /* Prepare the text modification.  */
+      std::string new_name;
+      if (WasFunction) {
+        /* In case the original declaration was a function, we only need to
+           rewrite the new symbol name.  */
+        new_name = NewSymbolDecl->getName().str();
+      } else {
+        /* In case the original declaration was a varaible, we need to indicate
+           that we are now accessing a pointer variable.  */
+        new_name = "(*" + NewSymbolDecl->getName().str() + ")";
+      }
+
       /* Issue a text modification.  */
-      RW.ReplaceText(range, NewSymbolDecl->getName());
+      RW.ReplaceText(range, new_name);
 
       /* Replace reference with the rewiten name.  */
       expr->setDecl(NewSymbolDecl);
@@ -87,7 +99,7 @@ bool FunctionExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *st
   return replaced;
 }
 
-bool FunctionExternalizer::FunctionUpdater::Update_References_To_Symbol(FunctionDecl *to_update)
+bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(DeclaratorDecl *to_update)
 {
   ToUpdate = to_update;
   if (to_update) {
@@ -96,12 +108,12 @@ bool FunctionExternalizer::FunctionUpdater::Update_References_To_Symbol(Function
   return false;
 }
 
-void FunctionExternalizer::Externalize_Symbol(DeclaratorDecl *to_externalize)
+void SymbolExternalizer::Externalize_Symbol(DeclaratorDecl *to_externalize)
 {
   assert(false && "To be implemented.");
 }
 
-VarDecl *FunctionExternalizer::Create_Externalized_Var(FunctionDecl *decl, const std::string &name)
+VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
 {
 
   /* Hack a new Variable Declaration node in which holds the address of our
@@ -131,8 +143,17 @@ VarDecl *FunctionExternalizer::Create_Externalized_Var(FunctionDecl *decl, const
   QualType pointer_to = astctx.getPointerType(decl->getType());
   TypeSourceInfo *tsi = astctx.CreateTypeSourceInfo(pointer_to);
 
+  /* Get context of decl.  */
+  DeclContext *decl_ctx;
+
   /* Create node.  */
-  VarDecl *ret = VarDecl::Create(astctx, decl->getParent(),
+  if (dynamic_cast<FunctionDecl *>(decl)) {
+    decl_ctx = dynamic_cast<FunctionDecl *>(decl)->getParent();
+  } else {
+    decl_ctx = decl->getDeclContext();
+  }
+
+  VarDecl *ret = VarDecl::Create(astctx, decl_ctx,
     decl->getBeginLoc(),
     decl->getEndLoc(),
     id,
@@ -145,7 +166,7 @@ VarDecl *FunctionExternalizer::Create_Externalized_Var(FunctionDecl *decl, const
   return ret;
 }
 
-bool FunctionExternalizer::Commit_Changes_To_Source(void)
+bool SymbolExternalizer::Commit_Changes_To_Source(void)
 {
   SourceManager &sm = AST->getSourceManager();
   clang::SourceManager::fileinfo_iterator it;
@@ -178,22 +199,24 @@ bool FunctionExternalizer::Commit_Changes_To_Source(void)
   return modified;
 }
 
-void FunctionExternalizer::_Externalize_Symbol(const std::string &to_externalize)
+void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
   VarDecl *new_decl = nullptr;
   bool must_update = false;
+  bool was_function = false;
 
   std::vector<Decl *> *topleveldecls = nullptr;
 
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
-    FunctionDecl *decl = dynamic_cast<FunctionDecl *>(*it);
+    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
 
     /* If we externalized some function, then we must start analyzing for further
        functions in order to find if there is a reference to the function we
        externalized.  */
     if (must_update) {
-      FunctionUpdater(RW, new_decl, to_externalize).Update_References_To_Symbol(decl);
+      FunctionUpdater(RW, new_decl, to_externalize, was_function)
+        .Update_References_To_Symbol(decl);
     }
 
     if (decl && decl->getName() == to_externalize) {
@@ -254,6 +277,7 @@ void FunctionExternalizer::_Externalize_Symbol(const std::string &to_externalize
         RW.ReplaceText(decl_range, outstr.str());
 
         must_update = true;
+        was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
 
         /* Slaps the new node into the position of where was the function
            to be externalized.  */
@@ -263,7 +287,7 @@ void FunctionExternalizer::_Externalize_Symbol(const std::string &to_externalize
   }
 }
 
-void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
+void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 {
   _Externalize_Symbol(to_externalize);
 
@@ -272,7 +296,7 @@ void FunctionExternalizer::Externalize_Symbol(const std::string &to_externalize)
   Commit_Changes_To_Source();
 }
 
-void FunctionExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
+void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
 
   for (const std::string &to_externalize : to_externalize_array) {

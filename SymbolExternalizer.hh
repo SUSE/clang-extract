@@ -5,7 +5,7 @@
 
 using namespace clang;
 
-/** Class encapsulating the function externalizer mechanism.
+/** Class encapsulating the Symbol externalizer mechanism.
  *
  * Livepatched functions very often references static functions or variables
  * that we have to `externalize` them.  Assume we want to externalize a
@@ -24,10 +24,10 @@ using namespace clang;
  * its correct address in the target binary.
  *
  */
-class FunctionExternalizer
+class SymbolExternalizer
 {
   public:
-  FunctionExternalizer(ASTUnit *ast)
+  SymbolExternalizer(ASTUnit *ast)
     : AST(ast),
       RW(AST->getSourceManager(), AST->getLangOpts())
   {
@@ -45,18 +45,21 @@ class FunctionExternalizer
     /** Name of the to be replaced function.  */
     const std::string &OldSymbolName;
 
-    FunctionUpdater(Rewriter &rw, VarDecl *new_decl, const std::string &old_decl_name)
-    : RW(rw), NewSymbolDecl(new_decl), OldSymbolName(old_decl_name)
+    FunctionUpdater(Rewriter &rw, VarDecl *new_decl, const std::string &old_decl_name, bool was_function)
+    : RW(rw), NewSymbolDecl(new_decl), OldSymbolName(old_decl_name), WasFunction(was_function)
     {}
 
     /** Sweeps the function and update any reference to the old function, replacing
         it with the externalized variable.  */
-    bool Update_References_To_Symbol(FunctionDecl *to_update);
+    bool Update_References_To_Symbol(DeclaratorDecl *to_update);
 
     private:
 
     /* Decl to update.  */
-    FunctionDecl *ToUpdate;
+    DeclaratorDecl *ToUpdate;
+
+    /* Was the original declaration a function?  */
+    bool WasFunction;
 
     bool Update_References_To_Symbol(Stmt *);
   };
@@ -64,7 +67,7 @@ class FunctionExternalizer
 
   /* Create the externalized var as a AST node ready to be slapped into the
      AST.  */
-  VarDecl *Create_Externalized_Var(FunctionDecl *decl, const std::string &name);
+  VarDecl *Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name);
 
   /** Externalize a symbol, that means transforming functions into a function
       pointer, or an global variable into a variable pointer.  */
