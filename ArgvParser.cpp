@@ -76,6 +76,13 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_OUTPUT_FILE=", str)) {
     OutputFile = Extract_Single_Arg(str);
+
+    return true;
+  }
+  if (!strcmp("-DCE_NO_EXTERNALIZATION", str)) {
+    DisableExternalization = true;
+
+    return true;
   }
 
   return false;

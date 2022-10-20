@@ -22,7 +22,7 @@
  * performance can be archived if we could remove duplicated edges.
  *
  */
-static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
+CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
 {
   CallGraph *cg = new CallGraph();
 

@@ -8,6 +8,27 @@
 
 using namespace clang;
 
+/** Build CallGraph from AST.
+ *
+ * The CallGraph is a datastructure in which nodes are functions and edges
+ * represents function call points. For example:
+ *
+ * void f();
+ * void g() { f(); f(); }
+ *
+ * Resuluts in the following CallGraph:
+ *
+ * (f) -> (g)
+ *     -> (g)
+ *
+ * There are two edges to `g` because there are two callpoints to it.
+ * Hence, the resulting graph is not `simple` in Graph Theory nomenclature. But
+ * for the analysis we are doing it is suffice to be, so perhaps some extra
+ * performance can be archived if we could remove duplicated edges.
+ *
+ */
+CallGraph *Build_CallGraph_From_AST(ASTUnit *ast);
+
 /** Function Dependency Finder.
  *
  * This class wraps all code necessary to find all Decl in the

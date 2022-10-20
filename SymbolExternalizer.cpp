@@ -2,6 +2,7 @@
 #include "PrettyPrint.hh"
 
 #include <unordered_set>
+#include <iostream>
 
 /****** Begin hack: used to get a pointer to a private member of a class. *****/
 struct ASTUnit_TopLevelDecls
@@ -64,22 +65,24 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
       StringRef str = PrettyPrint::Get_Source_Text(range);
 
       /* Ensure that we indeed got the old symbol.  */
-      assert(str == OldSymbolName);
+      if (str == OldSymbolName) {
+        /* Prepare the text modification.  */
+        std::string new_name;
+        if (WasFunction) {
+          /* In case the original declaration was a function, we only need to
+             rewrite the new symbol name.  */
+          new_name = NewSymbolDecl->getName().str();
+        } else {
+          /* In case the original declaration was a varaible, we need to indicate
+             that we are now accessing a pointer variable.  */
+          new_name = "(*" + NewSymbolDecl->getName().str() + ")";
+        }
 
-      /* Prepare the text modification.  */
-      std::string new_name;
-      if (WasFunction) {
-        /* In case the original declaration was a function, we only need to
-           rewrite the new symbol name.  */
-        new_name = NewSymbolDecl->getName().str();
+        /* Issue a text modification.  */
+        RW.ReplaceText(range, new_name);
       } else {
-        /* In case the original declaration was a varaible, we need to indicate
-           that we are now accessing a pointer variable.  */
-        new_name = "(*" + NewSymbolDecl->getName().str() + ")";
+        std::cout << "WARNING: Unable to find location of symbol name: " << OldSymbolName << '\n';
       }
-
-      /* Issue a text modification.  */
-      RW.ReplaceText(range, new_name);
 
       /* Replace reference with the rewiten name.  */
       expr->setDecl(NewSymbolDecl);

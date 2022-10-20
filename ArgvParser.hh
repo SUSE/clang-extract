@@ -45,6 +45,11 @@ class ArgvParser
     return OutputFile;
   }
 
+  inline bool Is_Externalization_Disabled(void)
+  {
+    return DisableExternalization;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -56,4 +61,6 @@ class ArgvParser
   std::vector<std::string> FunctionsToExtract;
   std::vector<std::string> SymbolsToExternalize;
   std::string OutputFile;
+
+  bool DisableExternalization;
 };

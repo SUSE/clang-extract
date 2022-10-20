@@ -3,6 +3,7 @@
 #include "MacroDepsFinder.hh"
 #include "SymbolExternalizer.hh"
 #include "ArgvParser.hh"
+#include "FunctionExternalizeFinder.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -63,7 +64,8 @@ int main(int argc, char **argv)
   std::unique_ptr<ASTUnit> ast = Create_ASTUnit(Args);
 
   auto func_extract_names = Args.Get_Functions_To_Extract();
-  auto syms_externalize = Args.Get_Symbols_To_Externalize();
+  auto syms_force_externalize = Args.Get_Symbols_To_Externalize();
+  bool should_externalize = !Args.Is_Externalization_Disabled();
 
   if (func_extract_names.size() == 0) {
     std::cout << "Error: No function to extract." << '\n'
@@ -77,12 +79,17 @@ int main(int argc, char **argv)
 
   PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
 
-  if (syms_externalize.size() > 0) {
-    SymbolExternalizer externalizer(ast.get());
-    externalizer.Externalize_Symbols(syms_externalize);
+  if (should_externalize) {
+    FunctionExternalizeFinder fef(ast.get(), func_extract_names, syms_force_externalize);
+    auto syms_externalize = fef.Get_To_Externalize();
 
-    ast->Reparse(std::make_shared< PCHContainerOperations >(), None, nullptr, /*KeepFileMgr=*/true);
-    PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
+    if (syms_externalize.size() > 0) {
+      SymbolExternalizer externalizer(ast.get());
+      externalizer.Externalize_Symbols(syms_externalize);
+
+      ast->Reparse(std::make_shared< PCHContainerOperations >(), None, nullptr, /*KeepFileMgr=*/true);
+      PrettyPrint::Set_Source_Manager(&ast->getSourceManager());
+    }
   }
 
   std::string output_path = Args.Get_Output_File();
