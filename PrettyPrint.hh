@@ -52,7 +52,7 @@ class PrettyPrint
     return LangOpts;
   }
 
-  static void Set_Output_Ostream(llvm::raw_fd_ostream *out)
+  static void Set_Output_Ostream(llvm::raw_ostream *out)
   {
     Out = out;
   }

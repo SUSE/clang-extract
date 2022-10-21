@@ -40,6 +40,8 @@ static std::string Extract_Single_Arg(const char *str)
 
 ArgvParser::ArgvParser(int argc, char **argv)
 {
+  DisableExternalization = false;
+
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
       ArgsToClang.push_back(argv[i]);

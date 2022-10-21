@@ -80,6 +80,8 @@ class SymbolExternalizer
       system.  */
   bool Commit_Changes_To_Source(void);
 
+  std::string Get_Modifications_To_Main_File(void);
+
   private:
 
   void _Externalize_Symbol(const std::string &to_externalize);

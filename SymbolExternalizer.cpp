@@ -202,6 +202,31 @@ bool SymbolExternalizer::Commit_Changes_To_Source(void)
   return modified;
 }
 
+std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
+{
+
+  SourceManager &sm = AST->getSourceManager();
+  clang::SourceManager::fileinfo_iterator it;
+
+  FileID main_id = sm.getMainFileID();
+  const FileEntry *fentry = sm.getFileEntryForID(main_id);
+
+  /* Our updated file buffer.  */
+  const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(sm.translateFile(fentry));
+
+  if (rewritebuf) {
+    /* In case we had modification, apply it and return a string with the
+       modifications.  */
+    std::string modified_str(rewritebuf->begin(), rewritebuf->end());
+    return modified_str;
+  } else {
+    /* In case we don't have modifications, return the original buffer in a new
+       string.  */
+    std::string original_content(sm.getBufferData(main_id).str());
+    return original_content;
+  }
+}
+
 void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
@@ -293,10 +318,6 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
 void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 {
   _Externalize_Symbol(to_externalize);
-
-  /* Update the source file buffer, else when we output based on the original
-     source we would still get references to the old symbol.  */
-  Commit_Changes_To_Source();
 }
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)

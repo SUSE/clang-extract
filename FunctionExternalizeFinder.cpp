@@ -49,9 +49,8 @@ bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
     externalized = Mark_For_Externalization(name);
   }
 
-  if (externalized) {
+  if (!externalized) {
     Externalize_Variables(dynamic_cast<FunctionDecl *>(decl));
-  } else {
     CallGraphNode::const_iterator child_it;
     for (child_it = node->begin(); child_it != node->end(); ++child_it) {
       CallGraphNode *child = child_it->Callee;
