@@ -81,6 +81,9 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
         /* Issue a text modification.  */
         RW.ReplaceText(range, new_name);
       } else {
+        /* If we did not get the old symbol, it mostly means that the
+           references comes from a macro.  */
+
         std::cout << "WARNING: Unable to find location of symbol name: " << OldSymbolName << '\n';
       }
 
@@ -307,9 +310,42 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         must_update = true;
         was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
 
+
+        /* Update any macros that may reference the symbol.  */
+        Rewrite_Macros(to_externalize, new_decl->getName());
+
         /* Slaps the new node into the position of where was the function
            to be externalized.  */
         *it = new_decl;
+      }
+    }
+  }
+}
+
+void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, StringRef replace_with)
+{
+  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+
+  for (PreprocessedEntity *entity : *rec) {
+    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
+      MacroInfo *info = MW.Get_Macro_Info(def);
+
+      if (!info)
+        continue;
+
+      for (const Token tok : info->tokens()) {
+        IdentifierInfo *id_info = tok.getIdentifierInfo();
+        if (!id_info)
+          continue;
+
+        MacroInfo *maybe_macro = MW.Get_Macro_Info(id_info, def->getLocation());
+
+        if (!maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, id_info)) {
+          if (id_info->getName() == to_look_for) {
+            SourceRange range(tok.getLocation(), tok.getEndLoc());
+            RW.ReplaceText(range, replace_with);
+          }
+        }
       }
     }
   }
@@ -329,5 +365,5 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
 
   /* Update the source file buffer, else when we output based on the original
      source we would still get references to the old symbol.  */
-  Commit_Changes_To_Source();
+  //Commit_Changes_To_Source();
 }

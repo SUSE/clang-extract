@@ -141,6 +141,8 @@ int main(int argc, char **argv)
 
       /* Get the new source code and add it to the filesystem.  */
       std::string modified = externalizer.Get_Modifications_To_Main_File();
+      llvm::outs() << modified << "\n\n\n";
+
       mfs->addFile(input_path, 0, MemoryBuffer::getMemBufferCopy(modified));
 
       /* Parse the temporary code to apply the changes by the externalizer

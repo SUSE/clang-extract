@@ -147,7 +147,7 @@ void PrettyPrint::Print_Macro_Undef(MacroDirective *directive)
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
-  Out << " info: " << Get_Source_Text(range) << '\n';
+  llvm::outs() << " info: " << Get_Source_Text(range) << '\n';
 }
 
 /** Private stuff.  */

@@ -6,7 +6,8 @@
 #define PProcessor (AST->getPreprocessor())
 
 MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::string const &function)
-  : FunctionDependencyFinder(ast, function)
+  : FunctionDependencyFinder(ast, function),
+    MW(ast->getPreprocessor())
 {
   /* The call to the parent constructor builds the dependency set of functions
      and types.  Now build the macro dependency list.  */
@@ -14,7 +15,8 @@ MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::string const &fu
 }
 
 MacroDependencyFinder::MacroDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions)
-  : FunctionDependencyFinder(ast, functions)
+  : FunctionDependencyFinder(ast, functions),
+    MW(ast->getPreprocessor())
 {
   Find_Macros_Required();
 }
@@ -75,7 +77,7 @@ void MacroDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLo
         it.undef_it++;
       } else if (e) {
         MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e);
-        if (print && entity && Is_Macro_Marked(Get_Macro_Info(entity))) {
+        if (print && entity && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
           PrettyPrint::Print_Macro_Def(entity);
         }
         it.macro_it++;
@@ -130,7 +132,7 @@ void MacroDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
       it.undef_it++;
     } else if (e) {
       MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e);
-      if (entity && Is_Macro_Marked(Get_Macro_Info(entity))) {
+      if (entity && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
         PrettyPrint::Print_Macro_Def(entity);
       }
       it.macro_it++;
@@ -182,23 +184,8 @@ void MacroDependencyFinder::Print(void)
 
 bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
 {
-  MacroInfo *info = Get_Macro_Info(macroexp);
+  MacroInfo *info = MW.Get_Macro_Info(macroexp);
   return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
-}
-
-/** Check if IdentifierInfo `tok` is actually an argument of the macro info.  */
-static bool Is_Identifier_Macro_Argument(MacroInfo *info, const IdentifierInfo *tok)
-{
-
-  StringRef tok_str = tok->getName();
-  for (const IdentifierInfo *arg : info->params()) {
-    StringRef arg_str = arg->getName();
-    if (tok_str.equals(arg_str)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc)
@@ -227,7 +214,7 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
     const IdentifierInfo *tok_id = tok->getIdentifierInfo();
 
     if (tok_id != nullptr) {
-      MacroInfo *maybe_macro = Get_Macro_Info(tok->getIdentifierInfo(), loc);
+      MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
 
       /* We must be careful to not confuse tokens which are function-like macro
          arguments with other macors.  Example:
@@ -237,72 +224,13 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
 
          We should not add `a` as macro when analyzing MAX once it is clearly an
          argument of the macro, not a reference to other symbol.  */
-      if (maybe_macro && !Is_Identifier_Macro_Argument(info, tok_id)) {
+      if (maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
         inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
       }
     }
   }
 
   return inserted;
-}
-
-MacroInfo *MacroDependencyFinder::Get_Macro_Info(MacroDefinitionRecord *record)
-{
-  MacroDirective *directive = Get_Macro_Directive(record);
-  return directive ? directive->getMacroInfo() : nullptr;
-}
-
-MacroInfo *MacroDependencyFinder::Get_Macro_Info(MacroExpansion *macroexp)
-{
-  SourceLocation loc = macroexp->getSourceRange().getBegin();
-  const IdentifierInfo *id = macroexp->getName();
-  return Get_Macro_Info(id, loc);
-}
-
-MacroInfo *MacroDependencyFinder::Get_Macro_Info(const IdentifierInfo *id, const SourceLocation &loc)
-{
-  MacroDirective *directive = PProcessor.getLocalMacroDirectiveHistory(id);
-  while (directive) {
-    MacroInfo *macroinfo = directive->getMacroInfo();
-
-    if (!macroinfo->getDefinitionLoc().isValid()) {
-      /* Skip if macro expansion seems to not have a valid location.  */
-      directive = directive->getPrevious();
-      continue;
-    }
-
-    /* If this MacroInfo object location is defined AFTER the given loc, then
-       it means we are looking for a macro that was later redefined.  So we
-       look into the previous definitions to find the last one that is defined
-       before loc.  */
-
-    if (PrettyPrint::Is_Before(macroinfo->getDefinitionLoc(), loc))
-      return macroinfo;
-
-    directive = directive->getPrevious();
-  }
-
-  /* MacroInfo object not found.  */
-  return nullptr;
-}
-
-MacroDirective *MacroDependencyFinder::Get_Macro_Directive(MacroDefinitionRecord *record) {
-  const IdentifierInfo *id = record->getName();
-  MacroDirective *directive = PProcessor.getLocalMacroDirectiveHistory(id);
-  while (directive) {
-    MacroInfo *macroinfo = directive->getMacroInfo();
-
-    /* If this MacroInfo object location is defined OUTSIDE the macro defintion,
-       then it means we are looking for a macro that was later redefined.  */
-    SourceRange range1(macroinfo->getDefinitionLoc(), macroinfo->getDefinitionEndLoc());
-    SourceRange range2(record->getLocation());
-    if (range1.fullyContains(range2)) {
-      return directive;
-    }
-    directive = directive->getPrevious();
-  }
-
-  return nullptr;
 }
 
 int MacroDependencyFinder::Populate_Need_Undef(void)
@@ -313,7 +241,7 @@ int MacroDependencyFinder::Populate_Need_Undef(void)
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
 
-      MacroDirective *directive = Get_Macro_Directive(def);
+      MacroDirective *directive = MW.Get_Macro_Directive(def);
       assert(directive);
 
       /* There is no point in analyzing a macro that wasn't added for output.  */

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FunctionDepsFinder.hh"
+#include "MacroWalker.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <unordered_set>
@@ -94,15 +95,6 @@ class MacroDependencyFinder : public FunctionDependencyFinder
       definition of A and get the last one above the expansion of U.  */
   bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
 
-  /** The object which holds the macro arguments is the MacroInfo.  Get the
-      MacroInfo being extra careful to not pick the last definition, since
-      macros can be redefined.  */
-  MacroInfo *Get_Macro_Info(MacroDefinitionRecord *record);
-  MacroInfo *Get_Macro_Info(MacroExpansion *macroexp);
-  MacroInfo *Get_Macro_Info(const IdentifierInfo *id, const SourceLocation &loc);
-
-  MacroDirective* Get_Macro_Directive(MacroDefinitionRecord *record);
-
   /* Populate the NeedsUndef vector whith macros that needs to be undefined
      somewhere in the code.  */
   int Populate_Need_Undef(void);
@@ -113,6 +105,8 @@ class MacroDependencyFinder : public FunctionDependencyFinder
   /* Vector of MacroDirective of macros that needs to be undefined somewhere in
      the code.  */
   std::vector<MacroDirective*> NeedsUndef;
+
+  MacroWalker MW;
 
   /** Dump the Dependencies set for debug purposes.  */
   void Dump_Dependencies(void);

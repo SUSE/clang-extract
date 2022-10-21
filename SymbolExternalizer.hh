@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MacroWalker.hh"
+
 #include <clang/Tooling/Tooling.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
@@ -29,7 +31,8 @@ class SymbolExternalizer
   public:
   SymbolExternalizer(ASTUnit *ast)
     : AST(ast),
-      RW(AST->getSourceManager(), AST->getLangOpts())
+      MW(ast->getPreprocessor()),
+      RW(ast->getSourceManager(), ast->getLangOpts())
   {
   }
 
@@ -85,6 +88,11 @@ class SymbolExternalizer
   private:
 
   void _Externalize_Symbol(const std::string &to_externalize);
+
+  void Rewrite_Macros(std::string const &to_look_for, StringRef replace_with);
+
+  /** MacroWalker object which helps iterating on Macros.  */
+  MacroWalker MW;
 
   /** AST in analysis.  */
   ASTUnit *AST;
