@@ -1,9 +1,9 @@
+int bbb;
+
 #define A bbb
 #define B bbb
 
-int bbb;
-
 int f()
 {
-  return A + B;
+  return A + B ;
 }

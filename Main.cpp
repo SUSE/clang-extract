@@ -21,9 +21,7 @@ static std::unique_ptr<ASTUnit> Create_ASTUnit(const ArgvParser &args, Intrusive
   const std::vector<const char *> &args_vector = args.Get_Args_To_Clang();
 
   Diags = CompilerInstance::createDiagnostics(new DiagnosticOptions());
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CInvok = createInvocation(args_vector, std::move(CIOpts));
+  CInvok = createInvocationFromCommandLine(args_vector, Diags);
 
   FileManager *FileMgr = new FileManager(FileSystemOptions(), vfs);
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
@@ -141,8 +139,6 @@ int main(int argc, char **argv)
 
       /* Get the new source code and add it to the filesystem.  */
       std::string modified = externalizer.Get_Modifications_To_Main_File();
-      llvm::outs() << modified << "\n\n\n";
-
       mfs->addFile(input_path, 0, MemoryBuffer::getMemBufferCopy(modified));
 
       /* Parse the temporary code to apply the changes by the externalizer

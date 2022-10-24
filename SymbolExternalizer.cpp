@@ -84,7 +84,7 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
         /* If we did not get the old symbol, it mostly means that the
            references comes from a macro.  */
 
-        std::cout << "WARNING: Unable to find location of symbol name: " << OldSymbolName << '\n';
+        //std::cout << "WARNING: Unable to find location of symbol name: " << OldSymbolName << '\n';
       }
 
       /* Replace reference with the rewiten name.  */
@@ -211,23 +211,11 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
   SourceManager &sm = AST->getSourceManager();
   clang::SourceManager::fileinfo_iterator it;
 
+  /* Our updated file buffer for main file.  */
   FileID main_id = sm.getMainFileID();
-  const FileEntry *fentry = sm.getFileEntryForID(main_id);
+  RewriteBuffer &main_buf = RW.getEditBuffer(main_id);
 
-  /* Our updated file buffer.  */
-  const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(sm.translateFile(fentry));
-
-  if (rewritebuf) {
-    /* In case we had modification, apply it and return a string with the
-       modifications.  */
-    std::string modified_str(rewritebuf->begin(), rewritebuf->end());
-    return modified_str;
-  } else {
-    /* In case we don't have modifications, return the original buffer in a new
-       string.  */
-    std::string original_content(sm.getBufferData(main_id).str());
-    return original_content;
-  }
+  return std::string(main_buf.begin(), main_buf.end());
 }
 
 void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
@@ -310,9 +298,10 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         must_update = true;
         was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
 
-
         /* Update any macros that may reference the symbol.  */
-        Rewrite_Macros(to_externalize, new_decl->getName());
+        std::string replacement = was_function ? new_decl->getName().str() : "*(" + new_decl->getName().str() + ")";
+
+        Rewrite_Macros(to_externalize, replacement);
 
         /* Slaps the new node into the position of where was the function
            to be externalized.  */
@@ -322,7 +311,7 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
   }
 }
 
-void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, StringRef replace_with)
+void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with)
 {
   PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
 
@@ -342,7 +331,7 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, StringRe
 
         if (!maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, id_info)) {
           if (id_info->getName() == to_look_for) {
-            SourceRange range(tok.getLocation(), tok.getEndLoc());
+            SourceRange range(tok.getLocation(), tok.getLastLoc());
             RW.ReplaceText(range, replace_with);
           }
         }

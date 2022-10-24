@@ -134,7 +134,7 @@ void PrettyPrint::Print_Stmt(Stmt *stmt)
 
 void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
 {
-  Out << "#define  " << Get_Source_Text(rec->getSourceRange()) << "\n";
+  Out << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n";
 }
 
 void PrettyPrint::Print_Macro_Undef(MacroDirective *directive)

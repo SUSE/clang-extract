@@ -89,7 +89,7 @@ class SymbolExternalizer
 
   void _Externalize_Symbol(const std::string &to_externalize);
 
-  void Rewrite_Macros(std::string const &to_look_for, StringRef replace_with);
+  void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 
   /** MacroWalker object which helps iterating on Macros.  */
   MacroWalker MW;
