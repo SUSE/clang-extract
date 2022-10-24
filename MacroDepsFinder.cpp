@@ -182,9 +182,19 @@ void MacroDependencyFinder::Print(void)
   }
 }
 
+/** Set containing the macros which were already analyzed.  */
+static std::unordered_set<MacroInfo *> AnalyzedMacros;
+static bool Already_Analyzed(MacroInfo *info)
+{
+  return AnalyzedMacros.find(info) != AnalyzedMacros.end();
+}
+
 bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
 {
   MacroInfo *info = MW.Get_Macro_Info(macroexp);
+
+  /* Reset the analyzed set.  */
+  AnalyzedMacros = std::unordered_set<MacroInfo *>();
   return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
 }
 
@@ -194,6 +204,23 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
 
   if (info == nullptr)
     return false;
+
+  /* If this macro were already been analyzed, then quickly return.
+
+     We can not use the MacroDependency set for that because macros
+     can reference macros that are later redefined. For example:
+
+     #define A B
+     int A;
+
+     #define A C
+     int A;.  */
+
+  if (Already_Analyzed(info)) {
+    return false;
+  }
+
+  AnalyzedMacros.insert(info);
 
   /* If this MacroInfo object with the macro contents wasn't marked for output
      then mark it now.  */
