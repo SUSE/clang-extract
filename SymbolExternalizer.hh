@@ -91,11 +91,11 @@ class SymbolExternalizer
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 
-  /** MacroWalker object which helps iterating on Macros.  */
-  MacroWalker MW;
-
   /** AST in analysis.  */
   ASTUnit *AST;
+
+  /** MacroWalker object which helps iterating on Macros.  */
+  MacroWalker MW;
 
   /** Clang's Rewriter class used to auxiliate us with changes in the source code.  */
   Rewriter RW;

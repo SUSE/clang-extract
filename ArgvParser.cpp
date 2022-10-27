@@ -41,6 +41,7 @@ static std::string Extract_Single_Arg(const char *str)
 ArgvParser::ArgvParser(int argc, char **argv)
 {
   DisableExternalization = false;
+  DumpPasses = false;
 
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
@@ -83,6 +84,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (!strcmp("-DCE_NO_EXTERNALIZATION", str)) {
     DisableExternalization = true;
+
+    return true;
+  }
+  if (!strcmp("-DCE_DUMP_PASSES", str)) {
+    DumpPasses = true;
 
     return true;
   }

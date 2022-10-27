@@ -12,7 +12,8 @@ OBJECTS= \
 	SymbolExternalizer.o \
 	ArgvParser.o \
 	FunctionExternalizeFinder.o \
-	MacroWalker.o
+	MacroWalker.o \
+	Passes.o
 
 clang-extract: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

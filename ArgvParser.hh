@@ -50,6 +50,11 @@ class ArgvParser
     return DisableExternalization;
   }
 
+  inline bool Should_Dump_Passes(void)
+  {
+    return DumpPasses;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -63,4 +68,5 @@ class ArgvParser
   std::string OutputFile;
 
   bool DisableExternalization;
+  bool DumpPasses;
 };
