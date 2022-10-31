@@ -1,5 +1,7 @@
 #include "PrettyPrint.hh"
 
+#include <clang/AST/Attr.h>
+
 /** Public methods.  */
 
 #define Out (*Out)
@@ -154,6 +156,12 @@ void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
   llvm::outs() << " info: " << Get_Source_Text(range) << '\n';
+}
+
+void PrettyPrint::Print_Attr(Attr *attr)
+{
+  attr->printPretty(llvm::outs(), PPolicy);
+  llvm::outs() << '\n';
 }
 
 /** Private stuff.  */

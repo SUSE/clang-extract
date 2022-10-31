@@ -252,9 +252,10 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     const DeclGroupRef decl_group = declstmt->getDeclGroup();
     for (Decl *decl : decl_group) {
       /* Look into the type for a RecordDecl.  */
-      ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl);
-      type = valuedecl->getType().getTypePtr();
-      Add_Type_And_Depends(type);
+      if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl)) {
+        type = valuedecl->getType().getTypePtr();
+        Add_Type_And_Depends(type);
+      }
     }
 
     type = nullptr;

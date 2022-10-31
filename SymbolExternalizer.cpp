@@ -266,6 +266,9 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
          then proceed to create and replace the function declaration node with
          a variable declaration node of proper type.  */
       else if (!new_decl) {
+
+        SourceManager &sm = AST->getSourceManager();
+
         /* The TopLevelDecls attribute from the AST is private, but we need to
            access that in order to remove nodes from the AST toplevel vector,
            else we can't remove further declarations of the function we need
@@ -284,11 +287,13 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         /* Get source location of old function declaration.  */
         SourceLocation decl_start;
         SourceLocation decl_end;
+        decl_start = decl->getSourceRange().getBegin();
 
-        decl_start = Lexer::GetBeginningOfToken(
-            decl->getSourceRange().getBegin(),
-            AST->getSourceManager(),
-            AST->getLangOpts());
+        /* Some declarations start with macro expansion, which the Rewriter
+           class simple rejects.  Get one which it will accept.  */
+        if (!decl_start.isFileID()) {
+          decl_start = sm.getExpansionLoc(decl_start);
+        }
 
         decl_end = Lexer::getLocForEndOfToken(
             decl->getSourceRange().getEnd(),

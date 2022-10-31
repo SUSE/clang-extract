@@ -11,6 +11,6 @@ struct AAA
 struct AAA* g(int x)
 {
   static struct AAA aa;
-  AAA.a = x;
+  aa.a = x;
   return &aa;
 }

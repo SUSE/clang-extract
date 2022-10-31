@@ -174,7 +174,8 @@ class ClosurePass : public Pass
   private:
     virtual bool Gate(PassManager::Context *ctx)
     {
-      return !ctx->ExternalizationDisabled && ctx->FuncExtractNames.size() > 0;
+      return (!ctx->ExternalizationDisabled || PrintToFile) &&
+             ctx->FuncExtractNames.size() > 0;
     }
 
     std::string Get_Output_From_Input_File(std::string &input)
