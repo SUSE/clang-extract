@@ -58,6 +58,7 @@ void ArgvParser::Insert_Required_Parameters(void)
      "-fno-builtin", // clang interposes some glibc functions and then it fails to find the declaration of them.
     "-Xclang", "-detailed-preprocessing-record",
     "-Xclang", "-ast-dump",
+    "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
   };
 
   for (const char *arg : priv_args) {

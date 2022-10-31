@@ -373,7 +373,10 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
   size_t first_closebrk = str.find("]", first_openbrk);
   long str_size = first_closebrk - first_openbrk - 1;
 
-  assert(str_size >= 0);
+  /* This declaration may be a result of an macro, in which case we won't
+     find any [].*/
+  if (str_size < 0)
+    return false;
 
   StringRef substr = str.substr(first_openbrk + 1, str_size);
 

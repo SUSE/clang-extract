@@ -13,13 +13,19 @@ void PrettyPrint::Print_Decl(Decl *decl)
 
   FunctionDecl *f = dynamic_cast<FunctionDecl*>(decl);
   TagDecl *t = dynamic_cast<TagDecl*>(decl);
+  EnumDecl *e = dynamic_cast<EnumDecl*>(decl);
   TypedefNameDecl *td = dynamic_cast<TypedefDecl*>(decl);
 
   if (f && f->hasBody() && f->isThisDeclarationADefinition()) {
     Print_Decl_Raw(f);
     Out << "\n";
-  } else if (t && t->getName() == "") {
-    /* If the RecordType doesn't have a name, then don't print it.  */
+  } else if (e) {
+      decl->print(Out, PPolicy);
+      Out << ";\n";
+  } else if (!e && t && t->getName() == "") {
+    /* If the RecordType doesn't have a name, then don't print it.  Except when
+       it is an empty named enum declaration, which in this case we must print
+       because it contains declared constants.  */
   } else if (td) {
     if (SM) {
     /* The Get_Source_Text will hang in the following case:
@@ -70,7 +76,7 @@ void PrettyPrint::Print_Decl(Decl *decl)
        but since the struct has no name, Type goes undefined.
 
        The way we fix that is output the typedef and the TagDecl
-       body, and we avoid outputs of unamed structs.  
+       body, and we avoid outputs of unamed structs.
 
        This problem does not seem to show up if we are printing
        from source location.  */

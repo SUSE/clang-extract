@@ -15,6 +15,48 @@
 using namespace llvm;
 using namespace clang;
 
+static void Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
+{
+  ctx->AST.reset();
+
+  IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
+  std::shared_ptr<CompilerInvocation> CInvok;
+  std::shared_ptr<PCHContainerOperations> PCHContainerOps;
+
+  if (!fs) {
+    /* Create a virtual file system.  */
+    ctx->OFS = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
+    ctx->MFS = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(new vfs::InMemoryFileSystem);
+
+    /* Push an additional memory filesystem on top of the overlay filesystem
+       which will hold temporary modified files.  */
+    ctx->OFS->pushOverlay(ctx->MFS);
+
+    fs = ctx->OFS;
+  }
+
+  /* Built the ASTUnit from the passed command line and set its SourceManager
+     to the PrettyPrint class.  */
+  Diags = CompilerInstance::createDiagnostics(new DiagnosticOptions());
+#if __clang_major__ >= 15
+  CreateInvocationOptions CIOpts;
+  CIOpts.Diags = Diags;
+  CInvok = createInvocation(ctx->ClangArgs, std::move(CIOpts));
+#else
+  CInvok = createInvocationFromCommandLine(ctx->ClangArgs, Diags);
+#endif
+
+  FileManager *FileMgr = new FileManager(FileSystemOptions(), fs);
+  PCHContainerOps = std::make_shared<PCHContainerOperations>();
+
+  auto AU = ASTUnit::LoadFromCompilerInvocation(
+      CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 1,
+      TU_Complete, false, false, false);
+
+  PrettyPrint::Set_Source_Manager(&AU->getSourceManager());
+  ctx->AST = std::move(AU);
+}
+
 std::string Pass::Get_Dump_Name_From_Input(PassManager::Context *ctx)
 {
   std::string work = ctx->InputPath;
@@ -41,6 +83,25 @@ class BuildASTPass : public Pass
     PassName = "BuildASTPass";
   }
 
+  /** Remove any undesired flags and insert new flags as necessary. */
+  void Update_Clang_Args(std::vector<const char *> &clangargs)
+  {
+    /* Linux adds -include header.h flag which we need to remove, else
+       the re-inclusion of this header when reparsing will overwrite our
+       changes.  */
+
+    for (auto it = clangargs.begin(); it != clangargs.end(); it++) {
+      const char *elem = *it;
+      if (!strcmp(elem, "-include")) {
+        clangargs.erase(it, it+2);
+
+        /* Required because we removed two elements from the vector.  */
+        it--;
+        it--;
+      }
+    }
+  }
+
   virtual bool Gate(PassManager::Context *ctx)
   {
     return true;
@@ -48,32 +109,10 @@ class BuildASTPass : public Pass
 
   virtual bool Run_Pass(PassManager::Context *ctx)
   {
-    IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
-    std::shared_ptr<CompilerInvocation> CInvok;
-    std::shared_ptr<PCHContainerOperations> PCHContainerOps;
+    Build_ASTUnit(ctx);
 
-    /* Create a virtual file system.  */
-    ctx->OFS = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
-    ctx->MFS = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(new vfs::InMemoryFileSystem);
-
-    /* Push an additional memory filesystem on top of the overlay filesystem
-       which will hold temporary modified files.  */
-    ctx->OFS->pushOverlay(ctx->MFS);
-
-    /* Built the ASTUnit from the passed command line and set its SourceManager
-       to the PrettyPrint class.  */
-    Diags = CompilerInstance::createDiagnostics(new DiagnosticOptions());
-    CInvok = createInvocationFromCommandLine(ctx->ClangArgs, Diags);
-
-    FileManager *FileMgr = new FileManager(FileSystemOptions(), ctx->OFS);
-    PCHContainerOps = std::make_shared<PCHContainerOperations>();
-
-    auto AU = ASTUnit::LoadFromCompilerInvocation(
-        CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 1,
-        TU_Complete, false, false, false);
-
-    PrettyPrint::Set_Source_Manager(&AU->getSourceManager());
-    ctx->AST = std::move(AU);
+    /* Remove any unwanted arguments from command line.  */
+    Update_Clang_Args(ctx->ClangArgs);
 
     /* Get the input file path.  */
     ctx->InputPath = Get_Input_File(ctx->AST.get()).str();
@@ -84,6 +123,9 @@ class BuildASTPass : public Pass
 
   virtual void Dump_Result(PassManager::Context *ctx)
   {
+    /* If the code is too large, this crashes with an stack overflow.  */
+    return;
+
     clang::ASTUnit::top_level_iterator it;
 
     std::error_code ec;
@@ -171,8 +213,7 @@ class ClosurePass : public Pass
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), None, ctx->MFS);
-      PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
+      Build_ASTUnit(ctx, ctx->MFS);
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return !de.hasErrorOccurred();

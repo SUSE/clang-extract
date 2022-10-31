@@ -241,7 +241,6 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
     const IdentifierInfo *tok_id = tok->getIdentifierInfo();
 
     if (tok_id != nullptr) {
-      MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
 
       /* We must be careful to not confuse tokens which are function-like macro
          arguments with other macors.  Example:
@@ -251,8 +250,21 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
 
          We should not add `a` as macro when analyzing MAX once it is clearly an
          argument of the macro, not a reference to other symbol.  */
-      if (maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
-        inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
+      if (!MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
+        MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
+
+        /* If this token is actually a name to a declared macro, then analyze it
+           as well.  */
+        if (maybe_macro) {
+          inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
+
+        /* If the token is a name to a constant declared in an enum, then add
+           the enum as well.  */
+        } else if (EnumDecl *edecl = EnumTable.Get(tok->getIdentifierInfo()->getName())) {
+          if (edecl && !Is_Decl_Marked(edecl)) {
+            Add_Decl_And_Prevs(edecl);
+          }
+        }
       }
     }
   }
@@ -269,7 +281,10 @@ int MacroDependencyFinder::Populate_Need_Undef(void)
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
 
       MacroDirective *directive = MW.Get_Macro_Directive(def);
-      assert(directive);
+
+      /* If there is no history, then doesn't bother analyzing.  */
+      if (directive == nullptr)
+        continue;
 
       /* There is no point in analyzing a macro that wasn't added for output.  */
       if (Is_Macro_Marked(directive->getMacroInfo())) {

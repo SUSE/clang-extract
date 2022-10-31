@@ -41,7 +41,8 @@ MacroInfo *MacroWalker::Get_Macro_Info(const IdentifierInfo *id, const SourceLoc
   return nullptr;
 }
 
-MacroDirective *MacroWalker::Get_Macro_Directive(MacroDefinitionRecord *record) {
+MacroDirective *MacroWalker::Get_Macro_Directive(MacroDefinitionRecord *record)
+{
   const IdentifierInfo *id = record->getName();
   MacroDirective *directive = PProcessor.getLocalMacroDirectiveHistory(id);
   while (directive) {

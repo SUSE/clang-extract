@@ -209,7 +209,6 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 {
 
   SourceManager &sm = AST->getSourceManager();
-  clang::SourceManager::fileinfo_iterator it;
 
   /* Our updated file buffer for main file.  */
   FileID main_id = sm.getMainFileID();
@@ -283,8 +282,15 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         outstr << ";\n";
 
         /* Get source location of old function declaration.  */
-        SourceLocation decl_start = decl->getSourceRange().getBegin();
-        SourceLocation decl_end = Lexer::getLocForEndOfToken(
+        SourceLocation decl_start;
+        SourceLocation decl_end;
+
+        decl_start = Lexer::GetBeginningOfToken(
+            decl->getSourceRange().getBegin(),
+            AST->getSourceManager(),
+            AST->getLangOpts());
+
+        decl_end = Lexer::getLocForEndOfToken(
             decl->getSourceRange().getEnd(),
             0,
             AST->getSourceManager(),
@@ -293,7 +299,7 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         SourceRange decl_range(decl_start, decl_end);
 
         /* Replace text content of old declaration.  */
-        RW.ReplaceText(decl_range, outstr.str());
+        assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
 
         must_update = true;
         was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;

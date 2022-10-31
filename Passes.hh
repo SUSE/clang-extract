@@ -60,7 +60,7 @@ class PassManager {
         bool ExternalizationDisabled;
 
         /** The arguments that will be sent to clang when building the AST.  */
-        const std::vector<const char *> &ClangArgs;
+        std::vector<const char *> &ClangArgs;
 
         /** Current pass number in the passes list.  */
         int PassNum;
