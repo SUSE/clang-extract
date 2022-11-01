@@ -116,6 +116,55 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
   /* If a SourceManager was specified and the decl source range seems valid,
      then output based on the original source code.  */
   if (SM && Is_Range_Valid(decl_range)) {
+
+    /* The range given by getSourceRange ignores attributes. Example :
+
+    int a __attribute__((aligned (8)));
+
+    outputs:
+
+    int a;
+
+    Therefore we must check for the attributes of this declaration and compute
+    the furthest location.  */
+
+    SourceLocation furthest = decl_range.getEnd();
+    AttrVec &attrvec = decl->getAttrs();
+    bool has_attr;
+
+    for (int i = 0; i < attrvec.size(); i++) {
+      SourceLocation loc = attrvec[i]->getRange().getEnd();
+      loc = Lexer::getLocForEndOfToken(loc, 0, *SM, LangOpts);
+
+      if (loc.isValid() && Is_Before(furthest, loc)) {
+        furthest = loc;
+        has_attr = true;
+      }
+    }
+
+    /* Find the last ')'.  On __attribute__((unused)), the previous code reach
+       until __attribute__((unused), ignoring the last parenthesis.  */
+    if (has_attr) {
+
+      tok::TokenKind r_paren(tok::r_paren);
+
+      while (true) {
+        auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
+        Token *tok = maybe_next_tok.getPointer();
+
+        if (tok == nullptr) {
+          break;
+        }
+
+        if (tok->is(r_paren)) {
+          furthest = tok->getLastLoc();
+        } else {
+          break;
+        }
+      }
+    }
+
+    decl_range = SourceRange(decl_range.getBegin(), furthest);
     StringRef decl_source = Get_Source_Text(decl_range);
 
     /* If for some reason Get_Source_Text is unable to find the source range
