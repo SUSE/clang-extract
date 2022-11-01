@@ -302,6 +302,29 @@ int MacroDependencyFinder::Populate_Need_Undef(void)
   return count;
 }
 
+void MacroDependencyFinder::Remove_Redundant_Decls(void)
+{
+  ASTUnit::top_level_iterator it;
+
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); it++) {
+    if (DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it)) {
+      SourceRange range = decl->getSourceRange();
+
+      const Type *type = decl->getType().getTypePtr();
+      TagDecl *typedecl = type->getAsTagDecl();
+      if (typedecl && Is_Decl_Marked(typedecl)) {
+        SourceRange type_range = typedecl->getSourceRange();
+
+        /* Using .fullyContains() fails in some declarations.  */
+        if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+          typedecl->print(llvm::outs(), LangOptions());
+          Dependencies.erase(typedecl);
+        }
+      }
+    }
+  }
+}
+
 void MacroDependencyFinder::Find_Macros_Required(void)
 {
   /* If a SourceManager wasn't passed to the PrettyPrint class we cannot
@@ -338,6 +361,7 @@ void MacroDependencyFinder::Find_Macros_Required(void)
   }
 
   Populate_Need_Undef();
+  Remove_Redundant_Decls();
 }
 
 void MacroDependencyFinder::Dump_Dependencies(void)

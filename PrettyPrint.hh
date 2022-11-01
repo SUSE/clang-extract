@@ -37,6 +37,8 @@ class PrettyPrint
 
   static void Print_Attr(Attr *attr);
 
+  static bool Contains_From_LineCol(const SourceRange &a, const SourceRange &b);
+
   static bool Contains(const SourceRange &a, const SourceRange &b);
 
   static inline void Set_Source_Manager(SourceManager *sm)

@@ -99,6 +99,9 @@ class MacroDependencyFinder : public FunctionDependencyFinder
      somewhere in the code.  */
   int Populate_Need_Undef(void);
 
+  /* Remove redundant decls, whose source location is inside another decl.  */
+  void Remove_Redundant_Decls();
+
   /* Hash containing the macros that are marked for output.  */
   std::unordered_set<MacroInfo*> MacroDependencies;
 

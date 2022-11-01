@@ -246,13 +246,8 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
   return is_before(a, b);
 }
 
-bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
+bool PrettyPrint::Contains_From_LineCol(const SourceRange &a, const SourceRange &b)
 {
-
-  if (a.fullyContains(b)) {
-    return true;
-  }
-
   PresumedLoc a_begin = SM->getPresumedLoc(a.getBegin());
   PresumedLoc a_end   = SM->getPresumedLoc(a.getEnd());
   PresumedLoc b_begin = SM->getPresumedLoc(b.getBegin());
@@ -280,6 +275,15 @@ bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
   }
 
   return a_begin_smaller && b_end_smaller;
+}
+
+bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
+{
+  if (a.fullyContains(b)) {
+    return true;
+  }
+
+  return Contains_From_LineCol(a, b);
 }
 
 /** Compare if SourceLocation a is after SourceLocation b in the source code.  */
