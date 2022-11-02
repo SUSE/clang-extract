@@ -90,6 +90,8 @@ class PrettyPrint
   /** Set output to file.  */
   static void Set_Output_To(const std::string &path);
 
+  static SourceLocation Get_Expanded_Loc(Decl *decl);
+
   /* This class can not be initialized.  */
   PrettyPrint() = delete;
 

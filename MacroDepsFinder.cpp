@@ -317,7 +317,6 @@ void MacroDependencyFinder::Remove_Redundant_Decls(void)
 
         /* Using .fullyContains() fails in some declarations.  */
         if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
-          typedecl->print(llvm::outs(), LangOptions());
           Dependencies.erase(typedecl);
         }
       }
@@ -343,13 +342,15 @@ void MacroDependencyFinder::Find_Macros_Required(void)
     Decl *decl = *it;
 
     if (decl && Is_Decl_Marked(decl)) {
+      SourceLocation expanded_decl_loc = PrettyPrint::Get_Expanded_Loc(decl);
 
       /* While the macro is before the end limit of the decl range, then:  */
-      while (macro_it != rec->end() && PrettyPrint::Is_Before((*macro_it)->getSourceRange().getBegin(), decl->getEndLoc())) {
+      while (macro_it != rec->end() && PrettyPrint::Is_Before((*macro_it)->getSourceRange().getBegin(), expanded_decl_loc)) {
+        SourceRange decl_range(decl->getSourceRange().getBegin(), expanded_decl_loc);
 
         /* If the macro location is in the Decl (function, variable, ...) range,
            then analyze this macro and its dependencies.  */
-        if (PrettyPrint::Contains(decl->getSourceRange(), (*macro_it)->getSourceRange())) {
+        if (PrettyPrint::Contains(decl_range, (*macro_it)->getSourceRange())) {
           if (MacroExpansion *macroexp = dyn_cast<MacroExpansion>(*macro_it)) {
             Backtrack_Macro_Expansion(macroexp);
           }
