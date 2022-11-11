@@ -189,16 +189,138 @@ static bool Already_Analyzed(MacroInfo *info)
   return AnalyzedMacros.find(info) != AnalyzedMacros.end();
 }
 
+/** Get next token in the token list.  */
+static StringRef Consume_Token(StringRef &token_list)
+{
+  static const char *empty = "";
+  int leading_spaces = 0;
+
+  if (token_list.size() == 0) {
+    return StringRef(empty);
+  }
+
+  /* Consume the spaces, if any.  */
+  while (token_list[leading_spaces] == ' ') {
+    leading_spaces++;
+  }
+
+  token_list = token_list.drop_front(leading_spaces);
+
+  /* Find , token argument separator.  */
+  size_t comma = token_list.find_first_of(',');
+
+  StringRef token = token_list.substr(0, comma);
+  if (comma < token_list.npos) {
+    token_list = token_list.drop_front(comma+1);
+  } else {
+    token_list = StringRef(empty);
+  }
+
+  return token;
+}
+
 bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
 {
   MacroInfo *info = MW.Get_Macro_Info(macroexp);
+  std::map<std::string, std::string> symtab;
+
+  /* In the case the macro is function-like, we must find the tokens which are
+     they parameters.  */
+  if (info && info->isFunctionLike()) {
+    StringRef expansion_str = PrettyPrint::Get_Source_Text(macroexp->getSourceRange());
+
+    /* Find parameters.  */
+    size_t lparen = expansion_str.find_first_of('(');
+    size_t rparen = expansion_str.find_last_of(')');
+    size_t len = rparen - lparen - 1;
+
+    assert(len >= 0);
+
+    StringRef token_list = expansion_str.substr(lparen+1, len);
+
+    auto it = info->param_begin();
+    StringRef token = Consume_Token(token_list);
+    while (token != "" && it != info->param_end()) {
+
+      std::string var = (*it)->getName().str();
+      symtab[var] = token.str();
+
+      token = Consume_Token(token_list);
+      it++;
+    }
+  }
 
   /* Reset the analyzed set.  */
   AnalyzedMacros = std::unordered_set<MacroInfo *>();
-  return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
+  return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin(), symtab);
 }
 
-bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc)
+static StringRef Get_Token_String(const Token *tok)
+{
+  tok::TokenKind tk = tok->getKind();
+
+  if (tok::isAnyIdentifier(tk)) {
+    return tok->getIdentifierInfo()->getName();
+  }
+
+  const char *punct = tok::getPunctuatorSpelling(tk);
+  if (punct) {
+    return StringRef(punct);
+  }
+
+  const char *spell = tok::getKeywordSpelling(tk);
+  if (punct) {
+    return StringRef(spell);
+  }
+
+  return StringRef();
+}
+
+
+void Dump_Map(std::map<std::string, std::string> &map)
+{
+  for (const auto& elem : map)
+  {
+    llvm::outs() << elem.first << " : " << elem.second << "\n";
+  }
+}
+
+static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *info, MacroInfo::const_tokens_iterator curr_it)
+{
+  std::map<std::string, std::string> symtab;
+
+  if (info->isFunctionLike()) {
+    int num_paren = 0;
+    const Token *tok;
+    MacroInfo::param_iterator param = info->param_begin();
+
+    do {
+      tok = ++curr_it;
+      tok::TokenKind tok_kind = tok->getKind();
+
+      if (tok_kind == tok::l_paren) {
+        num_paren++;
+      } else if (tok_kind == tok::r_paren) {
+        num_paren--;
+      }
+
+      IdentifierInfo *arg_info = tok->getIdentifierInfo();
+      if (num_paren == 1 && tok_kind != tok::comma && arg_info) {
+        StringRef arg_str = arg_info->getName();
+        const StringRef param_str = (*param)->getName();
+
+        symtab[param_str.str()] = arg_str.str();
+
+        llvm::outs() << param_str << " : " << arg_str << '\n';
+        param++;
+      }
+    } while (num_paren > 0);
+  }
+
+  return symtab;
+}
+
+bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc, std::map<std::string, std::string> symtab)
 {
   bool inserted = false;
 
@@ -236,12 +358,40 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
   auto it = info->tokens_begin(); /* Use auto here as the it type changes according to clang version.  */
   /* Iterate on the expansion tokens of this macro to find if it references other
      macros.  */
+  const Token *last_token = nullptr;
   for (; it != info->tokens_end(); ++it) {
     const Token *tok = it;
     const IdentifierInfo *tok_id = tok->getIdentifierInfo();
+    tok::TokenKind tok_kind = tok->getKind();
+
+    /* Handle the case where we concat symbols into a new one.  */
+    if (tok_kind == tok::hashhash) {
+
+      StringRef prevname = Get_Token_String(last_token);
+      StringRef nextname = Get_Token_String(++it);
+
+      if (MacroWalker::Is_Identifier_Macro_Argument(info, prevname)) {
+        prevname = symtab[prevname.str()];
+      }
+
+      if (MacroWalker::Is_Identifier_Macro_Argument(info, nextname)) {
+        nextname = symtab[nextname.str()];
+      }
+
+      Preprocessor &pprocessor = AST->getPreprocessor();
+      std::string concat = prevname.str() + nextname.str();
+
+      IdentifierInfo *concat_id = pprocessor.getIdentifierInfo(concat);
+      MacroInfo *concat_macro = pprocessor.getMacroInfo(concat_id);
+      if (concat_macro) {
+        auto new_symtab = Get_Macro_Args_Replacement(concat_macro, it);
+        inserted |= Backtrack_Macro_Expansion(concat_macro, loc, new_symtab);
+      }
+
+      it--;
+    }
 
     if (tok_id != nullptr) {
-
       /* We must be careful to not confuse tokens which are function-like macro
          arguments with other macors.  Example:
 
@@ -256,7 +406,8 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
         /* If this token is actually a name to a declared macro, then analyze it
            as well.  */
         if (maybe_macro) {
-          inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
+          auto new_symtab = Get_Macro_Args_Replacement(maybe_macro, it);
+          inserted |= Backtrack_Macro_Expansion(maybe_macro, loc, new_symtab);
 
         /* If the token is a name to a constant declared in an enum, then add
            the enum as well.  */
@@ -267,6 +418,7 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
         }
       }
     }
+    last_token = tok;
   }
 
   return inserted;

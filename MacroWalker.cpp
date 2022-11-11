@@ -61,12 +61,8 @@ MacroDirective *MacroWalker::Get_Macro_Directive(MacroDefinitionRecord *record)
   return nullptr;
 }
 
-bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, const IdentifierInfo *tok)
+bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, StringRef tok_str)
 {
-  if (tok == nullptr)
-    return false;
-
-  StringRef tok_str = tok->getName();
   for (const IdentifierInfo *arg : info->params()) {
     StringRef arg_str = arg->getName();
     if (tok_str.equals(arg_str)) {
@@ -75,4 +71,12 @@ bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, const Identifier
   }
 
   return false;
+}
+
+bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, const IdentifierInfo *tok)
+{
+  if (tok == nullptr)
+    return false;
+
+  return Is_Identifier_Macro_Argument(info, tok->getName());
 }

@@ -24,6 +24,7 @@ class MacroWalker
 
   /** Check if IdentifierInfo `tok` is actually an argument of the macro info.  */
   static bool Is_Identifier_Macro_Argument(MacroInfo *info, const IdentifierInfo *tok);
+  static bool Is_Identifier_Macro_Argument(MacroInfo *info, StringRef tok_str);
 
   private:
   Preprocessor &PProcessor;

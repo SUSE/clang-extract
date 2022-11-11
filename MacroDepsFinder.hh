@@ -93,7 +93,7 @@ class MacroDependencyFinder : public FunctionDependencyFinder
       will have its value changed.  We take this into account by looking at the
       location where the macro is expanded. In `f` it will discard the last
       definition of A and get the last one above the expansion of U.  */
-  bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
+  bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc, std::map<std::string, std::string> symtab);
 
   /* Populate the NeedsUndef vector whith macros that needs to be undefined
      somewhere in the code.  */
