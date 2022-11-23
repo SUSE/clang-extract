@@ -285,7 +285,7 @@ void Dump_Map(std::map<std::string, std::string> &map)
   }
 }
 
-static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *info, MacroInfo::const_tokens_iterator curr_it)
+static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *info, MacroInfo::const_tokens_iterator curr_it, const std::map<std::string, std::string> &old_symtab)
 {
   std::map<std::string, std::string> symtab;
 
@@ -306,15 +306,32 @@ static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *
 
       IdentifierInfo *arg_info = tok->getIdentifierInfo();
       if (num_paren == 1 && tok_kind != tok::comma && arg_info) {
-        StringRef arg_str = arg_info->getName();
+
+        std::string arg_str = arg_info->getName().str();
         const StringRef param_str = (*param)->getName();
 
-        symtab[param_str.str()] = arg_str.str();
+        /* In case there is a ## token next the current token being
+           analyzed, we need to concatenate the current with the next
+           one to form the real token.  */
+        if (curr_it->getKind() == tok::hashhash) {
 
-        llvm::outs() << param_str << " : " << arg_str << '\n';
+          /* Get next token.  */
+          MacroInfo::const_tokens_iterator next = ++curr_it;
+
+          const IdentifierInfo *tok2_id = next->getIdentifierInfo();
+          StringRef arg2_str = next->getName();
+
+          if (tok2_id) {
+            arg_str = arg_str + arg2_str.str();
+          }
+        }
+
+        symtab[param_str.str()] = arg_str;
+
+        //llvm::outs() << param_str << " : " << arg_str << '\n';
         param++;
       }
-    } while (num_paren > 0);
+    } while (num_paren > 0 && param != info->param_end());
   }
 
   return symtab;
@@ -384,7 +401,7 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
       IdentifierInfo *concat_id = pprocessor.getIdentifierInfo(concat);
       MacroInfo *concat_macro = pprocessor.getMacroInfo(concat_id);
       if (concat_macro) {
-        auto new_symtab = Get_Macro_Args_Replacement(concat_macro, it);
+        auto new_symtab = Get_Macro_Args_Replacement(concat_macro, it, symtab);
         inserted |= Backtrack_Macro_Expansion(concat_macro, loc, new_symtab);
       }
 
@@ -400,13 +417,14 @@ bool MacroDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const Sou
 
          We should not add `a` as macro when analyzing MAX once it is clearly an
          argument of the macro, not a reference to other symbol.  */
+
       if (!MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
         MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
 
         /* If this token is actually a name to a declared macro, then analyze it
            as well.  */
         if (maybe_macro) {
-          auto new_symtab = Get_Macro_Args_Replacement(maybe_macro, it);
+          auto new_symtab = Get_Macro_Args_Replacement(maybe_macro, it, symtab);
           inserted |= Backtrack_Macro_Expansion(maybe_macro, loc, new_symtab);
 
         /* If the token is a name to a constant declared in an enum, then add
