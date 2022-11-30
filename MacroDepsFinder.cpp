@@ -272,7 +272,6 @@ static StringRef Get_Token_String(const Token *tok)
   if (punct) {
     return StringRef(spell);
   }
-
   return StringRef();
 }
 
@@ -285,16 +284,33 @@ void Dump_Map(std::map<std::string, std::string> &map)
   }
 }
 
-static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *info, MacroInfo::const_tokens_iterator curr_it, const std::map<std::string, std::string> &old_symtab)
+static std::map<std::string, std::string>
+Get_Macro_Args_Replacement(MacroInfo *info, MacroInfo::const_tokens_iterator curr_it, std::map<std::string, std::string> &old_symtab)
 {
   std::map<std::string, std::string> symtab;
 
   if (info->isFunctionLike()) {
+    //PrettyPrint::Print_MacroInfo(info);
+
     int num_paren = 0;
     const Token *tok;
     MacroInfo::param_iterator param = info->param_begin();
 
-    do {
+    tok = ++curr_it;
+
+    /* Since this is a function-like macro, the next token must be a lparen.
+       Otherwise it is just a token that has a function-like macro with the
+       same name.  */
+    if (tok->getKind() != tok::l_paren) {
+      return symtab;
+    }
+
+    /* Increment the parenthesis stack to count that we are into finding the
+       parameters.  */
+    num_paren++;
+
+    std::string current_parameter_expansion = "";
+    while (num_paren > 0 && param != info->param_end()) {
       tok = ++curr_it;
       tok::TokenKind tok_kind = tok->getKind();
 
@@ -304,36 +320,41 @@ static std::map<std::string, std::string> Get_Macro_Args_Replacement(MacroInfo *
         num_paren--;
       }
 
-      IdentifierInfo *arg_info = tok->getIdentifierInfo();
-      if (num_paren == 1 && tok_kind != tok::comma && arg_info) {
+      if ((tok_kind == tok::comma && num_paren == 1) || num_paren == 0) {
 
-        std::string arg_str = arg_info->getName().str();
-        const StringRef param_str = (*param)->getName();
+        /* A parameter was found.  */
+        std::string param_str = (*param)->getName().str();
+        symtab[param_str] = current_parameter_expansion;
 
-        /* In case there is a ## token next the current token being
-           analyzed, we need to concatenate the current with the next
-           one to form the real token.  */
-        if (curr_it->getKind() == tok::hashhash) {
+        //llvm::outs() << "expansion: " << current_parameter_expansion << '\n';
 
-          /* Get next token.  */
-          MacroInfo::const_tokens_iterator next = ++curr_it;
-
-          const IdentifierInfo *tok2_id = next->getIdentifierInfo();
-          StringRef arg2_str = next->getName();
-
-          if (tok2_id) {
-            arg_str = arg_str + arg2_str.str();
-          }
+        current_parameter_expansion = "";
+        param++;
+      } else {
+        /* We are still matching a parameter.  */
+        if (tok->getKind() == tok::hashhash) {
+          /* In case where the current token is ##, we must concatenate with
+             the next token.  */
+          tok = ++curr_it;
         }
 
-        symtab[param_str.str()] = arg_str;
+        if (tok::isAnyIdentifier(tok->getKind())) {
+          std::string tok_id = tok->getIdentifierInfo()->getName().str();
+          std::string val = old_symtab[tok_id];
 
-        //llvm::outs() << param_str << " : " << arg_str << '\n';
-        param++;
+          /* In case the value is not a parameter, then replace with the
+             origial identifier.  */
+          if (val == "") {
+            val = tok_id;
+          }
+          current_parameter_expansion += val;
+        } else {
+          /* Token is a punctuation or something like that.  */
+          current_parameter_expansion += Get_Token_String(tok).str();
+        }
       }
-    } while (num_paren > 0 && param != info->param_end());
+    }
   }
-
   return symtab;
 }
 
