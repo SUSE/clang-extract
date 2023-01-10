@@ -1,12 +1,19 @@
 #pragma once
 
 #include "EnumConstTbl.hh"
+#include "MacroWalker.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Analysis/CallGraph.h>
 #include <unordered_set>
 
 using namespace clang;
+
+struct MacroIterator
+{
+  clang::PreprocessingRecord::iterator macro_it;
+  unsigned undef_it;
+};
 
 /** Build CallGraph from AST.
  *
@@ -57,15 +64,15 @@ CallGraph *Build_CallGraph_From_AST(ASTUnit *ast);
 class FunctionDependencyFinder
 {
   public:
-    FunctionDependencyFinder(ASTUnit *ast, std::string const &function);
-    FunctionDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions);
+    FunctionDependencyFinder(ASTUnit *ast, std::string const &function, bool closure=true);
+    FunctionDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions, bool closure=true);
 
     /** Print the marked nodes as they appear in the AST.  */
     void Print();
 
   protected:
     /** Run the analysis on function `function`*/
-    void Run_Analysis(std::vector<std::string> const &function);
+    void Run_Analysis(std::vector<std::string> const &function, bool closure);
 
     /** Mark decl as dependencies and all its previous decls versions.  */
     bool Add_Decl_And_Prevs(Decl *decl);
@@ -105,6 +112,61 @@ class FunctionDependencyFinder
     EnumConstantDecl in this case, forcing us to reparse this declaration.  */
     bool Handle_Array_Size(ValueDecl *decl);
 
+    /** Macros can expand into other macros, which must be expanded as well in a tree
+        like fashion.  We don't implement such tree, so we track every macro that
+        should be expanded as well by analyzing the sequence of tokens it produces.  */
+    bool Backtrack_Macro_Expansion(MacroExpansion *macroexp);
+
+    /** Use the name of the macro as argument, as well as the expansion location.
+        Macros can be redefined in weird ways such as:
+
+        #define MAX(a, b) ((a) > (b) ? (a) : (b))
+        #define A 3
+        #define U MAX(A, 2)
+
+        int f() {
+          return U;
+        }
+
+        #define A 2
+
+        int g() {
+          return U;
+        }
+
+        One may think that functions f and g produce the same result, but actually
+        they don't. Since macro A is redefined, the expansion of MAX(A, 2) will
+        will have its value changed.  We take this into account by looking at the
+        location where the macro is expanded. In `f` it will discard the last
+        definition of A and get the last one above the expansion of U.  */
+    bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
+
+    /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
+    void Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc);
+
+    /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
+        printing all macros reached in this path.  */
+    void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print=true);
+
+    /** Iterate on the PreprocessingRecord through `it` until the end of the
+        PreprocessingRecord is reached, printing all macros reached in this path.  */
+    void Print_Remaining_Macros(MacroIterator &it);
+
+    /** Return a new MacroIterator.  */
+    MacroIterator Get_Macro_Iterator(void);
+
+    /** Analyze macros in order to find references to constants declared in enums,
+        like in enum { CONSTANT = 0 }; and then #define MACRO CONSTANT.  */
+    void Include_Enum_Constants_Referenced_By_Macros(void);
+
+    /* Populate the NeedsUndef vector whith macros that needs to be undefined
+       somewhere in the code.  */
+    int Populate_Need_Undef(void);
+
+    /* Remove redundant decls, whose source location is inside another decl.  */
+    void Remove_Redundant_Decls();
+
+
     /** Datastructure holding all Decls required for the functions. This is
         then used to mark which Decls we need to output.
 
@@ -119,8 +181,18 @@ class FunctionDependencyFinder
         they original enum object.  */
     EnumConstantTable EnumTable;
 
+    /* Vector of MacroDirective of macros that needs to be undefined somewhere in
+       the code.  */
+    std::vector<MacroDirective*> NeedsUndef;
+
+    MacroWalker MW;
+
 
     /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)
     { return Dependencies.find(decl) != Dependencies.end(); }
+
+    /** Determine if a macro that are marked for output.  */
+    inline bool Is_Macro_Marked(MacroInfo *x)
+    { return x->isUsed(); }
 };

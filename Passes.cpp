@@ -1,7 +1,6 @@
 #include "Passes.hh"
 
 #include "FunctionDepsFinder.hh"
-#include "MacroDepsFinder.hh"
 #include "ArgvParser.hh"
 #include "PrettyPrint.hh"
 #include "FunctionExternalizeFinder.hh"
@@ -14,6 +13,15 @@
 
 using namespace llvm;
 using namespace clang;
+
+void Print_AST(ASTUnit *ast)
+{
+  for (auto it = ast->top_level_begin(); it != ast->top_level_end(); ++it) {
+    Decl *decl = *it;
+
+    decl->print(llvm::outs(), PrintingPolicy(LangOptions()));
+  }
+}
 
 static void Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
 {
@@ -194,6 +202,27 @@ class ClosurePass : public Pass
       ctx->CodeOutput = std::string();
       raw_string_ostream code_stream(ctx->CodeOutput);
 
+      PrettyPrint::Set_Output_Ostream(&code_stream);
+
+      /* Compute closure and output the code.  */
+      FunctionDependencyFinder fdf(ctx->AST.get(), ctx->FuncExtractNames);
+      fdf.Print();
+
+      /* Add the temporary string with code to the filesystem.  */
+      ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
+
+      /* Parse the temporary code to apply the changes by the externalizer
+         and set its new SourceManager to the PrettyPrint class.  */
+      Build_ASTUnit(ctx, ctx->MFS);
+
+      /* If there was an error on building the AST here, don't continue.  */
+      const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
+      if (de.hasErrorOccurred()) {
+        return false;
+      }
+
+      ctx->CodeOutput = std::string();
+
       /* Set output stream to a file if we set to print to a file.  */
       if (PrintToFile) {
         std::string output_path = ctx->OutputFile;
@@ -206,18 +235,14 @@ class ClosurePass : public Pass
       }
 
       /* Compute closure and output the code.  */
-      MacroDependencyFinder mdf(ctx->AST.get(), ctx->FuncExtractNames);
-      mdf.Print();
+      FunctionDependencyFinder fdf2(ctx->AST.get(), ctx->FuncExtractNames, /*closure=*/false);
+      fdf2.Print();
 
       /* Add the temporary string with code to the filesystem.  */
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
 
-      /* Parse the temporary code to apply the changes by the externalizer
-         and set its new SourceManager to the PrettyPrint class.  */
-      Build_ASTUnit(ctx, ctx->MFS);
-
-      const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
-      return !de.hasErrorOccurred();
+      const DiagnosticsEngine &de2 = ctx->AST->getDiagnostics();
+      return !de2.hasErrorOccurred();
     }
 
     virtual void Dump_Result(PassManager::Context *ctx)

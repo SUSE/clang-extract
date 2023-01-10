@@ -182,6 +182,11 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
   }
 }
 
+void PrettyPrint::Debug_Decl(Decl *decl)
+{
+  llvm::outs() << Get_Source_Text(decl->getSourceRange()) << '\n';
+}
+
 void PrettyPrint::Print_Stmt(Stmt *stmt)
 {
   /* Currently only used for debugging.  */

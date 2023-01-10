@@ -3,6 +3,8 @@
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
 
+#define PProcessor (AST->getPreprocessor())
+
 /** Build CallGraph from AST.
  *
  * The CallGraph is a datastructure in which nodes are functions and edges
@@ -36,6 +38,127 @@ CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
   }
 
   return cg;
+}
+
+MacroIterator FunctionDependencyFinder::Get_Macro_Iterator(void)
+{
+  MacroIterator it;
+  it.macro_it = PProcessor.getPreprocessingRecord()->begin();
+  it.undef_it = 0;
+  return it;
+}
+
+void FunctionDependencyFinder::Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc)
+{
+  Print_Macros_Until(it, loc, /*print = */ false);
+}
+
+void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print)
+{
+  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
+
+  /* Ensure that PreprocessingRecord is avaialable.  */
+  assert(rec && "PreprocessingRecord wasn't generated");
+
+  SourceLocation curr_loc;
+
+  /* We have to iterate in both the preprocessor record and the marked undef
+     vector to find which one we should print based on the location.  This is
+     somewhat similar to how mergesort merge two sorted vectors, if this
+     somehow helps to understand this code.  */
+  while (true) {
+    PreprocessedEntity *e = (it.macro_it == rec->end())? nullptr: *it.macro_it;
+    MacroDirective *undef = nullptr;
+    bool should_print_undef = false;
+
+    /* If we still have items to iterate on the preprocessing record.  */
+    if (e) {
+      curr_loc = e->getSourceRange().getBegin();
+    }
+
+    /* If we still have itens to iterate on the Undef vector.  */
+    if (it.undef_it < NeedsUndef.size()) {
+      undef = NeedsUndef[it.undef_it];
+      SourceLocation undef_loc = undef->getDefinition().getUndefLocation();
+
+      /* Now find out which one comes first.  */
+      if (!e || PrettyPrint::Is_Before(undef_loc, curr_loc)) {
+        should_print_undef = true;
+        curr_loc = undef_loc;
+      }
+    }
+
+    /* Check if we did not past the loc marker where we should stop printing.  */
+    if (curr_loc.isValid() && PrettyPrint::Is_Before(curr_loc, loc)) {
+      if (should_print_undef) {
+        if (print)
+          PrettyPrint::Print_Macro_Undef(undef);
+        it.undef_it++;
+      } else if (e) {
+        MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e);
+        if (print && entity && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
+          PrettyPrint::Print_Macro_Def(entity);
+        }
+        it.macro_it++;
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+
+  }
+}
+
+void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
+{
+  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
+
+  /* Ensure that PreprocessingRecord is avaialable.  */
+  assert(rec && "PreprocessingRecord wasn't generated");
+
+  SourceLocation curr_loc;
+
+  /* We have to iterate in both the preprocessor record and the marked undef
+     vector to find which one we should print based on the location.  This is
+     somewhat similar to how mergesort merge two sorted vectors, if this
+     somehow helps to understand this code.  */
+  while (true) {
+    PreprocessedEntity *e = (it.macro_it == rec->end())? nullptr: *it.macro_it;
+    MacroDirective *undef = nullptr;
+    bool should_print_undef = false;
+
+    /* If we still have items to iterate on the preprocessing record.  */
+    if (e) {
+      curr_loc = e->getSourceRange().getBegin();
+    }
+
+    /* If we still have itens to iterate on the Undef vector.  */
+    if (it.undef_it < NeedsUndef.size()) {
+      undef = NeedsUndef[it.undef_it];
+      SourceLocation undef_loc = undef->getDefinition().getUndefLocation();
+
+      /* Now find out which one comes first.  */
+      if (!e || PrettyPrint::Is_Before(undef_loc, curr_loc)) {
+        should_print_undef = true;
+        curr_loc = undef_loc;
+      }
+    }
+
+    /* Check if we did not past the loc marker where we should stop printing.  */
+    if (should_print_undef) {
+      PrettyPrint::Print_Macro_Undef(undef);
+      it.undef_it++;
+    } else if (e) {
+      MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e);
+      if (entity && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
+        PrettyPrint::Print_Macro_Def(entity);
+      }
+      it.macro_it++;
+    } else {
+      break;
+    }
+  }
 }
 
 void FunctionDependencyFinder::Find_Functions_Required
@@ -303,21 +426,25 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 /** FunctionDependencyFinder class methods implementation.  */
 
 FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
-                                                   std::string const &function)
+                                                   std::string const &function,
+                                                   bool closure)
   : AST(ast),
-    EnumTable(AST)
+    EnumTable(AST),
+    MW(AST->getPreprocessor())
 {
   std::vector<std::string> functions{ function };
-  Run_Analysis(functions);
+  Run_Analysis(functions, closure);
 }
 
 
 FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
-                                                   std::vector<std::string> const &functions)
+                                                   std::vector<std::string> const &funcs,
+                                                   bool closure)
   : AST(ast),
-    EnumTable(AST)
+    EnumTable(AST),
+    MW(AST->getPreprocessor())
 {
-  Run_Analysis(functions);
+  Run_Analysis(funcs, closure);
 }
 
 /** Add a decl to the Dependencies set and all its previous declarations in the
@@ -340,13 +467,41 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
 /** Pretty print all nodes were marked to output.  */
 void FunctionDependencyFinder::Print()
 {
+  SourceLocation last_decl_loc = SourceLocation::getFromRawEncoding(0U);
+  bool first = true;
+
+  /* We can only print macros if we have a SourceManager.  */
+  bool can_print_macros = (PrettyPrint::Get_Source_Manager() != nullptr);
+
+  MacroIterator macro_it = Get_Macro_Iterator();
   clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
 
     if (Is_Decl_Marked(decl)) {
+      if (can_print_macros) {
+        /* In the first decl we don't have a last source location, hence we have
+           to handle this special case.  */
+        if (first) {
+          Print_Macros_Until(macro_it, decl->getBeginLoc());
+          first = false;
+        } else {
+          /* Macros defined inside a function is printed together with the function,
+             so we must skip them.  */
+          Skip_Macros_Until(macro_it, last_decl_loc);
+
+          Print_Macros_Until(macro_it, decl->getBeginLoc());
+        }
+      }
+      last_decl_loc = decl->getEndLoc();
       PrettyPrint::Print_Decl(decl);
     }
+  }
+
+  if (can_print_macros) {
+    Skip_Macros_Until(macro_it, last_decl_loc);
+    /* Print remaining macros.  */
+    Print_Remaining_Macros(macro_it);
   }
 }
 
@@ -393,17 +548,248 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
   return true;
 }
 
-void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions)
+/** Set containing the macros which were already analyzed.  */
+static std::unordered_set<MacroInfo *> AnalyzedMacros;
+static bool Already_Analyzed(MacroInfo *info)
 {
-  /* Step 1: Build the CallGraph.  */
-  CallGraph *cg = Build_CallGraph_From_AST(AST);
+  return AnalyzedMacros.find(info) != AnalyzedMacros.end();
+}
 
-  /* Step 2: Find all functions that depends from `function`.  */
-  Find_Functions_Required(cg, functions);
 
-  /* Step 3: Find all Global variables and Types required by the functions
-     that are currently in the Dependencies set..  */
-  Compute_Closure();
+bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc)
+{
+  bool inserted = false;
 
-  delete cg;
+  if (info == nullptr)
+    return false;
+
+  /* If this macro were already been analyzed, then quickly return.
+
+     We can not use the MacroDependency set for that because macros
+     can reference macros that are later redefined. For example:
+
+     #define A B
+     int A;
+
+     #define A C
+     int A;.  */
+
+  if (Already_Analyzed(info)) {
+    return false;
+  }
+
+  AnalyzedMacros.insert(info);
+
+  /* If this MacroInfo object with the macro contents wasn't marked for output
+     then mark it now.  */
+  if (!Is_Macro_Marked(info)) {
+    inserted = true;
+  }
+
+  /* We can not quickly return if the macro is already marked.  Other macros
+     which this macro depends on may have been redefined in meanwhile, and
+     we don't implement some dependency tracking so far, so redo the analysis.  */
+
+  auto it = info->tokens_begin(); /* Use auto here as the it type changes according to clang version.  */
+  /* Iterate on the expansion tokens of this macro to find if it references other
+     macros.  */
+  for (; it != info->tokens_end(); ++it) {
+    const Token *tok = it;
+    const IdentifierInfo *tok_id = tok->getIdentifierInfo();
+
+    if (tok_id != nullptr) {
+      /* We must be careful to not confuse tokens which are function-like macro
+         arguments with other macors.  Example:
+
+         #define MAX(a, b) ((a) > (b) ? (a) : (b))
+         #define a 9
+
+         We should not add `a` as macro when analyzing MAX once it is clearly an
+         argument of the macro, not a reference to other symbol.  */
+      if (!MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
+        MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
+
+        /* If this token is actually a name to a declared macro, then analyze it
+           as well.  */
+        if (maybe_macro) {
+          inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
+
+        /* If the token is a name to a constant declared in an enum, then add
+           the enum as well.  */
+        } else if (EnumDecl *edecl = EnumTable.Get(tok->getIdentifierInfo()->getName())) {
+          if (edecl && !Is_Decl_Marked(edecl)) {
+            Add_Decl_And_Prevs(edecl);
+          }
+        }
+      }
+    }
+  }
+
+  return inserted;
+}
+
+bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
+{
+  MacroInfo *info = MW.Get_Macro_Info(macroexp);
+  return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
+}
+
+void FunctionDependencyFinder::Remove_Redundant_Decls(void)
+{
+  ASTUnit::top_level_iterator it;
+
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); it++) {
+
+    /* Handle the case where a enum is declared as:
+
+        typedef enum {
+          LEFT,
+          RIGHT
+        } Hand;
+
+        which is then broken as
+
+        enum {
+          LEFT,
+          RIGHT
+        };
+
+        typedef enum Hand Hand;
+
+        This one will remove the first enum and only mark the typedef
+        one because the location tracking will output the typedef
+        correctly.  */
+    if (TypedefDecl *decl = dynamic_cast<TypedefDecl *>(*it)) {
+      SourceRange range = decl->getSourceRange();
+
+      const Type *type = decl->getTypeForDecl();
+      if (type) {
+        TagDecl *typedecl = type->getAsTagDecl();
+
+        if (typedecl && Is_Decl_Marked(typedecl)) {
+          SourceRange type_range = typedecl->getSourceRange();
+
+          /* Using .fullyContains() fails in some declarations.  */
+          if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+            Dependencies.erase(typedecl);
+          }
+        }
+      }
+    } 
+    /* Handle the case where an enum is declared as:
+        extern enum system_states {
+          SYSTEM_BOOTING,
+          SYSTEM_SCHEDULING,
+          SYSTEM_FREEING_INITMEM,
+          SYSTEM_RUNNING,
+          SYSTEM_HALT,
+          SYSTEM_POWER_OFF,
+          SYSTEM_RESTART,
+          SYSTEM_SUSPEND,
+        } system_state;
+
+      In which will be broken down into:
+
+        enum system_states {
+          ...
+        };
+
+        enum system_states system_state;
+
+        this will remove the first enum declaration because the location
+        tracking will correctly include the enum system_states.  */
+
+    else if (DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it)) {
+      SourceRange range = decl->getSourceRange();
+
+      const Type *type = decl->getType().getTypePtr();
+      TagDecl *typedecl = type->getAsTagDecl();
+      if (typedecl && Is_Decl_Marked(typedecl)) {
+        SourceRange type_range = typedecl->getSourceRange();
+
+        /* Using .fullyContains() fails in some declarations.  */
+        if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+          Dependencies.erase(typedecl);
+        }
+      }
+    }
+  }
+}
+
+int FunctionDependencyFinder::Populate_Need_Undef(void)
+{
+  int count = 0;
+  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
+
+  for (PreprocessedEntity *entity : *rec) {
+    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
+
+      MacroDirective *directive = MW.Get_Macro_Directive(def);
+
+      /* If there is no history, then doesn't bother analyzing.  */
+      if (directive == nullptr)
+        continue;
+
+      /* There is no point in analyzing a macro that wasn't added for output.  */
+      if (Is_Macro_Marked(directive->getMacroInfo())) {
+        SourceLocation undef_loc = directive->getDefinition().getUndefLocation();
+
+        /* In case the macro isn't undefined then its location is invalid.  */
+        if (undef_loc.isValid()) {
+          NeedsUndef.push_back(directive);
+          count++;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(void)
+{
+  /* Ensure that PreprocessingRecord is avaialable.  */
+  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
+  assert(rec && "PreprocessingRecord wasn't generated");
+
+  clang::PreprocessingRecord::iterator macro_it;
+  for (macro_it = rec->begin(); macro_it != rec->end(); macro_it++) {
+    if (MacroDefinitionRecord *macroexp = dyn_cast<MacroDefinitionRecord>(*macro_it)) {
+      MacroInfo *info = MW.Get_Macro_Info(macroexp);
+      if (Is_Macro_Marked(info)) {
+        Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
+      }
+    }
+  }
+}
+
+void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions, bool closure)
+{
+  if (closure) {
+    /* Step 1: Build the CallGraph.  */
+    CallGraph *cg = Build_CallGraph_From_AST(AST);
+
+    /* Step 2: Find all functions that depends from `function`.  */
+    Find_Functions_Required(cg, functions);
+
+    /* Step 3: Find all Global variables and Types required by the functions
+       that are currently in the Dependencies set..  */
+    Compute_Closure();
+
+    delete cg;
+  } else {
+    /* Insert every declaration into the dependency list.  */
+    for (auto it = AST->top_level_begin(); it != AST->top_level_end(); it++) {
+      Dependencies.insert(*it);
+    }
+  }
+
+  /* Step 4: Find enum constants which are referenced by macros.  */
+  Include_Enum_Constants_Referenced_By_Macros();
+
+  /* Step 5: Handle macros that needs to be undefined.  */
+  Populate_Need_Undef();
+
+  /* Step 6: Remove any declaration that may have been declared twice.  */
+  Remove_Redundant_Decls();
 }

@@ -7,7 +7,6 @@ OBJECTS= \
 	Main.o \
 	PrettyPrint.o \
 	FunctionDepsFinder.o \
-	MacroDepsFinder.o \
 	EnumConstTbl.o \
 	SymbolExternalizer.o \
 	ArgvParser.o \

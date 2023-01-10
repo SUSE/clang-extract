@@ -24,6 +24,11 @@ class PrettyPrint
   static inline void Print_Decl_Tree(Decl *decl)
   { decl->print(*Out, PPolicy); *Out << '\n'; }
 
+  static inline void Debug_Decl_Tree(Decl *decl)
+  { decl->print(llvm::outs(), PPolicy); llvm::outs() << '\n'; }
+
+  static void Debug_Decl(Decl *decl);
+
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
 
