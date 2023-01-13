@@ -30,35 +30,8 @@ void PrettyPrint::Print_Decl(Decl *decl)
        because it contains declared constants.  */
   } else if (td) {
     if (SM) {
-    /* The Get_Source_Text will hang in the following case:
-      struct A {
-        int a;
-      }
-
-      typedef struct A A;
-
-      It generates the following code:
-
-      struct A {
-        int a;
-      }
-
-      typedef struct A {
-        int a;
-      } A;
-
-      which is a redefinition of struct A. Therefore we output the typedef manually.  */
-
-      TagDecl *tagdecl = td->getAnonDeclWithTypedefName();
-
-      if (tagdecl && tagdecl->getName() == "") {
-        Print_Decl_Raw(decl);
-        Out << ";\n";
-      } else {
-        decl->print(Out, PPolicy);
-        Out << ";\n";
-      }
-
+      Print_Decl_Raw(decl);
+      Out << ";\n";
     } else {
 
     /* The AST dump will hang on the following case:

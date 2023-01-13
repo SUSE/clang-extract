@@ -18,8 +18,8 @@ void Print_AST(ASTUnit *ast)
 {
   for (auto it = ast->top_level_begin(); it != ast->top_level_end(); ++it) {
     Decl *decl = *it;
-
     decl->print(llvm::outs(), PrintingPolicy(LangOptions()));
+    llvm::outs() << '\n';
   }
 }
 
@@ -210,6 +210,8 @@ class ClosurePass : public Pass
 
       /* Add the temporary string with code to the filesystem.  */
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
+
+      //Print_AST(ctx->AST.get());
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */

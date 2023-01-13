@@ -100,6 +100,8 @@ class FunctionDependencyFinder
     /* Add TypeDecl to the list of dependencies.  */
     bool Handle_TypeDecl(TypeDecl *decl);
 
+    bool Handle_EnumDecl(EnumDecl *decl);
+
   /* Handle the corner case where an array was declared as something like
 
     enum {
@@ -194,5 +196,5 @@ class FunctionDependencyFinder
 
     /** Determine if a macro that are marked for output.  */
     inline bool Is_Macro_Marked(MacroInfo *x)
-    { return x->isUsed(); }
+    { return x && x->isUsed(); }
 };

@@ -359,6 +359,25 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
   return inserted;
 }
 
+bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl)
+{
+  /* Mark the enum decl first to avoid problems with the following enums:
+
+    enum {
+      CONST0,
+      CONST1 = CONST0,
+    };
+  */
+  Add_Decl_And_Prevs(decl);
+
+  for (EnumConstantDecl *enum_const : decl->enumerators()) {
+    Expr *expr = enum_const->getInitExpr();
+    Mark_Types_In_Function_Body(expr);
+  }
+
+  return true;
+}
+
 void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 {
   if (!stmt)
@@ -394,12 +413,18 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
       /* If the decl is a reference to an enum field then we must add the
          enum declaration instead.  */
       if (EnumConstantDecl *ecdecl = dynamic_cast<EnumConstantDecl *>(decl)) {
-        to_mark = EnumTable.Get(ecdecl);
+        EnumDecl *enum_decl = EnumTable.Get(ecdecl);
         assert(to_mark && "Reference to EnumDecl not in EnumTable.");
-      }
 
-      if (!Is_Decl_Marked(to_mark))
-        Add_Decl_And_Prevs(to_mark);
+        /* Analyze the original enum to find references to other enum
+           constants.  */
+        if (enum_decl &&enum_decl &&  !Is_Decl_Marked(enum_decl)) {
+          Handle_EnumDecl(enum_decl);
+        }
+      } else {
+        if (!Is_Decl_Marked(to_mark))
+          Add_Decl_And_Prevs(to_mark);
+      }
     }
 
   } else if (Expr::classof(stmt)) {
@@ -618,7 +643,7 @@ bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const 
            the enum as well.  */
         } else if (EnumDecl *edecl = EnumTable.Get(tok->getIdentifierInfo()->getName())) {
           if (edecl && !Is_Decl_Marked(edecl)) {
-            Add_Decl_And_Prevs(edecl);
+            Handle_EnumDecl(edecl);
           }
         }
       }
@@ -669,13 +694,19 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         if (typedecl && Is_Decl_Marked(typedecl)) {
           SourceRange type_range = typedecl->getSourceRange();
 
-          /* Using .fullyContains() fails in some declarations.  */
-          if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
-            Dependencies.erase(typedecl);
+          /* Check if the strings regarding an decl empty. In that case we
+             can not delete the decl from list.  */
+          if (PrettyPrint::Get_Source_Text(range) != "" &&
+              PrettyPrint::Get_Source_Text(type_range) != "") {
+
+            /* Using .fullyContains() fails in some declarations.  */
+            if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+              Dependencies.erase(typedecl);
+            }
           }
         }
       }
-    } 
+    }
     /* Handle the case where an enum is declared as:
         extern enum system_states {
           SYSTEM_BOOTING,
@@ -756,6 +787,7 @@ void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(void)
   for (macro_it = rec->begin(); macro_it != rec->end(); macro_it++) {
     if (MacroDefinitionRecord *macroexp = dyn_cast<MacroDefinitionRecord>(*macro_it)) {
       MacroInfo *info = MW.Get_Macro_Info(macroexp);
+
       if (Is_Macro_Marked(info)) {
         Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
       }
