@@ -123,7 +123,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
       while (true) {
         auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
-        Token *tok = maybe_next_tok.getPointer();
+        Token *tok = &maybe_next_tok.value(); //maybe_next_tok.getPointer();
 
         if (tok == nullptr) {
           break;
@@ -313,7 +313,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
 
       while (true) {
         auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
-        Token *tok = maybe_next_tok.getPointer();
+        Token *tok = &maybe_next_tok.value(); //.getPointer();
 
         if (tok == nullptr) {
           break;
