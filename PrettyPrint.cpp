@@ -1,4 +1,5 @@
 #include "PrettyPrint.hh"
+#include "ClangCompat.hh"
 
 #include <clang/AST/Attr.h>
 
@@ -123,7 +124,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
       while (true) {
         auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
-        Token *tok = maybe_next_tok.getPointer();
+        Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
 
         if (tok == nullptr) {
           break;
@@ -313,7 +314,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
 
       while (true) {
         auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
-        Token *tok = maybe_next_tok.getPointer();
+        Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
 
         if (tok == nullptr) {
           break;

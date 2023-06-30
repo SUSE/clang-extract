@@ -5,6 +5,7 @@
 #include "PrettyPrint.hh"
 #include "FunctionExternalizeFinder.hh"
 #include "SymbolExternalizer.hh"
+#include "ClangCompat.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -46,13 +47,7 @@ static void Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
   /* Built the ASTUnit from the passed command line and set its SourceManager
      to the PrettyPrint class.  */
   Diags = CompilerInstance::createDiagnostics(new DiagnosticOptions());
-#if __clang_major__ >= 15
-  CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CInvok = createInvocation(ctx->ClangArgs, std::move(CIOpts));
-#else
-  CInvok = createInvocationFromCommandLine(ctx->ClangArgs, Diags);
-#endif
+  CInvok = ClangCompat::createInvocationFromCommandLine(ctx->ClangArgs, Diags);
 
   FileManager *FileMgr = new FileManager(FileSystemOptions(), fs);
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
@@ -132,7 +127,6 @@ class BuildASTPass : public Pass
   virtual void Dump_Result(PassManager::Context *ctx)
   {
     /* If the code is too large, this crashes with an stack overflow.  */
-    return;
 
     clang::ASTUnit::top_level_iterator it;
 
@@ -337,7 +331,7 @@ class FunctionExternalizerPass : public Pass
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), None, ctx->MFS);
+      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), ClangCompat_None, ctx->MFS);
       PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();

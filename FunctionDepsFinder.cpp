@@ -1,5 +1,6 @@
 #include "FunctionDepsFinder.hh"
 #include "PrettyPrint.hh"
+#include "ClangCompat.hh"
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
 
@@ -263,7 +264,7 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
   if (type->isTypedefNameType()) {
     /* Handle case where type is a typedef.  */
 
-    const TypedefType *t = type->getAs<const TypedefType>();
+    const TypedefType *t = ClangCompat::Get_Type_As_TypedefType(type);
     inserted = Handle_TypeDecl(t->getDecl());
 
     /* Typedefs can be typedef'ed in a chain, for example:

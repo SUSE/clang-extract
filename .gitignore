@@ -1,0 +1,7 @@
+**/*.o
+**/*.obj
+**/*.log
+**/__pycache__
+**/*.py[cod]
+**/*.dump.*
+clang-extract
