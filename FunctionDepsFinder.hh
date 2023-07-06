@@ -15,27 +15,6 @@ struct MacroIterator
   unsigned undef_it;
 };
 
-/** Build CallGraph from AST.
- *
- * The CallGraph is a datastructure in which nodes are functions and edges
- * represents function call points. For example:
- *
- * void f();
- * void g() { f(); f(); }
- *
- * Resuluts in the following CallGraph:
- *
- * (f) -> (g)
- *     -> (g)
- *
- * There are two edges to `g` because there are two callpoints to it.
- * Hence, the resulting graph is not `simple` in Graph Theory nomenclature. But
- * for the analysis we are doing it is suffice to be, so perhaps some extra
- * performance can be archived if we could remove duplicated edges.
- *
- */
-CallGraph *Build_CallGraph_From_AST(ASTUnit *ast);
-
 /** Function Dependency Finder.
  *
  * This class wraps all code necessary to find all Decl in the
@@ -77,16 +56,13 @@ class FunctionDependencyFinder
     /** Mark decl as dependencies and all its previous decls versions.  */
     bool Add_Decl_And_Prevs(Decl *decl);
 
-    /** Given function with name `funcname`, recursively find which functions
-        are required by such function.  */
-    void Find_Functions_Required(CallGraph *, std::vector<std::string> const &funcnames);
+    /** Given a list of functions in `funcnames`, compute the closure of those
+        functions.  That means find all Types, functions, and global variables
+        that are reachable from those functions.  */
+    void Find_Functions_Required(std::vector<std::string> const &funcnames);
 
     /** Mark function represented by `node` and all its callees.  */
-    void Mark_Required_Functions(CallGraphNode *node);
-
-    /** Find all Types and Global variables that are reachable from
-        Dependencies function.  */
-    void Compute_Closure(void);
+    void Mark_Required_Functions(FunctionDecl *decl);
 
     /** Mark all types reachable from a function body or statement chain.  */
     void Mark_Types_In_Function_Body(Stmt *stmt);

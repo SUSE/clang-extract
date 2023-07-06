@@ -6,41 +6,6 @@
 
 #define PProcessor (AST->getPreprocessor())
 
-/** Build CallGraph from AST.
- *
- * The CallGraph is a datastructure in which nodes are functions and edges
- * represents function call points. For example:
- *
- * void f();
- * void g() { f(); f(); }
- *
- * Resuluts in the following CallGraph:
- *
- * (f) -> (g)
- *     -> (g)
- *
- * There are two edges to `g` because there are two callpoints to it.
- * Hence, the resulting graph is not `simple` in Graph Theory nomenclature. But
- * for the analysis we are doing it is suffice to be, so perhaps some extra
- * performance can be archived if we could remove duplicated edges.
- *
- */
-CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
-{
-  CallGraph *cg = new CallGraph();
-
-  /* Iterate trough all nodes in toplevel.  */
-  clang::ASTUnit::top_level_iterator it;
-  for (it = ast->top_level_begin(); it != ast->top_level_end(); ++it) {
-    Decl *decl = *it;
-
-    /* Add decl node to the callgraph.  */
-    cg->addToCallGraph(decl);
-  }
-
-  return cg;
-}
-
 MacroIterator FunctionDependencyFinder::Get_Macro_Iterator(void)
 {
   MacroIterator it;
@@ -163,69 +128,25 @@ void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
 }
 
 void FunctionDependencyFinder::Find_Functions_Required
-            (CallGraph *cg, std::vector<std::string> const& funcnames)
+            (std::vector<std::string> const& funcnames)
 {
   assert(funcnames.size() > 0);
 
-  for (const std::string &funcname : funcnames) {
-    /* Find the node which name matches our funcname.  */
-    clang::CallGraph::iterator it;
-    for (it = cg->begin(); it != cg->end(); ++it) {
-      CallGraphNode *node = (*it).second.get();
+  ASTUnit::top_level_iterator it;
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    /* Get Declaration as a FunctionDecl to query its name.  */
+    FunctionDecl *decl = dynamic_cast<FunctionDecl *>(*it);
 
-      /* Get Declaration as a NamedDecl to query its name.  */
-      NamedDecl *ndecl = dynamic_cast<NamedDecl *>(node->getDecl());
+    if (!decl)
+      continue;
 
-      if (ndecl && ndecl->getNameAsString() == funcname) {
-        // Now iterate through all nodes reachable from begin_node and mark all
-        // of them for output.
-        Mark_Required_Functions(node);
+    /* Find the function which name matches our funcname.  */
+    for (const std::string &funcname : funcnames) {
+      if (decl->getNameAsString() == funcname) {
+        /* Now analyze the function to compute its closure.  */
+        Mark_Required_Functions(decl);
       }
     }
-  }
-}
-
-void FunctionDependencyFinder::Mark_Required_Functions(CallGraphNode *node)
-{
-  if (!node)
-    return;
-
-  /* If the function is already in the FunctionDependency set, then we can
-     quickly return because this node was already analyzed.  */
-  if (Is_Decl_Marked(node->getDecl()))
-    return;
-
-  FunctionDecl *func_decl = node->getDecl()->getAsFunction();
-
-  /* In case this function has a body, we mark its body as well.  */
-  Add_Decl_And_Prevs(func_decl->hasBody()? func_decl->getDefinition(): func_decl);
-
-  /* Iterate through all callees and repeat the process in a DFS fashion.  */
-  for (CallGraphNode *callee: *node) {
-    Mark_Required_Functions(callee);
-  }
-}
-
-void FunctionDependencyFinder::Compute_Closure(void)
-{
-
-  size_t n = 0;
-  Decl *dependencies[Dependencies.size()];
-
-  /* Copy the Dependencies set into a temporary array so we don't shoot ourselves
-     on the foot.  */
-  for (Decl *decl: Dependencies) {
-    /* If decl is a function, then add to analysis queue.  */
-    if (decl->getAsFunction()) {
-      dependencies[n++] = decl;
-    }
-  }
-
-  /* Iterate through all function definitions and trigger the
-     RecordDecl dependency tracker.  */
-  for (size_t i = 0; i < n; i++) {
-    FunctionDecl *decl = dependencies[i]->getAsFunction();
-    Mark_Types_In_Function_Body(decl->getBody());
   }
 
   /* Handle the corner case where an global array was declared as
@@ -244,6 +165,23 @@ void FunctionDependencyFinder::Compute_Closure(void)
       Handle_Array_Size(vardecl);
     }
   }
+}
+
+void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
+{
+  if (!decl)
+    return;
+
+  /* If the function is already in the FunctionDependency set, then we can
+     quickly return because this node was already analyzed.  */
+  if (Is_Decl_Marked(decl))
+    return;
+
+  /* In case this function has a body, we mark its body as well.  */
+  Add_Decl_And_Prevs(decl->hasBody()? decl->getDefinition(): decl);
+
+  /* Analyze body, which will add functions in a DFS fashion.  */
+  Mark_Types_In_Function_Body(decl->getBody());
 }
 
 bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
@@ -419,9 +357,12 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 
         /* Analyze the original enum to find references to other enum
            constants.  */
-        if (enum_decl &&enum_decl &&  !Is_Decl_Marked(enum_decl)) {
+        if (enum_decl && !Is_Decl_Marked(enum_decl)) {
           Handle_EnumDecl(enum_decl);
         }
+      } else if (FunctionDecl *fundecl = dynamic_cast<FunctionDecl *>(decl)) {
+        /* This is a reference to a function. We have to analyze it recursively.  */
+        Mark_Required_Functions(fundecl);
       } else {
         if (!Is_Decl_Marked(to_mark))
           Add_Decl_And_Prevs(to_mark);
@@ -496,8 +437,15 @@ void FunctionDependencyFinder::Print()
   SourceLocation last_decl_loc = SourceLocation::getFromRawEncoding(0U);
   bool first = true;
 
+  SourceManager *sm = PrettyPrint::Get_Source_Manager();
+  bool can_print_macros = false;
+
   /* We can only print macros if we have a SourceManager.  */
-  bool can_print_macros = (PrettyPrint::Get_Source_Manager() != nullptr);
+  if (sm != nullptr) {
+    can_print_macros = true;
+    FileID mainfile = sm->getMainFileID();
+    last_decl_loc = sm->getLocForEndOfFile(mainfile);
+  }
 
   MacroIterator macro_it = Get_Macro_Iterator();
   clang::ASTUnit::top_level_iterator it = AST->top_level_begin();
@@ -799,17 +747,8 @@ void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(void)
 void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions, bool closure)
 {
   if (closure) {
-    /* Step 1: Build the CallGraph.  */
-    CallGraph *cg = Build_CallGraph_From_AST(AST);
-
-    /* Step 2: Find all functions that depends from `function`.  */
-    Find_Functions_Required(cg, functions);
-
-    /* Step 3: Find all Global variables and Types required by the functions
-       that are currently in the Dependencies set..  */
-    Compute_Closure();
-
-    delete cg;
+    /* Step 1: Compute the closure.  */
+    Find_Functions_Required(functions);
   } else {
     /* Insert every declaration into the dependency list.  */
     for (auto it = AST->top_level_begin(); it != AST->top_level_end(); it++) {
@@ -817,12 +756,12 @@ void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
     }
   }
 
-  /* Step 4: Find enum constants which are referenced by macros.  */
+  /* Step 2: Find enum constants which are referenced by macros.  */
   Include_Enum_Constants_Referenced_By_Macros();
 
-  /* Step 5: Handle macros that needs to be undefined.  */
+  /* Step 3: Handle macros that needs to be undefined.  */
   Populate_Need_Undef();
 
-  /* Step 6: Remove any declaration that may have been declared twice.  */
+  /* Step 4: Remove any declaration that may have been declared twice.  */
   Remove_Redundant_Decls();
 }
