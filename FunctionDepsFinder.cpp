@@ -1,26 +1,26 @@
 #include "FunctionDepsFinder.hh"
-#include "PrettyPrint.hh"
 #include "ClangCompat.hh"
+#include "PrettyPrint.hh"
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
 
 #define PProcessor (AST->getPreprocessor())
 
-MacroIterator FunctionDependencyFinder::Get_Macro_Iterator(void)
-{
+MacroIterator FunctionDependencyFinder::Get_Macro_Iterator(void) {
   MacroIterator it;
   it.macro_it = PProcessor.getPreprocessingRecord()->begin();
   it.undef_it = 0;
   return it;
 }
 
-void FunctionDependencyFinder::Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc)
-{
+void FunctionDependencyFinder::Skip_Macros_Until(MacroIterator &it,
+                                                 const SourceLocation &loc) {
   Print_Macros_Until(it, loc, /*print = */ false);
 }
 
-void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print)
-{
+void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it,
+                                                  const SourceLocation &loc,
+                                                  bool print) {
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */
@@ -33,7 +33,8 @@ void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it, const Sourc
      somewhat similar to how mergesort merge two sorted vectors, if this
      somehow helps to understand this code.  */
   while (true) {
-    PreprocessedEntity *e = (it.macro_it == rec->end())? nullptr: *it.macro_it;
+    PreprocessedEntity *e =
+        (it.macro_it == rec->end()) ? nullptr : *it.macro_it;
     MacroDirective *undef = nullptr;
     bool should_print_undef = false;
 
@@ -54,7 +55,7 @@ void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it, const Sourc
       }
     }
 
-    /* Check if we did not past the loc marker where we should stop printing.  */
+    /* Check if we did not past the loc marker where we should stop printing. */
     if (curr_loc.isValid() && PrettyPrint::Is_Before(curr_loc, loc)) {
       if (should_print_undef) {
         if (print)
@@ -72,12 +73,10 @@ void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it, const Sourc
     } else {
       break;
     }
-
   }
 }
 
-void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
-{
+void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it) {
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
   /* Ensure that PreprocessingRecord is avaialable.  */
@@ -90,7 +89,8 @@ void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
      somewhat similar to how mergesort merge two sorted vectors, if this
      somehow helps to understand this code.  */
   while (true) {
-    PreprocessedEntity *e = (it.macro_it == rec->end())? nullptr: *it.macro_it;
+    PreprocessedEntity *e =
+        (it.macro_it == rec->end()) ? nullptr : *it.macro_it;
     MacroDirective *undef = nullptr;
     bool should_print_undef = false;
 
@@ -111,7 +111,7 @@ void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
       }
     }
 
-    /* Check if we did not past the loc marker where we should stop printing.  */
+    /* Check if we did not past the loc marker where we should stop printing. */
     if (should_print_undef) {
       PrettyPrint::Print_Macro_Undef(undef);
       it.undef_it++;
@@ -127,9 +127,8 @@ void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it)
   }
 }
 
-void FunctionDependencyFinder::Find_Functions_Required
-            (std::vector<std::string> const& funcnames)
-{
+void FunctionDependencyFinder::Find_Functions_Required(
+    std::vector<std::string> const &funcnames) {
   assert(funcnames.size() > 0);
 
   ASTUnit::top_level_iterator it;
@@ -159,7 +158,7 @@ void FunctionDependencyFinder::Find_Functions_Required
 
     in which clang will unfortunatelly expands const1 to 1 and lose the
     EnumConstantDecl in this case, forcing us to reparse this declaration.  */
-  for (Decl *decl: Dependencies) {
+  for (Decl *decl : Dependencies) {
     VarDecl *vardecl = dynamic_cast<VarDecl *>(decl);
     if (vardecl) {
       Handle_Array_Size(vardecl);
@@ -167,8 +166,7 @@ void FunctionDependencyFinder::Find_Functions_Required
   }
 }
 
-void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
-{
+void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl) {
   if (!decl)
     return;
 
@@ -178,18 +176,22 @@ void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
     return;
 
   /* In case this function has a body, we mark its body as well.  */
-  Add_Decl_And_Prevs(decl->hasBody()? decl->getDefinition(): decl);
+  Add_Decl_And_Prevs(decl->hasBody() ? decl->getDefinition() : decl);
 
   /* Analyze body, which will add functions in a DFS fashion.  */
   Mark_Types_In_Function_Body(decl->getBody());
 }
 
-bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
-{
+bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
   if (!type)
     return false;
 
   bool inserted = false;
+
+  if (TypeOfExprType::classof(type)) {
+    const TypeOfExprType *t = type->getAs<const TypeOfExprType>();
+    Mark_Types_In_Function_Body(t->getUnderlyingExpr());
+  }
 
   /* Check type to the correct type and handle it accordingly.  */
   if (TagType::classof(type)) {
@@ -262,18 +264,32 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
   return false;
 }
 
-bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
-{
+bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl) {
   bool inserted = false;
 
   /* If decl was already inserted then quickly return.  */
   if (Is_Decl_Marked(decl))
     return false;
 
+  /* Be careful with anon structs declarations.  */
+  RecordDecl *rdecl = dynamic_cast<RecordDecl *>(decl);
+  if (rdecl) {
+    if (TypedefNameDecl *typedefdecl = rdecl->getTypedefNameForAnonDecl()) {
+      /* In case the record decl was declared in an anon typedef, as in
+       *
+       * typedef struct { int x; } X;
+       *
+       * then insert the typedef instead, not the anon struct declaration
+       */
+
+      decl = typedefdecl;
+    }
+  }
+
   /* Add current decl.  */
   inserted = Add_Decl_And_Prevs(decl);
 
-  if (RecordDecl *rdecl = dynamic_cast<RecordDecl *>(decl)) {
+  if (rdecl) {
     /* RecordDecl may have nested records, for example:
 
       struct A {
@@ -298,8 +314,7 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
   return inserted;
 }
 
-bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl)
-{
+bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl) {
   /* Mark the enum decl first to avoid problems with the following enums:
 
     enum {
@@ -317,8 +332,7 @@ bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl)
   return true;
 }
 
-void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
-{
+void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt) {
   if (!stmt)
     return;
 
@@ -327,7 +341,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
   const Type *type = nullptr;
 
   if (DeclStmt::classof(stmt)) {
-    DeclStmt *declstmt = (DeclStmt *) stmt;
+    DeclStmt *declstmt = (DeclStmt *)stmt;
 
     /* Get Decl object from DeclStmt.  */
     const DeclGroupRef decl_group = declstmt->getDeclGroup();
@@ -342,7 +356,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     type = nullptr;
   } else if (DeclRefExpr::classof(stmt)) {
     /* Handle global variables and references to an enum.  */
-    DeclRefExpr *expr = (DeclRefExpr *) stmt;
+    DeclRefExpr *expr = (DeclRefExpr *)stmt;
     ValueDecl *decl = expr->getDecl();
 
     if (decl) {
@@ -361,7 +375,8 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
           Handle_EnumDecl(enum_decl);
         }
       } else if (FunctionDecl *fundecl = dynamic_cast<FunctionDecl *>(decl)) {
-        /* This is a reference to a function. We have to analyze it recursively.  */
+        /* This is a reference to a function. We have to analyze it recursively.
+         */
         Mark_Required_Functions(fundecl);
       } else {
         if (!Is_Decl_Marked(to_mark))
@@ -369,8 +384,49 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
       }
     }
 
+  } else if (AsmStmt::classof(stmt)) {
+    /* Handle ASM statements like (see asm-1.c):
+        asm volatile ("mov %1, %0\n\t"
+                                   : "=r"(dest)
+                                   : "i" (__builtin_offsetof(Head, y))
+                                   : );  */
+
+    AsmStmt *asmstmt = (AsmStmt *)stmt;
+    unsigned num_inputs = asmstmt->getNumInputs();
+    unsigned num_outputs = asmstmt->getNumOutputs();
+
+    for (int i = 0; i < num_inputs; i++) {
+      Expr *expr = (Expr *)asmstmt->getInputExpr(i);
+      Mark_Types_In_Function_Body(expr);
+    }
+
+    for (int i = 0; i < num_outputs; i++) {
+      Expr *expr = (Expr *)asmstmt->getOutputExpr(i);
+      Mark_Types_In_Function_Body(expr);
+    }
+
+  } else if (OffsetOfExpr::classof(stmt)) {
+    /* Handle the following case:
+     *
+     * typedef struct {
+     *   int x;
+     *   int y;
+     * } Head;
+     *
+     * int x = __builtin_offsetof(Head, y);
+     */
+    OffsetOfExpr *expr = (OffsetOfExpr *)stmt;
+    unsigned num_components = expr->getNumComponents();
+    for (int i = 0; i < num_components; i++) {
+      /* Get the RecordDecl referenced in the builtin_offsetof and add to the
+         dependency list.  */
+      const OffsetOfNode &component = expr->getComponent(i);
+      const FieldDecl *field = component.getField();
+      RecordDecl *record = (RecordDecl *)field->getParent();
+      Handle_TypeDecl(record);
+    }
   } else if (Expr::classof(stmt)) {
-    Expr *expr = (Expr *) stmt;
+    Expr *expr = (Expr *)stmt;
 
     type = expr->getType().getTypePtr();
   }
@@ -382,8 +438,8 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
   /* Iterate through the list of all children Statements and repeat the
      process.  */
   clang::Stmt::child_iterator it, it_end;
-  for (it = stmt->child_begin(), it_end = stmt->child_end();
-      it != it_end; ++it) {
+  for (it = stmt->child_begin(), it_end = stmt->child_end(); it != it_end;
+       ++it) {
 
     Stmt *child = *it;
     Mark_Types_In_Function_Body(child);
@@ -395,30 +451,21 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
                                                    std::string const &function,
                                                    bool closure)
-  : AST(ast),
-    EnumTable(AST),
-    MW(AST->getPreprocessor())
-{
-  std::vector<std::string> functions{ function };
+    : AST(ast), EnumTable(AST), MW(AST->getPreprocessor()) {
+  std::vector<std::string> functions{function};
   Run_Analysis(functions, closure);
 }
 
-
-FunctionDependencyFinder::FunctionDependencyFinder(ASTUnit *ast,
-                                                   std::vector<std::string> const &funcs,
-                                                   bool closure)
-  : AST(ast),
-    EnumTable(AST),
-    MW(AST->getPreprocessor())
-{
+FunctionDependencyFinder::FunctionDependencyFinder(
+    ASTUnit *ast, std::vector<std::string> const &funcs, bool closure)
+    : AST(ast), EnumTable(AST), MW(AST->getPreprocessor()) {
   Run_Analysis(funcs, closure);
 }
 
 /** Add a decl to the Dependencies set and all its previous declarations in the
     AST. A function can have multiple definitions but its body may only be
     defined later.  */
-bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
-{
+bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl) {
   bool inserted = false;
   while (decl) {
     if (!Is_Decl_Marked(decl)) {
@@ -432,8 +479,7 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
 }
 
 /** Pretty print all nodes were marked to output.  */
-void FunctionDependencyFinder::Print()
-{
+void FunctionDependencyFinder::Print() {
   SourceLocation last_decl_loc = SourceLocation::getFromRawEncoding(0U);
   bool first = true;
 
@@ -460,8 +506,8 @@ void FunctionDependencyFinder::Print()
           Print_Macros_Until(macro_it, decl->getBeginLoc());
           first = false;
         } else {
-          /* Macros defined inside a function is printed together with the function,
-             so we must skip them.  */
+          /* Macros defined inside a function is printed together with the
+             function, so we must skip them.  */
           Skip_Macros_Until(macro_it, last_decl_loc);
 
           Print_Macros_Until(macro_it, decl->getBeginLoc());
@@ -479,8 +525,7 @@ void FunctionDependencyFinder::Print()
   }
 }
 
-bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
-{
+bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl) {
   if (decl == nullptr)
     return false;
 
@@ -496,7 +541,6 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
   if (!type->isConstantArrayType()) {
     return false;
   }
-
 
   StringRef str = PrettyPrint::Get_Source_Text(decl->getSourceRange());
   size_t first_openbrk = str.find("[");
@@ -524,14 +568,12 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl)
 
 /** Set containing the macros which were already analyzed.  */
 static std::unordered_set<MacroInfo *> AnalyzedMacros;
-static bool Already_Analyzed(MacroInfo *info)
-{
+static bool Already_Analyzed(MacroInfo *info) {
   return AnalyzedMacros.find(info) != AnalyzedMacros.end();
 }
 
-
-bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc)
-{
+bool FunctionDependencyFinder::Backtrack_Macro_Expansion(
+    MacroInfo *info, const SourceLocation &loc) {
   bool inserted = false;
 
   if (info == nullptr)
@@ -562,11 +604,13 @@ bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const 
 
   /* We can not quickly return if the macro is already marked.  Other macros
      which this macro depends on may have been redefined in meanwhile, and
-     we don't implement some dependency tracking so far, so redo the analysis.  */
+     we don't implement some dependency tracking so far, so redo the analysis.
+   */
 
-  auto it = info->tokens_begin(); /* Use auto here as the it type changes according to clang version.  */
-  /* Iterate on the expansion tokens of this macro to find if it references other
-     macros.  */
+  auto it = info->tokens_begin(); /* Use auto here as the it type changes
+                                     according to clang version.  */
+  /* Iterate on the expansion tokens of this macro to find if it references
+     other macros.  */
   for (; it != info->tokens_end(); ++it) {
     const Token *tok = it;
     const IdentifierInfo *tok_id = tok->getIdentifierInfo();
@@ -581,16 +625,18 @@ bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const 
          We should not add `a` as macro when analyzing MAX once it is clearly an
          argument of the macro, not a reference to other symbol.  */
       if (!MacroWalker::Is_Identifier_Macro_Argument(info, tok_id)) {
-        MacroInfo *maybe_macro = MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
+        MacroInfo *maybe_macro =
+            MW.Get_Macro_Info(tok->getIdentifierInfo(), loc);
 
         /* If this token is actually a name to a declared macro, then analyze it
            as well.  */
         if (maybe_macro) {
           inserted |= Backtrack_Macro_Expansion(maybe_macro, loc);
 
-        /* If the token is a name to a constant declared in an enum, then add
-           the enum as well.  */
-        } else if (EnumDecl *edecl = EnumTable.Get(tok->getIdentifierInfo()->getName())) {
+          /* If the token is a name to a constant declared in an enum, then add
+             the enum as well.  */
+        } else if (EnumDecl *edecl =
+                       EnumTable.Get(tok->getIdentifierInfo()->getName())) {
           if (edecl && !Is_Decl_Marked(edecl)) {
             Handle_EnumDecl(edecl);
           }
@@ -602,14 +648,13 @@ bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroInfo *info, const 
   return inserted;
 }
 
-bool FunctionDependencyFinder::Backtrack_Macro_Expansion(MacroExpansion *macroexp)
-{
+bool FunctionDependencyFinder::Backtrack_Macro_Expansion(
+    MacroExpansion *macroexp) {
   MacroInfo *info = MW.Get_Macro_Info(macroexp);
   return Backtrack_Macro_Expansion(info, macroexp->getSourceRange().getBegin());
 }
 
-void FunctionDependencyFinder::Remove_Redundant_Decls(void)
-{
+void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
   ASTUnit::top_level_iterator it;
 
   for (it = AST->top_level_begin(); it != AST->top_level_end(); it++) {
@@ -696,8 +741,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
   }
 }
 
-int FunctionDependencyFinder::Populate_Need_Undef(void)
-{
+int FunctionDependencyFinder::Populate_Need_Undef(void) {
   int count = 0;
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
 
@@ -710,9 +754,10 @@ int FunctionDependencyFinder::Populate_Need_Undef(void)
       if (directive == nullptr)
         continue;
 
-      /* There is no point in analyzing a macro that wasn't added for output.  */
+      /* There is no point in analyzing a macro that wasn't added for output. */
       if (Is_Macro_Marked(directive->getMacroInfo())) {
-        SourceLocation undef_loc = directive->getDefinition().getUndefLocation();
+        SourceLocation undef_loc =
+            directive->getDefinition().getUndefLocation();
 
         /* In case the macro isn't undefined then its location is invalid.  */
         if (undef_loc.isValid()) {
@@ -726,15 +771,16 @@ int FunctionDependencyFinder::Populate_Need_Undef(void)
   return count;
 }
 
-void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(void)
-{
+void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(
+    void) {
   /* Ensure that PreprocessingRecord is avaialable.  */
   PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
   assert(rec && "PreprocessingRecord wasn't generated");
 
   clang::PreprocessingRecord::iterator macro_it;
   for (macro_it = rec->begin(); macro_it != rec->end(); macro_it++) {
-    if (MacroDefinitionRecord *macroexp = dyn_cast<MacroDefinitionRecord>(*macro_it)) {
+    if (MacroDefinitionRecord *macroexp =
+            dyn_cast<MacroDefinitionRecord>(*macro_it)) {
       MacroInfo *info = MW.Get_Macro_Info(macroexp);
 
       if (Is_Macro_Marked(info)) {
@@ -744,8 +790,8 @@ void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(void)
   }
 }
 
-void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions, bool closure)
-{
+void FunctionDependencyFinder::Run_Analysis(
+    std::vector<std::string> const &functions, bool closure) {
   if (closure) {
     /* Step 1: Compute the closure.  */
     Find_Functions_Required(functions);
