@@ -2,6 +2,9 @@
 
 #include <string.h>
 
+#define STRINGFY_VALUE(s) STRINGFY(s)
+#define STRINGFY(s) #s
+
 static bool prefix(const char *a, const char *b)
 {
   return !strncmp(a, b, strlen(a));
@@ -59,6 +62,8 @@ void ArgvParser::Insert_Required_Parameters(void)
     "-Xclang", "-detailed-preprocessing-record",
     "-Xclang", "-ast-dump",
     "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
+    // For some reason libtooling do not pass the clang include folder.  Pass this then.
+    "-I/usr/lib64/clang/" STRINGFY_VALUE(__clang_major__) "/include",
   };
 
   for (const char *arg : priv_args) {
