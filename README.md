@@ -1,92 +1,68 @@
 # clang-extract
 
-A tool to extract functions from source files using the clang and LLVM infrastructure.
+A tool to extract code content from source files using the clang and LLVM infrastructure.
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### Compiling clang-extract
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
+clang-extract requires clang, LLVM and libtooling. On OpenSUSE, you can install them by running:
 ```
-cd existing_repo
-git remote add origin https://gitlab.suse.de/gbelinassi/clang-extract.git
-git branch -M main
-git push -uf origin main
+$ sudo zypper install clang16 clang16-devel libclang-cpp16 \
+       clang-tools libLLVM16 llvm16 llvm16-devel 
+```
+Older versions of clang and LLVM may also work, but is untested.
+Once you have all those packages installed, compiling clang-extract is as easy as running
+```
+$ make
 ```
 
-## Integrate with your tools
+### Testing clang-extract
 
-- [ ] [Set up project integrations](https://gitlab.suse.de/gbelinassi/clang-extract/-/settings/integrations)
+clang-extract has automated testing. You need a few python3 libraries installed for it to run:
+```
+$ sudo zypper install python311-subprocess-tee python311-pytest
+```
+Then running the testsuite is as easy as running:
+```
+$ make check -j<num_jobs>
+```
+## Using clang-extract
+Clang-extract currently only support C project, such as `glibc` and `openssl`. Assuming clang-extract is compiled, it can be used to extract code content from projects using the following steps.
 
-## Collaborate with your team
+1. Find, in the project, the function you want to extract, and which file it is in.
+2. Compile the project and grab the command line passed to the compiler.
+3.  Replace `gcc` with `clang-extract`
+4. Pass `-DCE_NO_EXTERNALIZATION -DCE_EXTRACT_FUNCTIONS=function -DCE_OUTPUT_FILE=/tmp/output.c`  to clang-extract.
+5. Done. In `/tmp/output.c` will have everything necessary for  `function` to compile without any external dependencies.
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+### Example
+Let's extract the function `__libc_malloc` from the glibc project. The steps are:
+1. Compile the glibc project until `malloc.c` is compiled: `make -j8 | grep malloc.c`
+2. Grab the command line:  
+```
+gcc malloc.c -c -std=gnu11 -fgnu89-inline  -g -O2 -Wall -Wwrite-strings -Wundef -Werror -fmerge-all-constants -frounding-math -fno-stack-protector -fno-common -Wp,-U_FORTIFY_SOURCE -Wstrict-prototypes -Wold-style-definition -fmath-errno    -fPIE   -DMORECORE_CLEARS=2  -ftls-model=initial-exec     -I../include -I/home/giulianob/projects/glibc/build_glibc/malloc  -I/home/giulianob/projects/glibc/build_glibc  -I../sysdeps/unix/sysv/linux/x86_64/64  -I../sysdeps/unix/sysv/linux/x86_64  -I../sysdeps/unix/sysv/linux/x86/include -I../sysdeps/unix/sysv/linux/x86  -I../sysdeps/x86/nptl  -I../sysdeps/unix/sysv/linux/wordsize-64  -I../sysdeps/x86_64/nptl  -I../sysdeps/unix/sysv/linux/include -I../sysdeps/unix/sysv/linux  -I../sysdeps/nptl  -I../sysdeps/pthread  -I../sysdeps/gnu  -I../sysdeps/unix/inet  -I../sysdeps/unix/sysv  -I../sysdeps/unix/x86_64  -I../sysdeps/unix  -I../sysdeps/posix  -I../sysdeps/x86_64/64  -I../sysdeps/x86_64/fpu/multiarch  -I../sysdeps/x86_64/fpu  -I../sysdeps/x86/fpu  -I../sysdeps/x86_64/multiarch  -I../sysdeps/x86_64  -I../sysdeps/x86/include -I../sysdeps/x86  -I../sysdeps/ieee754/float128  -I../sysdeps/ieee754/ldbl-96/include -I../sysdeps/ieee754/ldbl-96  -I../sysdeps/ieee754/dbl-64  -I../sysdeps/ieee754/flt-32  -I../sysdeps/wordsize-64  -I../sysdeps/ieee754  -I../sysdeps/generic  -I.. -I../libio -I.  -D_LIBC_REENTRANT -include /home/giulianob/projects/glibc/build_glibc/libc-modules.h -DMODULE_NAME=libc -include ../include/libc-symbols.h  -DPIC  -DUSE_TCACHE=1   -DTOP_NAMESPACE=
+glibc -o /home/giulianob/projects/glibc/build_glibc/malloc/malloc.o -MD -MP -MF /home/giulianob/projects/glibc/build_glibc/malloc/malloc.o.dt -MT /home/giulianob/projects/glibc/build_glibc/m
+alloc/malloc.o
+```
+3. Replace `gcc` with `clang-extract` and add the extra parameters (removed `-Werror` since clang treats some things as errors where gcc doesn't:
+```
+~/projects/clang-extract/clang-extract malloc.c -c -std=gnu11 -fgnu89-inline  -g -O2 -Wall -Wwrite-strings -fmerge-all-constants -frounding-math -fno-stack-protector -fno-common -Wp,-U_FORTIFY_SOURCE -Wstrict-prototypes -Wold-style-definition -fmath-errno    -fPIE   -DMORECORE_CLEARS=2  -ftls-model=initial-exec     -I../include -I/home/giulianob/projects/glibc/build_glibc/malloc  -I/home/giulianob/projects/glibc/build_glibc  -I../sysdeps/unix/sysv/linux/x86_64/64  -I../sysdeps/unix/sysv/linux/x86_64  -I../sysdeps/unix/sysv/linux/x86/include -I../sysdeps/unix/sysv/linux/x86  -I../sysdeps/x86/nptl  -I../sysdeps/unix/sysv/linux/wordsize-64  -I../sysdeps/x86_64/nptl  -I../sysdeps/unix/sysv/linux/include -I../sysdeps/unix/sysv/linux  -I../sysdeps/nptl  -I../sysdeps/pthread  -I../sysdeps/gnu  -I../sysdeps/unix/inet  -I../sysdeps/unix/sysv  -I../sysdeps/unix/x86_64  -I../sysdeps/unix  -I../sysdeps/posix  -I../sysdeps/x86_64/64  -I../sysdeps/x86_64/fpu/multiarch  -I../sysdeps/x86_64/fpu  -I../sysdeps/x86/fpu  -I../sysdeps/x86_64/multiarch  -I../sysdeps/x86_64  -I../sysdeps/x86/include -I../sysdeps/x86  -I../sysdeps/ieee754/float128  -I../sysdeps/ieee754/ldbl-96/include -I../sysdeps/ieee754/ldbl-96  -I../sysdeps/ieee754/dbl-64  -I../sysdeps/ieee754/flt-32  -I../sysdeps/wordsize-64  -I../sysdeps/ieee754  -I../sysdeps/generic  -I.. -I../libio -I.  -D_LIBC_REENTRANT -include /home/giulianob/projects/glibc/build_glibc/libc-modules.h -DMODULE_NAME=libc -include ../include/libc-symbols.h  -DPIC  -DUSE_TCACHE=1   -DTOP_NAMESPACE=glibc -o /home/giulianob/projects/glibc/build_glibc/malloc/malloc.o -MD -MP -MF /home/giulianob/projects/glibc/build_glibc/malloc/malloc.o.dt -MT /home/giulianob/projects/glibc/build_glibc/malloc/malloc.o -DCE_NO_EXTERNALIZATION -DCE_OUTPUT_FILE=/tmp/out.c -DCE_EXTRACT_FUNCTIONS=__libc_malloc
+```
+4. The output should be in `/tmp/out.c` and should be self-compilable. Check it by calling `$ gcc -c /tmp/out.c`. Here is the output for malloc: https://godbolt.org/z/6vrrTPoP9
+##  Supported options
 
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
+You can pass the following options to clang-extract:
+- `-DCE_OUTPUT_FILE=<out>` File to write to. Else the output will be deduced from the input file.
+-  `-DCE_EXTRACT_FUNCTIONS=f,g,h,...` The functions that should be extracted.
+- `-DCE_DISABLE_EXTERNALIZATION` Disable symbol externalization. Symbol externalization would rewrite references to private symbols as pointers to addresses, which would be initialized by `libpulp`. This currently do not work as intended as clang-extract has no engine to analyze where the symbol is in the original library, so always pass this option at the moment.
 
 ## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- Support for C projects: DONE.
+- Support for OpenSSL and Glibc: DONE.
+- Automatic testing: Done.
+- Symbol Externalization engine: Done.
+- Support for the Linux Kernel: TBI.
+- Support for C++ code: TBI.
+- Support binary analysis for symbol externalization: TBI.
+- Support for Macro Rewriting: Partial.
