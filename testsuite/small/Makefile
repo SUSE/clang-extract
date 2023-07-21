@@ -1,5 +1,6 @@
-TESTS=$(wildcard *.c)
-TESTS_OBJ=$(patsubst %.c, %.log, $(TESTS))
+TESTS=$(wildcard *.c) $(wildcard *.cpp)
+TESTS_OBJ=$(patsubst %.c, %.log, $(TESTS)) \
+					$(patsubst %.cpp, %.log, $(TESTS))
 
 .PHONY: check
 check: $(TESTS_OBJ)
@@ -8,5 +9,8 @@ check: $(TESTS_OBJ)
 %.log: %.c
 	@python3 runtest.py $^ -o $@
 
+%.log: %.cpp
+	@python3 runtest.py $^ -o $@
+
 clean:
-	rm *.log
+	rm -f *.log

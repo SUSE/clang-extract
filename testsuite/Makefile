@@ -1,6 +1,6 @@
 check: small
 	$(MAKE) -C $<
 
-
 clean:
-	rm testrun.*
+	$(MAKE) -C small clean
+	rm -f testrun.*

@@ -247,7 +247,9 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
     return inserted;
   }
 
-  if (type->isElaboratedTypeSpecifier()) {
+  /* The `isElaboratedTypeSpecifier` seems to reject some cases where the type
+     is indeed an ElaboratedType.  */
+  if (type->isElaboratedTypeSpecifier() || isa<ElaboratedType>(type)) {
     /* For some reason clang add some ElaboratedType types, which is not clear
        of their purpose.  But handle them as well.  */
 
@@ -255,6 +257,19 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
 
     return Add_Type_And_Depends(t->desugar().getTypePtr());
   }
+
+  /* Parse the template arguments.  */
+  if (isa<TemplateSpecializationType>(type)) {
+    const TemplateSpecializationType *t =
+      type->getAs<const TemplateSpecializationType>();
+
+    for (TemplateArgument arg : t->template_arguments()) {
+      Add_Type_And_Depends(arg.getAsType().getTypePtr());
+    }
+
+    Add_Type_And_Depends(t->desugar().getTypePtr());
+  }
+
   if (type->isPointerType() || type->isArrayType()) {
     /* Handle case where type is a pointer or array.  */
 
@@ -266,10 +281,6 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
 
 bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl) {
   bool inserted = false;
-
-  /* If decl was already inserted then quickly return.  */
-  if (Is_Decl_Marked(decl))
-    return false;
 
   /* Be careful with anon structs declarations.  */
   RecordDecl *rdecl = dynamic_cast<RecordDecl *>(decl);
@@ -285,6 +296,20 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl) {
       decl = typedefdecl;
     }
   }
+
+  /* Be careful with RecordTypes comming from templates.  */
+  if (ClassTemplateSpecializationDecl *templtspecial =
+      dynamic_cast<ClassTemplateSpecializationDecl *>(decl)) {
+    if (ClassTemplateDecl *templatedecl = templtspecial->getSpecializedTemplate()) {
+      /* This record declaration comes from a template declaration, so we must
+         add it as well.  */
+      Add_Decl_And_Prevs(templatedecl);
+    }
+  }
+
+  /* If decl was already inserted then quickly return.  */
+  if (Is_Decl_Marked(decl))
+    return false;
 
   /* Add current decl.  */
   inserted = Add_Decl_And_Prevs(decl);
@@ -379,6 +404,9 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt) {
          */
         Mark_Required_Functions(fundecl);
       } else {
+        type = decl->getType().getTypePtr();
+        Add_Type_And_Depends(type);
+
         if (!Is_Decl_Marked(to_mark))
           Add_Decl_And_Prevs(to_mark);
       }
@@ -472,6 +500,16 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl) {
       Dependencies.insert(decl);
       inserted = true;
     }
+
+    DeclContext *context = decl->getDeclContext();
+    if (context) {
+      Decl *d = cast<Decl>(context);
+      if (d && !Is_Decl_Marked(d)) {
+        Dependencies.insert(d);
+        inserted = true;
+      }
+    }
+
     decl = decl->getPreviousDecl();
   }
 

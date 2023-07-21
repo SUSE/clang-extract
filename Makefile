@@ -1,5 +1,5 @@
 CXX=clang++ #/tmp/clang/usr/local/bin/clang++
-CXXFLAGS=-Wall -g -fsanitize=address # -I/tmp/clang/include
+CXXFLAGS=-Wall -g3 -fsanitize=address # -I/tmp/clang/include
 LDPATH=#-L/tmp/clang/lib/ -Wl,--rpath=/tmp/clang/lib/
 LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM
 
@@ -19,3 +19,4 @@ check: clang-extract
 
 clean:
 	rm -f *.o clang-extract
+	$(MAKE) -C testsuite clean

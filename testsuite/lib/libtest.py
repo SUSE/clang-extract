@@ -219,7 +219,7 @@ class UnitTest:
                     p = self.must_not_have_regexes[i]
                     matched = re.search(p, line)
                     if matched is not None:
-                        self.log.print("Must not have pattern found: ",
+                        self.log.print("Must not have pattern found: " +
                                        self.must_not_have[i])
                         return False
 

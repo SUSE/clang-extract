@@ -9,7 +9,6 @@
 
 void PrettyPrint::Print_Decl(Decl *decl)
 {
-
   /* When handling C code, we need to check if given declaration is a function
      with body.  If yes, we can simply print the declaration, but otherwise
      we need to manually insert the end of statement ';' token.  */
@@ -159,6 +158,11 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 void PrettyPrint::Debug_Decl(Decl *decl)
 {
   llvm::outs() << Get_Source_Text(decl->getSourceRange()) << '\n';
+}
+
+void PrettyPrint::Debug_Stmt(Stmt *stmt)
+{
+  stmt->printPretty(llvm::outs(), nullptr, PPolicy);
 }
 
 void PrettyPrint::Print_Stmt(Stmt *stmt)
