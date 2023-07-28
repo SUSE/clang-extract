@@ -24,7 +24,7 @@ void Print_AST(ASTUnit *ast)
   }
 }
 
-static void Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
+static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
 {
   ctx->AST.reset();
 
@@ -56,8 +56,15 @@ static void Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
       CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 1,
       TU_Complete, false, false, false);
 
+  if (AU == nullptr) {
+    std::cerr << "Could not create the AST";
+    return false;
+  }
+
   PrettyPrint::Set_Source_Manager(&AU->getSourceManager());
   ctx->AST = std::move(AU);
+
+  return true;
 }
 
 std::string Pass::Get_Dump_Name_From_Input(PassManager::Context *ctx)
@@ -112,7 +119,8 @@ class BuildASTPass : public Pass
 
   virtual bool Run_Pass(PassManager::Context *ctx)
   {
-    Build_ASTUnit(ctx);
+    if (!Build_ASTUnit(ctx))
+      return false;
 
     /* Remove any unwanted arguments from command line.  */
     Update_Clang_Args(ctx->ClangArgs);
@@ -209,7 +217,8 @@ class ClosurePass : public Pass
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      Build_ASTUnit(ctx, ctx->MFS);
+      if (!Build_ASTUnit(ctx, ctx->MFS))
+        return false;
 
       /* If there was an error on building the AST here, don't continue.  */
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
