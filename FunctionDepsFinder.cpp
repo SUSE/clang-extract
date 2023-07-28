@@ -182,7 +182,8 @@ void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl) {
   Mark_Types_In_Function_Body(decl->getBody());
 }
 
-bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
+bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
+{
   if (!type)
     return false;
 
@@ -279,7 +280,8 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type) {
   return false;
 }
 
-bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl) {
+bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
+{
   bool inserted = false;
 
   /* Be careful with anon structs declarations.  */
@@ -295,6 +297,19 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl) {
 
       decl = typedefdecl;
     }
+  } else if (TypedefNameDecl *tdecl = dynamic_cast<TypedefNameDecl *>(decl)) {
+    /* In case the given decl is a typedef, we must be careful with the
+     * following case:
+     *
+     *  typedef unsigned long pteval_t;
+     *  typedef struct { pteval_t pte; } pte_t;
+     *
+     * Assuming that was given the node for the pte_t typedef, we must
+     * recursively look into the declarations inside the struct to find
+     * if there is a reference to a type that needs to be included in the
+     * closure.
+     */
+    rdecl = dynamic_cast<RecordDecl *>(tdecl->getAnonDeclWithTypedefName());
   }
 
   /* Be careful with RecordTypes comming from templates.  */
@@ -357,7 +372,8 @@ bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl) {
   return true;
 }
 
-void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt) {
+void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
+{
   if (!stmt)
     return;
 
