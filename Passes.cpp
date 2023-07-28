@@ -384,7 +384,7 @@ void PassManager::Run_Passes(ArgvParser &args)
       }
 
       if (pass_success == false) {
-        std::cout << '\n' << "Error on pass: " << pass->PassName << '\n';
+        std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
         return;
       }
     }
