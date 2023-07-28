@@ -21,7 +21,7 @@ $ make
 
 clang-extract has automated testing. You need a few python3 libraries installed for it to run:
 ```
-$ sudo zypper install python311-subprocess-tee python311-pytest
+$ sudo zypper install python311-subprocess-tee python311-pytest python311-pexpect python311-psutil
 ```
 Then running the testsuite is as easy as running:
 ```
