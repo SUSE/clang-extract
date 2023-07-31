@@ -114,7 +114,7 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Declarator
   return false;
 }
 
-void SymbolExternalizer::Externalize_Symbol(DeclaratorDecl *to_externalize)
+void SymbolExternalizer::Externalize_Symbol([[maybe_unused]] DeclaratorDecl *to_externalize)
 {
   assert(false && "To be implemented.");
 }

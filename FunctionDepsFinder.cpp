@@ -439,12 +439,12 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     unsigned num_inputs = asmstmt->getNumInputs();
     unsigned num_outputs = asmstmt->getNumOutputs();
 
-    for (int i = 0; i < num_inputs; i++) {
+    for (unsigned i = 0; i < num_inputs; i++) {
       Expr *expr = (Expr *)asmstmt->getInputExpr(i);
       Mark_Types_In_Function_Body(expr);
     }
 
-    for (int i = 0; i < num_outputs; i++) {
+    for (unsigned i = 0; i < num_outputs; i++) {
       Expr *expr = (Expr *)asmstmt->getOutputExpr(i);
       Mark_Types_In_Function_Body(expr);
     }
@@ -461,7 +461,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
      */
     OffsetOfExpr *expr = (OffsetOfExpr *)stmt;
     unsigned num_components = expr->getNumComponents();
-    for (int i = 0; i < num_components; i++) {
+    for (unsigned i = 0; i < num_components; i++) {
       /* Get the RecordDecl referenced in the builtin_offsetof and add to the
          dependency list.  */
       const OffsetOfNode &component = expr->getComponent(i);

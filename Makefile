@@ -1,5 +1,5 @@
 CXX=clang++ #/tmp/clang/usr/local/bin/clang++
-CXXFLAGS=-Wall -g3 -fsanitize=address # -I/tmp/clang/include
+CXXFLAGS=-Wall -Wextra -Werror -g3 -fsanitize=address # -I/tmp/clang/include
 LDPATH=#-L/tmp/clang/lib/ -Wl,--rpath=/tmp/clang/lib/
 LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM
 
