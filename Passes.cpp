@@ -112,7 +112,7 @@ class BuildASTPass : public Pass
     }
   }
 
-  virtual bool Gate(PassManager::Context *ctx)
+  virtual bool Gate([[maybe_unused]] PassManager::Context *ctx)
   {
     return true;
   }

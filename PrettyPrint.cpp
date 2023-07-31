@@ -105,7 +105,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
     AttrVec &attrvec = decl->getAttrs();
     bool has_attr;
 
-    for (int i = 0; i < attrvec.size(); i++) {
+    for (size_t i = 0; i < attrvec.size(); i++) {
       SourceLocation loc = attrvec[i]->getRange().getEnd();
       loc = Lexer::getLocForEndOfToken(loc, 0, *SM, LangOpts);
 
@@ -300,7 +300,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
     AttrVec &attrvec = decl->getAttrs();
     bool has_attr;
 
-    for (int i = 0; i < attrvec.size(); i++) {
+    for (size_t i = 0; i < attrvec.size(); i++) {
       SourceLocation loc = attrvec[i]->getRange().getEnd();
       loc = Lexer::getLocForEndOfToken(loc, 0, *SM, LangOpts);
 
