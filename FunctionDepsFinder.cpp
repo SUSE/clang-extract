@@ -420,11 +420,19 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
          */
         Mark_Required_Functions(fundecl);
       } else {
+
         type = decl->getType().getTypePtr();
         Add_Type_And_Depends(type);
 
-        if (!Is_Decl_Marked(to_mark))
+        if (!Is_Decl_Marked(to_mark)) {
           Add_Decl_And_Prevs(to_mark);
+          if (VarDecl *vardecl = dynamic_cast<VarDecl *>(decl)) {
+            /* This is a reference to a global variable.  Look for its initializer symbols.  */
+            if (vardecl->hasGlobalStorage() && vardecl->hasInit()) {
+              Mark_Types_In_Function_Body(vardecl->getInit());
+            }
+          }
+        }
       }
     }
 

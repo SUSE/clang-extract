@@ -10,8 +10,6 @@
 #include <clang/Tooling/Tooling.h>
 #include "clang/Frontend/CompilerInstance.h"
 
-using namespace clang;
-
 namespace ClangCompat
 {
 #if __clang_major__ >= 16
@@ -22,13 +20,13 @@ namespace ClangCompat
 # define ClangCompat_GetTokenPtr(token) (token).getPointer()
 #endif
 
-  static inline const TypedefType *Get_Type_As_TypedefType(const Type *type)
+  static inline const clang::TypedefType *Get_Type_As_TypedefType(const clang::Type *type)
   {
 #if __clang_major__ >= 16
       /* Clang 16 upwards do not provide getAs<const TypedefType>.  */
-    return type->getAs<TypedefType>();
+    return type->getAs<clang::TypedefType>();
 #else
-    return type->getAs<const TypedefType>();
+    return type->getAs<const clang::TypedefType>();
 #endif
   }
 
