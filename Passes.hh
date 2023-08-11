@@ -32,6 +32,8 @@ class PassManager {
             Externalize(args.Get_Symbols_To_Externalize()),
             OutputFile(args.Get_Output_File()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
+            KeepIncludes(args.Should_Keep_Includes()),
+            HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             PassNum(0)
         {
@@ -58,6 +60,12 @@ class PassManager {
 
         /** Is the externalization passes disabled?  */
         bool ExternalizationDisabled;
+
+        /** Should we keep the includes whenever is possible?  */
+        bool KeepIncludes;
+
+        /** Which includes we must expand? */
+        std::vector<std::string> HeadersToExpand;
 
         /** The arguments that will be sent to clang when building the AST.  */
         std::vector<const char *> &ClangArgs;

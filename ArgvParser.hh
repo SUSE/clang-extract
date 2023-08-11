@@ -40,6 +40,11 @@ class ArgvParser
     return SymbolsToExternalize;
   }
 
+  inline std::vector<std::string>& Get_Headers_To_Expand(void)
+  {
+    return HeadersToExpand;
+  }
+
   inline std::string &Get_Output_File(void)
   {
     return OutputFile;
@@ -48,6 +53,11 @@ class ArgvParser
   inline bool Is_Externalization_Disabled(void)
   {
     return DisableExternalization;
+  }
+
+  inline bool Should_Keep_Includes(void)
+  {
+    return WithIncludes;
   }
 
   inline bool Should_Dump_Passes(void)
@@ -65,8 +75,10 @@ class ArgvParser
 
   std::vector<std::string> FunctionsToExtract;
   std::vector<std::string> SymbolsToExternalize;
+  std::vector<std::string> HeadersToExpand;
   std::string OutputFile;
 
   bool DisableExternalization;
+  bool WithIncludes;
   bool DumpPasses;
 };

@@ -177,11 +177,28 @@ void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
   Out << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n";
 }
 
+void PrettyPrint::Debug_Macro_Def(MacroDefinitionRecord *rec)
+{
+  llvm::outs() << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n";
+}
+
 void PrettyPrint::Print_Macro_Undef(MacroDirective *directive)
 {
   SourceLocation loc = directive->getDefinition().getUndefLocation();
   assert(loc.isValid() && "Undefine location is invalid");
   Out << "#undef " << Get_Source_Text(loc) << '\n';
+}
+
+void PrettyPrint::Debug_Macro_Undef(MacroDirective *directive)
+{
+  SourceLocation loc = directive->getDefinition().getUndefLocation();
+  assert(loc.isValid() && "Undefine location is invalid");
+  llvm::outs() << "#undef " << Get_Source_Text(loc) << '\n';
+}
+
+void PrettyPrint::Print_InclusionDirective(InclusionDirective *include)
+{
+  Out << Get_Source_Text(include->getSourceRange()) << '\n';
 }
 
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
@@ -227,6 +244,11 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
   assert(b.isValid());
 
   return is_before(a, b);
+}
+
+void PrettyPrint::Debug_SourceLoc(const SourceLocation &loc)
+{
+  loc.dump(*SM);
 }
 
 bool PrettyPrint::Contains_From_LineCol(const SourceRange &a, const SourceRange &b)
@@ -344,6 +366,16 @@ void PrettyPrint::Set_Output_To(const std::string &path)
   static llvm::raw_fd_ostream out(path, ec);
 
   Set_Output_Ostream(&out);
+}
+
+StringRef PrettyPrint::Get_Filename_From_Loc(const SourceLocation &loc)
+{
+  return SM->getFilename(loc);
+}
+
+OptionalFileEntryRef PrettyPrint::Get_FileEntry(const SourceLocation &loc)
+{
+  return SM->getFileEntryRefForID(SM->getFileID(loc));
 }
 
 /* See PrettyPrint.hh for what they do.  */

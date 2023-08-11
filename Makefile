@@ -1,11 +1,12 @@
 CXX=clang++ #/tmp/clang/usr/local/bin/clang++
-CXXFLAGS=-Wall -g3 #-I/tmp/clang/usr/local/include
+CXXFLAGS=-Wall -Wextra -fsanitize=address -g3 #-I/tmp/clang/usr/local/include
 LDPATH=#-L/tmp/clang/usr/local/lib/ -Wl,--rpath=/tmp/clang/usr/local/lib/
 LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM
 
 PYTHON=python -B
 
 FILES=$(wildcard *.cpp)
+HEADERS=$(wildcard *.hh)
 OBJECTS=$(patsubst %.cpp, %.o, $(FILES))
 
 clang-extract: $(OBJECTS)
@@ -14,7 +15,7 @@ clang-extract: $(OBJECTS)
 check: clang-extract
 	$(MAKE) -C testsuite
 
-%.o: %.cpp
+%.o: %.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $<
 
 clean:

@@ -1,13 +1,11 @@
-check: ccp small
+TEST_FOLDERS=ccp small includes
 
-small:
-	$(MAKE) -C small
+check: $(TEST_FOLDERS)
 
-ccp:
-	$(MAKE) -C ccp
+$(TEST_FOLDERS):
+	$(MAKE) -C $@
 
 clean:
-	$(MAKE) -C small clean
-	rm -f testrun.*
+	for folder in $(TEST_FOLDERS); do $(MAKE) -C $$folder clean; done;
 
-.PHONY: check small ccp clean
+.PHONY: check clean $(TEST_FOLDERS)

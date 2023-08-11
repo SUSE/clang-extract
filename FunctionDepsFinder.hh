@@ -2,6 +2,8 @@
 
 #include "EnumConstTbl.hh"
 #include "MacroWalker.hh"
+#include "IncludeTree.hh"
+#include "Passes.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Analysis/CallGraph.h>
@@ -43,15 +45,14 @@ struct MacroIterator
 class FunctionDependencyFinder
 {
   public:
-    FunctionDependencyFinder(ASTUnit *ast, std::string const &function, bool closure=true);
-    FunctionDependencyFinder(ASTUnit *ast, std::vector<std::string> const &functions, bool closure=true);
+    FunctionDependencyFinder(PassManager::Context *);
 
     /** Print the marked nodes as they appear in the AST.  */
-    void Print();
+    void Print(void);
 
   protected:
     /** Run the analysis on function `function`*/
-    void Run_Analysis(std::vector<std::string> const &function, bool closure);
+    void Run_Analysis(std::vector<std::string> const &function);
 
     /** Mark decl as dependencies and all its previous decls versions.  */
     bool Add_Decl_And_Prevs(Decl *decl);
@@ -122,6 +123,16 @@ class FunctionDependencyFinder
     /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
     void Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc);
 
+    /** Print output expanding all #includes.  */
+    void Print_Without_Headers(void);
+    void Print_Without_Headers(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until, bool print = true);
+
+    /** Skip declaration and macros.  Used when outputing preserving the #includes.  */
+    inline void Skip_Decls_And_Macros(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until)
+    {
+      Print_Without_Headers(it, macro_it, until, false);
+    }
+
     /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
         printing all macros reached in this path.  */
     void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print=true);
@@ -144,6 +155,10 @@ class FunctionDependencyFinder
     /* Remove redundant decls, whose source location is inside another decl.  */
     void Remove_Redundant_Decls();
 
+    /* Remove decls covered by includes.  */
+    void Remove_Decls_Covered_By_Includes(void);
+    void Remove_Macros_Covered_By_Includes(void);
+
 
     /** Datastructure holding all Decls required for the functions. This is
         then used to mark which Decls we need to output.
@@ -163,8 +178,14 @@ class FunctionDependencyFinder
        the code.  */
     std::vector<MacroDirective*> NeedsUndef;
 
+    /* MacroWalker object to do interfacing with macros in the code.  */
     MacroWalker MW;
 
+    /* Tree of #includes.  */
+    IncludeTree IT;
+
+    /* Should we keep the includes when printing?  */
+    bool KeepIncludes;
 
     /** Check if a given declaration was already marked as dependency.  */
     inline bool Is_Decl_Marked(Decl *decl)
@@ -172,5 +193,5 @@ class FunctionDependencyFinder
 
     /** Determine if a macro that are marked for output.  */
     inline bool Is_Macro_Marked(MacroInfo *x)
-    { return x && x->isUsed(); }
+    { return x && (x->isUsed() || x->isUsedForHeaderGuard()); }
 };

@@ -29,6 +29,8 @@ class PrettyPrint
 
   static void Debug_Decl(Decl *decl);
   static void Debug_Stmt(Stmt *stmt);
+  static void Debug_Macro_Def(MacroDefinitionRecord *rec);
+  static void Debug_Macro_Undef(MacroDirective *);
 
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
@@ -41,7 +43,11 @@ class PrettyPrint
 
   static void Print_MacroInfo(MacroInfo *info);
 
+  static void Print_InclusionDirective(InclusionDirective *);
+
   static void Print_Attr(Attr *attr);
+
+  static void Debug_SourceLoc(const SourceLocation &loc);
 
   static bool Contains_From_LineCol(const SourceRange &a, const SourceRange &b);
 
@@ -96,7 +102,11 @@ class PrettyPrint
   /** Set output to file.  */
   static void Set_Output_To(const std::string &path);
 
+  static StringRef Get_Filename_From_Loc(const SourceLocation &loc);
+
   static SourceLocation Get_Expanded_Loc(Decl *decl);
+
+  static OptionalFileEntryRef Get_FileEntry(const SourceLocation &loc);
 
   /* This class can not be initialized.  */
   PrettyPrint() = delete;

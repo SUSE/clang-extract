@@ -42,10 +42,10 @@ static std::string Extract_Single_Arg(const char *str)
 }
 
 ArgvParser::ArgvParser(int argc, char **argv)
+  : DisableExternalization(false),
+    WithIncludes(false),
+    DumpPasses(false)
 {
-  DisableExternalization = false;
-  DumpPasses = false;
-
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
       ArgsToClang.push_back(argv[i]);
@@ -111,6 +111,16 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (!strcmp("-DCE_DUMP_PASSES", str)) {
     DumpPasses = true;
+
+    return true;
+  }
+  if (!strcmp("-DCE_KEEP_INCLUDES", str)) {
+    WithIncludes = true;
+
+    return true;
+  }
+  if (prefix("-DCE_EXPAND_INCLUDES=", str)) {
+    HeadersToExpand = Extract_Args(str);
 
     return true;
   }

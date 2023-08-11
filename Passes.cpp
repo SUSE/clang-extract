@@ -94,20 +94,24 @@ class BuildASTPass : public Pass
   }
 
   /** Remove any undesired flags and insert new flags as necessary. */
-  void Update_Clang_Args(std::vector<const char *> &clangargs)
+  void Update_Clang_Args(PassManager::Context *ctx)
   {
-    /* Linux adds -include header.h flag which we need to remove, else
-       the re-inclusion of this header when reparsing will overwrite our
-       changes.  */
+    bool keep_includes = ctx->KeepIncludes;
+    std::vector<const char *> &clangargs = ctx->ClangArgs;
 
-    for (auto it = clangargs.begin(); it != clangargs.end(); it++) {
-      const char *elem = *it;
-      if (!strcmp(elem, "-include")) {
-        clangargs.erase(it, it+2);
+    if (keep_includes == false) {
+      /* Linux adds -include header.h flag which we need to remove, else
+         the re-inclusion of this header when reparsing will overwrite our
+         changes.  */
+      for (auto it = clangargs.begin(); it != clangargs.end(); it++) {
+        const char *elem = *it;
+        if (!strcmp(elem, "-include")) {
+          clangargs.erase(it, it+2);
 
-        /* Required because we removed two elements from the vector.  */
-        it--;
-        it--;
+          /* Required because we removed two elements from the vector.  */
+          it--;
+          it--;
+        }
       }
     }
   }
@@ -123,7 +127,7 @@ class BuildASTPass : public Pass
       return false;
 
     /* Remove any unwanted arguments from command line.  */
-    Update_Clang_Args(ctx->ClangArgs);
+    Update_Clang_Args(ctx);
 
     /* Get the input file path.  */
     ctx->InputPath = Get_Input_File(ctx->AST.get()).str();
@@ -135,6 +139,7 @@ class BuildASTPass : public Pass
   virtual void Dump_Result(PassManager::Context *ctx)
   {
     /* If the code is too large, this crashes with an stack overflow.  */
+    return;
 
     clang::ASTUnit::top_level_iterator it;
 
@@ -207,7 +212,7 @@ class ClosurePass : public Pass
       PrettyPrint::Set_Output_Ostream(&code_stream);
 
       /* Compute closure and output the code.  */
-      FunctionDependencyFinder fdf(ctx->AST.get(), ctx->FuncExtractNames);
+      FunctionDependencyFinder fdf(ctx);
       fdf.Print();
 
       /* Add the temporary string with code to the filesystem.  */
@@ -216,9 +221,20 @@ class ClosurePass : public Pass
       //Print_AST(ctx->AST.get());
 
       /* Parse the temporary code to apply the changes by the externalizer
-         and set its new SourceManager to the PrettyPrint class.  */
-      if (!Build_ASTUnit(ctx, ctx->MFS))
-        return false;
+         and set its new SourceManager to the PrettyPrint class.  In case we
+         must keep the includes, pass the overlayFS instead of the memoryFS
+         as we must access the headers in disk.  If we are expanding all
+         headers, pass the memoryFS so we can catch possible bugs where
+         #includes went through.  */
+      if (ctx->KeepIncludes) {
+        if (!Build_ASTUnit(ctx, ctx->OFS)) {
+          return false;
+        }
+      } else {
+        if (!Build_ASTUnit(ctx, ctx->MFS)) {
+          return false;
+        }
+      }
 
       /* If there was an error on building the AST here, don't continue.  */
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
@@ -240,7 +256,7 @@ class ClosurePass : public Pass
       }
 
       /* Compute closure and output the code.  */
-      FunctionDependencyFinder fdf2(ctx->AST.get(), ctx->FuncExtractNames, /*closure=*/false);
+      FunctionDependencyFinder fdf2(ctx);
       fdf2.Print();
 
       /* Add the temporary string with code to the filesystem.  */
