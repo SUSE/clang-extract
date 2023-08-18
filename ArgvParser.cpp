@@ -73,6 +73,22 @@ void ArgvParser::Insert_Required_Parameters(void)
 
 bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 {
+  std::vector<const char *> gcc_args = {
+    "-mpreferred-stack-boundary=3",
+    "-mindirect-branch=thunk-extern",
+    "-mindirect-branch-register",
+    "-fno-var-tracking-assignments",
+    "-fconserve-stack",
+    "-mrecord-mcount",
+    "-fconserve-stack",
+  };
+
+  /* Ignore gcc arguments that are not known to clang */
+  /* FIXME: Use std::find... */
+  for (const char *arg : gcc_args)
+  	if (prefix(arg, str))
+		return true;
+
   if (prefix("-DCE_EXTRACT_FUNCTIONS=", str)) {
     FunctionsToExtract = Extract_Args(str);
 
