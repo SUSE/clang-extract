@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import tempfile
+import glob
 
 # Third-party libraries
 import pexpect
@@ -20,6 +21,13 @@ RED    = '\033[91m'
 HRED   = '\033[0;91m'
 YELLOW = '\033[93m'
 BLUE   = '\033[34m'
+
+def cleanup_temp_files(files):
+    for f in files:
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
 
 # Logs messages into file.
 class Log:
@@ -34,7 +42,7 @@ class Log:
         self.file.write(s + '\n')
 
 class UnitTest:
-    def __init__(self, test_path, log_path):
+    def __init__(self, test_path, log_path, binaries_path):
         self.log = Log(log_path)
 
         self.test_path = test_path
@@ -47,6 +55,12 @@ class UnitTest:
         self.must_not_have = self.extract_must_not_have()
         self.error_msgs = self.extract_error_msgs()
         self.warning_msgs = self.extract_warning_msgs()
+        self.compile_options = self.extract_must_compile()
+        self.skip_silently = self.should_skip_test_silently()
+        self.no_debuginfo = self.without_debuginfo()
+        self.no_ipa_clones = self.without_ipaclones()
+
+        self.binaries_path = binaries_path
 
         self.must_have_regexes, self.must_not_have_regexes, self.error_msgs_regexes, self.warning_msgs_regexes = self.compile_regexes()
 
@@ -116,6 +130,58 @@ class UnitTest:
             return True
 
         return False
+
+    # Flag that e must compile the file.
+    def extract_must_compile(self):
+        p = re.compile('{ *dg-compile "(.*)" *}')
+        matches = re.search(p, self.file_content)
+        if matches is not None:
+            matches = matches.group(1)
+            return matches.split()
+
+        return None
+
+    def should_skip_test_silently(self):
+        p = re.compile('{ *dg-skip-silent *}')
+        matched = re.search(p, self.file_content)
+        if matched is not None:
+            return True
+
+        return False
+
+    def without_debuginfo(self):
+        p = re.compile('{ *dg-no-debuginfo *}')
+        matched = re.search(p, self.file_content)
+        if matched is not None:
+            return True
+
+        return False
+
+    def without_ipaclones(self):
+        p = re.compile('{ *dg-no-ipa-clones *}')
+        matched = re.search(p, self.file_content)
+        if matched is not None:
+            return True
+
+        return False
+
+
+    def gcc_compile(self):
+        # Do not compile if dg-compile wasn't specified.
+        if self.compile_options is None:
+            return None
+
+        compiler = '/usr/bin/gcc'
+        output = './' + next(tempfile._get_candidate_names()) + ".out"
+
+        command = [ compiler, '-o', output,
+                    self.test_path ]
+        command.extend(self.compile_options)
+
+        tool = subprocess.run(command, timeout=10, stderr=subprocess.STDOUT,
+                              stdout=subprocess.PIPE)
+
+        return output
 
     # Compile the regexes in scan-tree-dump and scan-tree-dump-not.
     def compile_regexes(self):
@@ -204,7 +270,7 @@ class UnitTest:
             with open(output_file, mode="rt", encoding="utf-8") as file:
                 line = file.read()
 
-                self.log.print("clang-extract output:")
+                self.log.print("output:")
                 self.log.print(line)
 
                 self.log.print("-----")
@@ -231,9 +297,17 @@ class UnitTest:
 
         return True
 
+    def get_ipa_clones_path(self, elf):
+        output_folder = os.path.dirname(elf)
+        elf_file = os.path.basename(elf)
+
+        test_file = os.path.basename(self.test_path)
+
+        return output_folder + "/" + elf_file + "-" + test_file + ".000i.ipa-clones"
+
     # Indeed run the test.
-    def run_test(self):
-        clang_extract = '../../clang-extract'
+    def run_test(self, lto_test=False):
+        clang_extract = self.binaries_path + 'clang-extract'
         ce_output_path = '/tmp/' + next(tempfile._get_candidate_names()) + '.CE.c'
 
         command = [ clang_extract, '-DCE_OUTPUT_FILE=' + ce_output_path,
@@ -243,7 +317,47 @@ class UnitTest:
         tool = subprocess.run(command, timeout=10, stderr=subprocess.STDOUT,
                               stdout=subprocess.PIPE)
 
-        self.log.print("terminal output of clang-extract:")
+        r = self.check(tool, ce_output_path)
+        cleanup_temp_files([ce_output_path])
+        return r
+
+    def run_inline_test(self, lto_test=False):
+        if self.skip_silently:
+            return 0
+
+        inline = self.binaries_path + 'inline'
+        ce_output_path = '/tmp/' + next(tempfile._get_candidate_names()) + '.txt'
+
+        elf = self.gcc_compile()
+
+        command = [ inline, '-o', ce_output_path ]
+        command.extend(self.options)
+        if elf is not None:
+            if self.no_debuginfo == False:
+                command.append("-debuginfo")
+                command.append(elf)
+            if self.no_ipa_clones == False:
+                command.append("-ipa-files")
+                if lto_test:
+                    # Pass the directory with all ipa-clones rather than the
+                    # path to the ipa-clone file.
+                    command.append(os.path.dirname(self.get_ipa_clones_path(elf)))
+                else:
+                    command.append(self.get_ipa_clones_path(elf))
+
+        tool = subprocess.run(command, timeout=10, stderr=subprocess.STDOUT,
+                              stdout=subprocess.PIPE)
+
+        r = self.check(tool, ce_output_path)
+        cleanup_temp_files((elf, self.get_ipa_clones_path(elf), ce_output_path))
+        if lto_test == True:
+            filelist = glob.glob('*.ipa-clones')
+            cleanup_temp_files(filelist)
+
+        return r
+
+    def check(self, tool, ce_output_path):
+        self.log.print("terminal output of inline:")
         self.log.print(tool.stdout.decode())
 
         should_xfail = self.extract_should_xfail()
@@ -262,11 +376,4 @@ class UnitTest:
                 self.print_result(tool.returncode, should_xfail)
                 return tool.returncode
 
-        try:
-            os.remove(ce_output_path)
-        except FileNotFoundError:
-            pass
-
         self.print_result(0, should_xfail)
-
-        return 0

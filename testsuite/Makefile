@@ -1,4 +1,5 @@
-TEST_FOLDERS=ccp small includes
+DIRS = $(sort $(dir $(wildcard */)))
+TEST_FOLDERS=$(filter-out lib/,$(DIRS))
 
 check: $(TEST_FOLDERS)
 

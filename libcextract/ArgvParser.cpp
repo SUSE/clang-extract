@@ -1,45 +1,5 @@
 #include "ArgvParser.hh"
-
-#include <string.h>
-
-#define STRINGFY_VALUE(s) STRINGFY(s)
-#define STRINGFY(s) #s
-
-static bool prefix(const char *a, const char *b)
-{
-  return !strncmp(a, b, strlen(a));
-}
-
-static std::vector<std::string> Extract_Args(const char *str)
-{
-  std::vector<std::string> arg_list;
-
-  const char *params = strchr(str, '=') + 1;
-  char buf[strlen(params) + 1];
-  const char *tok;
-
-  strcpy(buf, params);
-  tok = strtok(buf, ",");
-
-  while (tok != nullptr) {
-    arg_list.push_back(std::string(tok));
-    tok = strtok(nullptr, ",");
-  }
-
-  return arg_list;
-}
-
-static std::string Extract_Single_Arg(const char *str)
-{
-  const char *params = strchr(str, '=') + 1;
-  char buf[strlen(params) + 1];
-  const char *tok;
-
-  strcpy(buf, params);
-  tok = strtok(buf, ",");
-
-  return std::string(tok);
-}
+#include "NonLLVMMisc.hh"
 
 ArgvParser::ArgvParser(int argc, char **argv)
   : DisableExternalization(false),
