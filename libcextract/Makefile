@@ -1,5 +1,5 @@
 CXX=clang++
-CXXFLAGS=-Wall -Wextra -fsanitize=address -g3 -O2
+CXXFLAGS=-Wall -Wextra -fsanitize=address -g3
 LDPATH=
 LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM -lelf
 AR=llvm-ar

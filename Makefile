@@ -1,6 +1,6 @@
 CXX=clang++ #/tmp/clang/usr/local/bin/clang++
 INCLUDES=-I./libcextract
-CXXFLAGS=$(INCLUDES) -Wall -Wextra -fsanitize=address -g3 -O2 #-I/tmp/clang/usr/local/include
+CXXFLAGS=$(INCLUDES) -Wall -Wextra -fsanitize=address -g3 #-I/tmp/clang/usr/local/include
 LDPATH=#-L/tmp/clang/usr/local/lib/ -Wl,--rpath=/tmp/clang/usr/local/lib/
 LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM -lelf
 

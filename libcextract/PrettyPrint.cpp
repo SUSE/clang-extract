@@ -383,3 +383,217 @@ raw_ostream *PrettyPrint::Out = &llvm::outs();
 LangOptions PrettyPrint::LangOpts;
 PrintingPolicy PrettyPrint::PPolicy(LangOpts);
 SourceManager *PrettyPrint::SM;
+
+
+
+/** --- New RecursivePrint class code.  */
+
+RecursivePrint::RecursivePrint(ASTUnit *ast,
+                               std::unordered_set<Decl *> &deps,
+                               IncludeTree &it,
+                               bool keep_includes)
+  : AST(ast),
+    MW(ast->getPreprocessor()),
+    Decl_Deps(deps),
+    IT(it),
+    KeepIncludes(keep_includes)
+{
+  MI.macro_it = AST->getPreprocessor().getPreprocessingRecord()->begin();
+  MI.undef_it = 0;
+
+  Analyze_Includes();
+  Populate_Need_Undef();
+}
+
+void RecursivePrint::Analyze_Includes(void)
+{
+  /* If we do not want to keep the includes then quickly return.  */
+  if (KeepIncludes == false) {
+    return;
+  }
+
+  /* Remove any macros that are provided by an include that should be output.  */
+  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  for (PreprocessedEntity *entity : *rec) {
+    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
+      SourceLocation loc = def->getLocation();
+      IncludeNode *include = IT.Get(loc);
+
+      if (include != nullptr && include->Should_Be_Expanded() == false) {
+        MacroDirective *macrodir = MW.Get_Macro_Directive(def);
+        if (macrodir) {
+          MacroInfo *macro = macrodir->getMacroInfo();
+          macro->setIsUsed(false);
+        }
+      }
+    }
+  }
+
+  /* Remove any decls that are provided by an include that should be output.  */
+  for (auto it = Decl_Deps.begin(); it != Decl_Deps.end();) {
+    SourceLocation loc = (*it)->getLocation();
+    IncludeNode *include = IT.Get(loc);
+
+    /* The location is covered by a include.  Now check if this include is not
+       marked for expansion.  */
+    if (include != nullptr && include->Should_Be_Expanded() == false) {
+      /* If not we can safely remove this decl.  */
+      if (NamedDecl *ndecl = dynamic_cast<NamedDecl*>(*it)) {
+        llvm::outs() << "Deleting " << ndecl->getName() << '\n';
+      }
+      it = Decl_Deps.erase(it);
+    } else {
+      it++;
+    }
+  }
+}
+
+void RecursivePrint::Print(void)
+{
+  /** Print the root node "Translation Unit".  */
+  Print_Decl(AST->getASTContext().getTranslationUnitDecl());
+}
+
+void RecursivePrint::Print_Decl(Decl *decl)
+{
+  if (TranslationUnitDecl *tu = dynamic_cast<TranslationUnitDecl*>(decl)) {
+    for (Decl *d : tu->decls()) {
+      Print_Preprocessor_Until(d->getBeginLoc());
+      Print_Decl(d);
+    }
+
+    /* Print remaining macros located after all declarations.  */
+    SourceManager &sm = AST->getSourceManager();
+    SourceLocation end = sm.getLocForEndOfFile(sm.getMainFileID());
+
+    Print_Preprocessor_Until(end);
+  } else if (Is_Decl_Marked(decl)) {
+    /* Handle namespaces.  Namespace declaration can contain many functions
+       that can be unused in the program.  Hence we need to handle it
+       carefully to remove what we don't need.  */
+    if (NamespaceDecl *namespacedecl = dynamic_cast<NamespaceDecl*>(decl)) {
+      (*PrettyPrint::Out) <<"namespace " << namespacedecl->getName() << " {\n  ";
+
+      /* Iterate on each macro.  */
+      for (auto child : namespacedecl->decls()) {
+        Print_Decl(child);
+      }
+      (*PrettyPrint::Out) << "}\n";
+    } else {
+      SourceLocation l1 = decl->getBeginLoc();
+      Skip_Preprocessor_Until(l1);
+      PrettyPrint::Print_Decl(decl);
+    }
+  }
+}
+
+/** Sort function for Macros.  */
+static bool Compare_Macro_Undef_Loc(MacroDirective *a, MacroDirective *b)
+{
+  return PrettyPrint::Is_Before(a->getDefinition().getUndefLocation(),
+                                b->getDefinition().getUndefLocation());
+}
+
+void RecursivePrint::Populate_Need_Undef(void)
+{
+  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+
+  for (PreprocessedEntity *entity : *rec) {
+    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
+
+      MacroDirective *directive = MW.Get_Macro_Directive(def);
+
+      /* If there is no history, then doesn't bother analyzing.  */
+      if (directive == nullptr)
+        continue;
+
+      /* There is no point in analyzing a macro that wasn't added for output. */
+      if (Is_Macro_Marked(directive->getMacroInfo())) {
+        SourceLocation undef_loc =
+            directive->getDefinition().getUndefLocation();
+
+        /* In case the macro isn't undefined then its location is invalid.  */
+        if (undef_loc.isValid()) {
+          NeedsUndef.push_back(directive);
+        }
+      }
+    }
+  }
+
+  std::sort(NeedsUndef.begin(), NeedsUndef.end(), Compare_Macro_Undef_Loc);
+}
+
+void RecursivePrint::Print_Preprocessor_Until(const SourceLocation &loc, bool print)
+{
+  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  SourceManager *sm = &AST->getSourceManager();
+
+  SourceLocation curr_loc;
+
+  /* We have to iterate in both the preprocessor record and the marked undef
+     vector to find which one we should print based on the location.  This is
+     somewhat similar to how mergesort merge two sorted vectors, if this
+     somehow helps to understand this code.  */
+  while (true) {
+    PreprocessedEntity *e = nullptr;
+    MacroDirective *undef = nullptr;
+
+    /* Initialize with the last possible location for the case we already
+       covered all #defines or all #undefs.  */
+    SourceLocation define_loc = sm->getLocForEndOfFile(sm->getMainFileID());
+    SourceLocation undef_loc = define_loc;
+
+    /* Initialize variables.  */
+    if (MI.macro_it != rec->end()) {
+      e = *MI.macro_it;
+      define_loc = e->getSourceRange().getBegin();
+    }
+    if (MI.undef_it < NeedsUndef.size()) {
+      undef = NeedsUndef[MI.undef_it];
+      undef_loc = undef->getDefinition().getUndefLocation();
+    }
+
+    /* If we can't get any macros or undefs, then return because we are done.  */
+    if (e == nullptr && undef == nullptr) {
+      return;
+    }
+
+    /* Find out which comes first.  */
+    if (PrettyPrint::Is_Before(define_loc, undef_loc)) {
+      curr_loc = define_loc;
+      /* Mark undefine as invalid.  */
+      undef = nullptr;
+    } else {
+      curr_loc = undef_loc;
+      /* Mark define as invalid.  */
+      e = nullptr;
+    }
+
+    /* If we passed the mark to where we should stop printing, then we are done.  */
+    if (PrettyPrint::Is_After(curr_loc, loc)) {
+      return;
+    }
+
+    /* Print wathever comes first.  */
+    if (e) {
+      if (MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e)) {
+        if (print && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
+          PrettyPrint::Print_Macro_Def(entity);
+        }
+      } else if (KeepIncludes) {
+        if (InclusionDirective *inc = dyn_cast<InclusionDirective>(e)) {
+          IncludeNode *node = IT.Get(inc);
+          if (node && node->Should_Be_Output()) {
+            PrettyPrint::Print_InclusionDirective(inc);
+          }
+        }
+      }
+      MI.macro_it++;
+    } else if (undef) {
+      if (print) {
+        PrettyPrint::Print_Macro_Undef(undef);
+      }
+      MI.undef_it++;
+    }
+  }
+}

@@ -4,144 +4,12 @@
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
 
-
 #define PProcessor (AST->getPreprocessor())
 
-MacroIterator FunctionDependencyFinder::Get_Macro_Iterator(void) {
-  MacroIterator it;
-  it.macro_it = PProcessor.getPreprocessingRecord()->begin();
-  it.undef_it = 0;
-  return it;
-}
-
-void FunctionDependencyFinder::Skip_Macros_Until(MacroIterator &it,
-                                                 const SourceLocation &loc) {
-  Print_Macros_Until(it, loc, /*print = */ false);
-}
-
-void FunctionDependencyFinder::Print_Macros_Until(MacroIterator &it,
-                                                  const SourceLocation &loc,
-                                                  bool print) {
-  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
-  SourceManager *sm = &AST->getSourceManager();
-
-  /* Ensure that PreprocessingRecord is avaialable.  */
-  assert(rec && "PreprocessingRecord wasn't generated");
-
-  assert(loc.isValid() && "Until print location is invalid.");
-
-  SourceLocation curr_loc;
-
-  /* We have to iterate in both the preprocessor record and the marked undef
-     vector to find which one we should print based on the location.  This is
-     somewhat similar to how mergesort merge two sorted vectors, if this
-     somehow helps to understand this code.  */
-  while (true) {
-    PreprocessedEntity *e = nullptr;
-    MacroDirective *undef = nullptr;
-
-    /* Initialize with the last possible location for the case we already
-       covered all #defines or all #undefs.  */
-    SourceLocation define_loc = sm->getLocForEndOfFile(sm->getMainFileID());
-    SourceLocation undef_loc = define_loc;
-
-    /* Initialize variables.  */
-    if (it.macro_it != rec->end()) {
-      e = *it.macro_it;
-      define_loc = e->getSourceRange().getBegin();
-    }
-    if (it.undef_it < NeedsUndef.size()) {
-      undef = NeedsUndef[it.undef_it];
-      undef_loc = undef->getDefinition().getUndefLocation();
-    }
-
-    /* If we can't get any macros or undefs, then return because we are done.  */
-    if (e == nullptr && undef == nullptr) {
-      return;
-    }
-
-    /* Find out which comes first.  */
-    if (PrettyPrint::Is_Before(define_loc, undef_loc)) {
-      curr_loc = define_loc;
-      /* Mark undefine as invalid.  */
-      undef = nullptr;
-    } else {
-      curr_loc = undef_loc;
-      /* Mark define as invalid.  */
-      e = nullptr;
-    }
-
-    /* If we passed the mark to where we should stop printing, then we are done.  */
-    if (PrettyPrint::Is_After(curr_loc, loc)) {
-      return;
-    }
-
-    /* Print wathever comes first.  */
-    if (e) {
-      if (MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e)) {
-        if (print && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
-          PrettyPrint::Print_Macro_Def(entity);
-        }
-      }
-      it.macro_it++;
-    } else if (undef) {
-      if (print) {
-        PrettyPrint::Print_Macro_Undef(undef);
-      }
-      it.undef_it++;
-    }
-  }
-}
-
-void FunctionDependencyFinder::Print_Remaining_Macros(MacroIterator &it) {
-  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
-
-  /* Ensure that PreprocessingRecord is avaialable.  */
-  assert(rec && "PreprocessingRecord wasn't generated");
-
-  SourceLocation curr_loc;
-
-  /* We have to iterate in both the preprocessor record and the marked undef
-     vector to find which one we should print based on the location.  This is
-     somewhat similar to how mergesort merge two sorted vectors, if this
-     somehow helps to understand this code.  */
-  while (true) {
-    PreprocessedEntity *e =
-        (it.macro_it == rec->end()) ? nullptr : *it.macro_it;
-    MacroDirective *undef = nullptr;
-    bool should_print_undef = false;
-
-    /* If we still have items to iterate on the preprocessing record.  */
-    if (e) {
-      curr_loc = e->getSourceRange().getBegin();
-    }
-
-    /* If we still have itens to iterate on the Undef vector.  */
-    if (it.undef_it < NeedsUndef.size()) {
-      undef = NeedsUndef[it.undef_it];
-      SourceLocation undef_loc = undef->getDefinition().getUndefLocation();
-
-      /* Now find out which one comes first.  */
-      if (!e || PrettyPrint::Is_Before(undef_loc, curr_loc)) {
-        should_print_undef = true;
-        curr_loc = undef_loc;
-      }
-    }
-
-    /* Check if we did not past the loc marker where we should stop printing. */
-    if (should_print_undef) {
-      PrettyPrint::Print_Macro_Undef(undef);
-      it.undef_it++;
-    } else if (e) {
-      MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e);
-      if (entity && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
-        PrettyPrint::Print_Macro_Def(entity);
-      }
-      it.macro_it++;
-    } else {
-      break;
-    }
-  }
+/** For debugging purposes.  */
+extern "C" void Debug_Function_Decl(FunctionDecl *fdcl)
+{
+  PrettyPrint::Debug_Decl(fdcl);
 }
 
 void FunctionDependencyFinder::Find_Functions_Required(
@@ -183,7 +51,9 @@ void FunctionDependencyFinder::Find_Functions_Required(
   }
 }
 
-void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl) {
+
+void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
+{
   if (!decl)
     return;
 
@@ -191,6 +61,11 @@ void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl) {
      quickly return because this node was already analyzed.  */
   if (Is_Decl_Marked(decl))
     return;
+
+  if (decl->getBuiltinID() != 0) {
+    /* Do not redeclare compiler builtin functions.  */
+    return;
+  }
 
   /* In case this function has a body, we mark its body as well.  */
   Add_Decl_And_Prevs(decl->hasBody() ? decl->getDefinition() : decl);
@@ -563,95 +438,14 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl) {
   return inserted;
 }
 
-/** Pretty print all nodes were marked to output.  */
-void FunctionDependencyFinder::Print_Without_Headers(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until, bool print) {
-
-  SourceManager *sm = &AST->getSourceManager();
-  SourceLocation last_decl_loc = sm->getLocForEndOfFile(sm->getMainFileID());
-  bool first = true;
-
-  assert(until.isValid());
-
-  for (; it != AST->top_level_end(); ++it) {
-    Decl *decl = *it;
-
-    if (Is_Decl_Marked(decl)) {
-      if (PrettyPrint::Is_Before(decl->getBeginLoc(), until)) {
-        /* In the first decl we don't have a last source location, hence we have
-           to handle this special case.  */
-        if (first) {
-          Print_Macros_Until(macro_it, decl->getBeginLoc(), print);
-          first = false;
-        } else {
-          /* Macros defined inside a function is printed together with the
-             function, so we must skip them.  */
-          Skip_Macros_Until(macro_it, last_decl_loc);
-
-          Print_Macros_Until(macro_it, decl->getBeginLoc(), print);
-        }
-        last_decl_loc = decl->getEndLoc();
-        if (print)
-          PrettyPrint::Print_Decl(decl);
-      } else {
-        // We passed the `until` mark.
-        Print_Macros_Until(macro_it, until, print);
-        return;
-      }
-    }
-  }
-
-  Skip_Macros_Until(macro_it, last_decl_loc);
-  /* Print remaining macros.  */
-  Print_Remaining_Macros(macro_it);
-}
-
-void FunctionDependencyFinder::Print_Without_Headers(void)
-{
-  MacroIterator macro_it = Get_Macro_Iterator();
-  ASTUnit::top_level_iterator it = AST->top_level_begin();
-  SourceManager &sm = AST->getSourceManager();
-  SourceLocation end = sm.getLocForEndOfFile(sm.getMainFileID());
-
-  Print_Without_Headers(it, macro_it, end, true);
-}
-
 void FunctionDependencyFinder::Print(void)
 {
-  if (KeepIncludes == false) {
-    Print_Without_Headers();
-    return;
-  }
-
-  SourceManager *sm = &AST->getSourceManager();
-  auto includes = IT.Get_Non_Expand_Includes();
-  ASTUnit::top_level_iterator it = AST->top_level_begin();
-  MacroIterator macro_it = Get_Macro_Iterator();
-
-  for (auto include : *includes) {
-    InclusionDirective *incl = include->Get_InclusionDirective();
-    Print_Without_Headers(it, macro_it, incl->getSourceRange().getBegin());
-
-    if (include->Should_Be_Output()) {
-      PrettyPrint::Print_InclusionDirective(incl);
-    }
-    /* Discard all macros or decls that belongs to the included file.  */
-    Skip_Decls_And_Macros(it, macro_it, incl->getSourceRange().getEnd());
-  }
-
-  /* Print remaining stuff.  */
-  SourceLocation end = sm->getLocForEndOfFile(sm->getMainFileID());
-  Print_Without_Headers(it, macro_it, end);
+  RecursivePrint(AST, Dependencies, IT, KeepIncludes).Print();
 }
 
 bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl) {
   if (decl == nullptr)
     return false;
-
-  /* We can't continue if no SourceManager was provided to the PrettyPrint
-     class.  */
-  if (PrettyPrint::Get_Source_Manager() == nullptr) {
-    return false;
-  }
 
   /* If the type is not an Array Type then there is no point in doing this
      analysis.  */
@@ -859,72 +653,6 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
   }
 }
 
-void FunctionDependencyFinder::Remove_Decls_Covered_By_Includes(void)
-{
-  for (auto it = Dependencies.begin(); it != Dependencies.end();) {
-    SourceLocation loc = (*it)->getLocation();
-    IncludeNode *include = IT.Get(loc);
-
-    /* The location is covered by a include.  Now check if this include is not
-       marked for expansion.  */
-    if (include != nullptr && include->Should_Be_Expanded() == false) {
-      /* If not we can safely remove this decl.  */
-      it = Dependencies.erase(it);
-    } else {
-      it++;
-    }
-  }
-}
-
-void FunctionDependencyFinder::Remove_Macros_Covered_By_Includes(void)
-{
-  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
-  for (PreprocessedEntity *entity : *rec) {
-    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
-      SourceLocation loc = def->getLocation();
-      IncludeNode *include = IT.Get(loc);
-
-      if (include != nullptr && include->Should_Be_Expanded() == false) {
-        MacroDirective *macrodir = MW.Get_Macro_Directive(def);
-        if (macrodir) {
-          MacroInfo *macro = macrodir->getMacroInfo();
-          macro->setIsUsed(false);
-        }
-      }
-    }
-  }
-}
-
-int FunctionDependencyFinder::Populate_Need_Undef(void) {
-  int count = 0;
-  PreprocessingRecord *rec = PProcessor.getPreprocessingRecord();
-
-  for (PreprocessedEntity *entity : *rec) {
-    if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
-
-      MacroDirective *directive = MW.Get_Macro_Directive(def);
-
-      /* If there is no history, then doesn't bother analyzing.  */
-      if (directive == nullptr)
-        continue;
-
-      /* There is no point in analyzing a macro that wasn't added for output. */
-      if (Is_Macro_Marked(directive->getMacroInfo())) {
-        SourceLocation undef_loc =
-            directive->getDefinition().getUndefLocation();
-
-        /* In case the macro isn't undefined then its location is invalid.  */
-        if (undef_loc.isValid()) {
-          NeedsUndef.push_back(directive);
-          count++;
-        }
-      }
-    }
-  }
-
-  return count;
-}
-
 void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(
     void) {
   /* Ensure that PreprocessingRecord is avaialable.  */
@@ -954,13 +682,4 @@ void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
 
   /* Step 3: Remove any declaration that may have been declared twice.  */
   Remove_Redundant_Decls();
-
-  /* Step 4: Remove decls and macros that are covered by included headers.  */
-  if (KeepIncludes) {
-    Remove_Decls_Covered_By_Includes();
-    Remove_Macros_Covered_By_Includes();
-  }
-
-  /* Step 5: Handle macros that needs to be undefined.  */
-  Populate_Need_Undef();
 }

@@ -3,6 +3,7 @@
 #include "EnumConstTbl.hh"
 #include "MacroWalker.hh"
 #include "IncludeTree.hh"
+#include "PrettyPrint.hh"
 #include "Passes.hh"
 
 #include <clang/Tooling/Tooling.h>
@@ -10,12 +11,6 @@
 #include <unordered_set>
 
 using namespace clang;
-
-struct MacroIterator
-{
-  clang::PreprocessingRecord::iterator macro_it;
-  unsigned undef_it;
-};
 
 /** Function Dependency Finder.
  *
@@ -120,45 +115,22 @@ class FunctionDependencyFinder
         definition of A and get the last one above the expansion of U.  */
     bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
 
-    /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
-    void Skip_Macros_Until(MacroIterator &it, const SourceLocation &loc);
-
     /** Print output expanding all #includes.  */
     void Print_Without_Headers(void);
     void Print_Without_Headers(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until, bool print = true);
-
-    /** Skip declaration and macros.  Used when outputing preserving the #includes.  */
-    inline void Skip_Decls_And_Macros(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until)
-    {
-      Print_Without_Headers(it, macro_it, until, false);
-    }
-
-    /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
-        printing all macros reached in this path.  */
-    void Print_Macros_Until(MacroIterator &it, const SourceLocation &loc, bool print=true);
 
     /** Iterate on the PreprocessingRecord through `it` until the end of the
         PreprocessingRecord is reached, printing all macros reached in this path.  */
     void Print_Remaining_Macros(MacroIterator &it);
 
-    /** Return a new MacroIterator.  */
-    MacroIterator Get_Macro_Iterator(void);
-
     /** Analyze macros in order to find references to constants declared in enums,
         like in enum { CONSTANT = 0 }; and then #define MACRO CONSTANT.  */
     void Include_Enum_Constants_Referenced_By_Macros(void);
 
-    /* Populate the NeedsUndef vector whith macros that needs to be undefined
-       somewhere in the code.  */
     int Populate_Need_Undef(void);
 
     /* Remove redundant decls, whose source location is inside another decl.  */
     void Remove_Redundant_Decls();
-
-    /* Remove decls covered by includes.  */
-    void Remove_Decls_Covered_By_Includes(void);
-    void Remove_Macros_Covered_By_Includes(void);
-
 
     /** Datastructure holding all Decls required for the functions. This is
         then used to mark which Decls we need to output.

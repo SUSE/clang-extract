@@ -310,6 +310,14 @@ std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Includes(void)
   return std::unique_ptr<std::vector<IncludeNode *>>{vec};
 }
 
+IncludeNode *IncludeTree::Get(const InclusionDirective *directive)
+{
+  OptionalFileEntryRef ofer = directive->getFile();
+  const FileEntry *fentry = &ofer->getFileEntry();
+  return Map[fentry];
+}
+
+
 void IncludeTree::IncludeNode::Dump(unsigned ident)
 {
   llvm::outs() << std::string(ident, ' ') << File->getName()

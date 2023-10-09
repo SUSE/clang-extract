@@ -1,7 +1,6 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail }*/
 
-/* Unused function should be removed, which currently it isn't.  */
+/* Unused function should be removed.  */
 
 int printf(const char *, ...);
 

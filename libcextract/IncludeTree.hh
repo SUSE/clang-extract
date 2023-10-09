@@ -144,6 +144,9 @@ class IncludeTree
   /* Get from SourceLocation.  */
   IncludeNode *Get(const SourceLocation &loc);
 
+  /** Get from InclusionDirective.  */
+  IncludeNode *Get(const InclusionDirective *);
+
   /** Dump for debugging purposes.  */
   void Dump(void);
 

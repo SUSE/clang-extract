@@ -1,9 +1,15 @@
 #pragma once
 
+#include <unordered_set>
 #include <clang/Tooling/Tooling.h>
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/Support/raw_ostream.h>
+
+#include "IncludeTree.hh"
+#include "MacroWalker.hh"
 
 using namespace clang;
+
+class RecursivePrint;
 
 /** @brief Wrapper class to printing clang AST nodes.
  *
@@ -129,6 +135,8 @@ class PrettyPrint
   /** SourceManager built when parsing the AST.  Must be set after constructing
       the ast by calling Set_Source_Manager.  */
   static SourceManager *SM;
+
+  friend class RecursivePrint;
 };
 
 /** Since writing PrettyPrint::Print_Decl can be bothering and result in
@@ -147,3 +155,75 @@ static inline bool Is_Loc_Before(const SourceLocation &a, const SourceLocation &
 {
   return PrettyPrint::Is_Before(a, b);
 }
+
+struct MacroIterator
+{
+  clang::PreprocessingRecord::iterator macro_it;
+  unsigned undef_it;
+};
+
+class RecursivePrint
+{
+  public:
+  RecursivePrint(ASTUnit *ast,
+                 std::unordered_set<Decl *> &deps,
+                 IncludeTree &it,
+                 bool keep_includes);
+
+  /* Print output to `Out`.  */
+  void Print(void);
+
+  /** Print single decl.  */
+  void Print_Decl(Decl *decl);
+
+  /** Print a Macro Defintion into ostream `Out`.  */
+  void Print_Macro(MacroDefinitionRecord *rec);
+
+  /** Print a Macro Undef into ostream `Out`.  */
+  void Print_Macro_Undef(MacroDirective *directive);
+
+  protected:
+
+  /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
+      printing all macros reached in this path.  */
+  void Print_Preprocessor_Until(const SourceLocation &loc, bool print=true);
+
+  /* Populate the NeedsUndef vector whith macros that needs to be undefined
+     somewhere in the code.  */
+  void Populate_Need_Undef(void);
+
+  /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
+  inline void Skip_Preprocessor_Until(const SourceLocation &loc)
+  {
+    Print_Preprocessor_Until(loc, false);
+  }
+
+  /** Remove decls and macros that are already covered by includes that are
+      marked for output.  */
+  void Analyze_Includes(void);
+
+  /** Check if a given declaration was already marked as dependency.  */
+  inline bool Is_Decl_Marked(Decl *decl)
+  { return Decl_Deps.find(decl) != Decl_Deps.end(); }
+
+  /** Determine if a macro that are marked for output.  */
+  inline bool Is_Macro_Marked(MacroInfo *x)
+  { return x && (x->isUsed() || x->isUsedForHeaderGuard()); }
+
+  inline void Unmark_Decl(Decl *decl)
+  { Decl_Deps.erase(decl); }
+
+  inline void Unmark_Macro(MacroInfo *x)
+  { x->setIsUsed(false); }
+
+  ASTUnit *AST;
+  MacroWalker MW;
+  std::unordered_set<Decl *> &Decl_Deps;
+  IncludeTree &IT;
+  MacroIterator MI;
+  bool KeepIncludes;
+
+  /* Vector of MacroDirective of macros that needs to be undefined somewhere in
+     the code.  */
+  std::vector<MacroDirective*> NeedsUndef;
+};
