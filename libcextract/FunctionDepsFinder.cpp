@@ -168,7 +168,15 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
       Add_Type_And_Depends(arg.getAsType().getTypePtr());
     }
 
-    Add_Type_And_Depends(t->desugar().getTypePtr());
+    return Add_Type_And_Depends(t->desugar().getTypePtr());
+  }
+
+  /* Deduced template specialization.  */
+  if (isa<DeducedTemplateSpecializationType>(type)) {
+    const DeducedTemplateSpecializationType *t =
+              type->getAs<const DeducedTemplateSpecializationType>();
+
+    return Add_Type_And_Depends(t->getDeducedType().getTypePtr());
   }
 
   if (type->isPointerType() || type->isArrayType()) {
@@ -215,6 +223,14 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
   /* Be careful with RecordTypes comming from templates.  */
   if (ClassTemplateSpecializationDecl *templtspecial =
       dynamic_cast<ClassTemplateSpecializationDecl *>(decl)) {
+
+    /* Handle the template arguments.  */
+    const TemplateArgumentList &list = templtspecial->getTemplateArgs();
+    for (unsigned i = 0; i < list.size(); i++) {
+       const Type *t = list[i].getAsType().getTypePtr();
+       Add_Type_And_Depends(t);
+    }
+
     if (ClassTemplateDecl *templatedecl = templtspecial->getSpecializedTemplate()) {
       /* This record declaration comes from a template declaration, so we must
          add it as well.  */
