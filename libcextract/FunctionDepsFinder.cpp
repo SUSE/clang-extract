@@ -246,6 +246,14 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
   inserted = Add_Decl_And_Prevs(decl);
 
   if (rdecl) {
+    /* In C++, RecordDecl may have inheritance.  Handle it here.  */
+    if (CXXRecordDecl *cxxrdecl = dynamic_cast<CXXRecordDecl *>(rdecl)) {
+      for (CXXBaseSpecifier base : cxxrdecl->bases()) {
+        const Type *type = base.getType().getTypePtr();
+        Add_Type_And_Depends(type);
+      }
+    }
+
     /* RecordDecl may have nested records, for example:
 
       struct A {
