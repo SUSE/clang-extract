@@ -6,12 +6,6 @@
 
 #define PProcessor (AST->getPreprocessor())
 
-/** For debugging purposes.  */
-extern "C" void Debug_Function_Decl(FunctionDecl *fdcl)
-{
-  PrettyPrint::Debug_Decl(fdcl);
-}
-
 void FunctionDependencyFinder::Find_Functions_Required(
     std::vector<std::string> const &funcnames) {
   assert(funcnames.size() > 0);
@@ -102,10 +96,9 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
     return Handle_TypeDecl(t->getAsTagDecl());
   }
 
-  if (type->isTypedefNameType()) {
+  if (isa<const TypedefType>(type)) {
     /* Handle case where type is a typedef.  */
-
-    const TypedefType *t = ClangCompat::Get_Type_As_TypedefType(type);
+    const TypedefType *t = type->getAs<const TypedefType>();
     inserted = Handle_TypeDecl(t->getDecl());
 
     /* Typedefs can be typedef'ed in a chain, for example:
@@ -121,8 +114,9 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
          was already marked for output.
     */
 
-    if (inserted)
+    if (inserted) {
       Add_Type_And_Depends(t->desugar().getTypePtr());
+    }
 
     return inserted;
   }
@@ -151,10 +145,15 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
   /* The `isElaboratedTypeSpecifier` seems to reject some cases where the type
      is indeed an ElaboratedType.  */
   if (type->isElaboratedTypeSpecifier() || isa<ElaboratedType>(type)) {
-    /* For some reason clang add some ElaboratedType types, which is not clear
-       of their purpose.  But handle them as well.  */
-
     const ElaboratedType *t = type->getAs<const ElaboratedType>();
+    if (t != nullptr) {
+      /* ElaboratedType encode information about template specification
+         (see c++-8 testcase).  */
+      NestedNameSpecifier *nns = t->getQualifier();
+      if (nns != nullptr) {
+        Add_Type_And_Depends(nns->getAsType());
+      }
+    }
 
     return Add_Type_And_Depends(t->desugar().getTypePtr());
   }
@@ -218,6 +217,13 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
      * closure.
      */
     rdecl = dynamic_cast<RecordDecl *>(tdecl->getAnonDeclWithTypedefName());
+    if (rdecl == nullptr) {
+      /* On C++ there is a possibility that getAnonDeclWithTypedefType returns
+         NULL, yet it specifies an type to a node which needs to be inserted,
+         for instance on template specification.  In this case, this type is
+         a ElaboratedType and we need to get it through its NestedNameSpecifier.  */
+      Add_Type_And_Depends(tdecl->getUnderlyingType().getTypePtr());
+    }
   }
 
   /* Be careful with RecordTypes comming from templates.  */
@@ -248,9 +254,13 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
   if (rdecl) {
     /* In C++, RecordDecl may have inheritance.  Handle it here.  */
     if (CXXRecordDecl *cxxrdecl = dynamic_cast<CXXRecordDecl *>(rdecl)) {
-      for (CXXBaseSpecifier base : cxxrdecl->bases()) {
-        const Type *type = base.getType().getTypePtr();
-        Add_Type_And_Depends(type);
+      /* For some reason, trying to iterate on all base classes of a
+         bodyless declaration results in a crash from clang's side.  */
+      if (cxxrdecl->hasDefinition()) {
+        for (CXXBaseSpecifier base : cxxrdecl->bases()) {
+          const Type *type = base.getType().getTypePtr();
+          Add_Type_And_Depends(type);
+        }
       }
     }
 
@@ -266,12 +276,27 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
       };
 
       in this case we have to recursively analyze the nested types as well.  */
-    clang::RecordDecl::field_iterator it;
-    for (it = rdecl->field_begin(); it != rdecl->field_end(); ++it) {
-      ValueDecl *valuedecl = *it;
+    Handle_DeclContext(rdecl);
+  }
+
+  return inserted;
+}
+
+bool FunctionDependencyFinder::Handle_DeclContext(DeclContext *decl)
+{
+  bool inserted = false;
+
+  for (Decl *d : decl->decls()) {
+    /* Handle fields in case of structs and classes.  */
+    if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(d)) {
       Handle_Array_Size(valuedecl);
 
       Add_Type_And_Depends(valuedecl->getType().getTypePtr());
+    } else if (CXXMethodDecl *method = dynamic_cast<CXXMethodDecl *>(d)) {
+      /* Handle C++ declarations that can be done inside structs and classes.  */
+      Mark_Required_Functions(method);
+    } else if (TypeDecl *typedecl = dynamic_cast<TypeDecl *>(d)) {
+      Handle_TypeDecl(typedecl);
     }
   }
 

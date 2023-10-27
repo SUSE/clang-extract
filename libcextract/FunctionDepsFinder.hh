@@ -74,6 +74,8 @@ class FunctionDependencyFinder
 
     bool Handle_EnumDecl(EnumDecl *decl);
 
+    bool Handle_DeclContext(DeclContext *decl);
+
   /* Handle the corner case where an array was declared as something like
 
     enum {

@@ -1,0 +1,7 @@
+CXX=clang++ #/tmp/clang/usr/local/bin/clang++
+INCLUDES=-I./libcextract #-I/tmp/clang/usr/local/include
+CXXFLAGS=$(INCLUDES) -fsanitize=address -Wall -Wextra -Wno-unused-parameter -g3
+LDPATH=#-L/tmp/clang/usr/local/lib64/ -Wl,--rpath=/tmp/clang/usr/local/lib64/
+LDFLAGS= $(LDPATH) -l:libclang-cpp.so.16 -l:libLLVM.so.16 -lelf
+AR=llvm-ar
+PYTHON=python -B

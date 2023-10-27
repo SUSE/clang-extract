@@ -1,8 +1,4 @@
-CXX=clang++
-CXXFLAGS=-Wall -Wextra -fsanitize=address -g3
-LDPATH=
-LDFLAGS= $(LDPATH) -lclang-cpp -lclang -lLLVM -lelf
-AR=llvm-ar
+include ../Makefile.common
 
 FILES=$(wildcard *.cpp)
 HEADERS=$(wildcard *.hh)
