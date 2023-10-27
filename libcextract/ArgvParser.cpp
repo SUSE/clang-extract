@@ -20,7 +20,6 @@ void ArgvParser::Insert_Required_Parameters(void)
   std::vector<const char *> priv_args = {
      "-fno-builtin", // clang interposes some glibc functions and then it fails to find the declaration of them.
     "-Xclang", "-detailed-preprocessing-record",
-    "-Xclang", "-ast-dump",
     "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
     // For some reason libtooling do not pass the clang include folder.  Pass this then.
     "-I/usr/lib64/clang/" STRINGFY_VALUE(__clang_major__) "/include",

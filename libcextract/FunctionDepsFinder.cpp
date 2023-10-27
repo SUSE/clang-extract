@@ -121,7 +121,7 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
     return inserted;
   }
 
-  if (type->isFunctionProtoType()) {
+  if (isa<const FunctionProtoType>(type)) {
     /* Handle function prototypes.  Can appear in typedefs or struct keys
        in ways like this:
 
@@ -176,6 +176,17 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
               type->getAs<const DeducedTemplateSpecializationType>();
 
     return Add_Type_And_Depends(t->getDeducedType().getTypePtr());
+  }
+
+  if (isa<const ParenType>(type)) {
+    const ParenType *t = type->getAs<const ParenType>();
+    return Add_Type_And_Depends(t->desugar().getTypePtr());
+  }
+
+  /* Typeof(x).  */
+  if (isa<const TypeOfType>(type)) {
+    const TypeOfType *t = type->getAs<const TypeOfType>();
+    return Add_Type_And_Depends(t->desugar().getTypePtr());
   }
 
   if (type->isPointerType() || type->isArrayType()) {
@@ -290,7 +301,6 @@ bool FunctionDependencyFinder::Handle_DeclContext(DeclContext *decl)
     /* Handle fields in case of structs and classes.  */
     if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(d)) {
       Handle_Array_Size(valuedecl);
-
       Add_Type_And_Depends(valuedecl->getType().getTypePtr());
     } else if (CXXMethodDecl *method = dynamic_cast<CXXMethodDecl *>(d)) {
       /* Handle C++ declarations that can be done inside structs and classes.  */
@@ -380,6 +390,8 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
             if (vardecl->hasGlobalStorage() && vardecl->hasInit()) {
               Mark_Types_In_Function_Body(vardecl->getInit());
             }
+            /* Add its type.  */
+            Add_Type_And_Depends(vardecl->getType().getTypePtr());
           }
         }
       }
