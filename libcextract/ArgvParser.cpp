@@ -23,6 +23,7 @@ void ArgvParser::Insert_Required_Parameters(void)
     "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
     // For some reason libtooling do not pass the clang include folder.  Pass this then.
     "-I/usr/lib64/clang/" STRINGFY_VALUE(__clang_major__) "/include",
+    "-Wno-gnu-variable-sized-type-not-at-end",
   };
 
   for (const char *arg : priv_args) {
