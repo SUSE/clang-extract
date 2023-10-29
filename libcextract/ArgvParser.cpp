@@ -33,6 +33,8 @@ void ArgvParser::Insert_Required_Parameters(void)
 
 bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 {
+  // TODO: Review these options from time to time in order to remove them as
+  // soon as they are supported by clang
   std::vector<const char *> gcc_args = {
     "-mpreferred-stack-boundary=3",
     "-mindirect-branch=thunk-extern",
@@ -41,6 +43,20 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     "-fconserve-stack",
     "-mrecord-mcount",
     "-fconserve-stack",
+    "-falign-jumps=1",
+    "-fasan-shadow-offset=0xdffffc0000000000",
+    "-fno-allow-store-data-races",
+    "-Wno-alloc-size-larger-than",
+    "-Wno-dangling-pointer",
+    "-Wno-format-truncation",
+    "-Wno-format-overflow",
+    "-Wno-maybe-uninitialized",
+    "-Wno-packed-not-aligned",
+    "-Wno-restrict",
+    "-Wno-stringop-overflow",
+    "-Wno-stringop-truncation",
+    "-Werror=designated-init",
+    "-Wimplicit-fallthrough=5",
   };
 
   /* Ignore gcc arguments that are not known to clang */
