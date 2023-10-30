@@ -3,6 +3,7 @@
 #include "PrettyPrint.hh"
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
+#include "clang/AST/ParentMapContext.h"
 
 #define PProcessor (AST->getPreprocessor())
 
@@ -357,6 +358,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
   } else if (DeclRefExpr::classof(stmt)) {
     /* Handle global variables and references to an enum.  */
     DeclRefExpr *expr = (DeclRefExpr *)stmt;
+
     ValueDecl *decl = expr->getDecl();
 
     if (decl) {
@@ -378,6 +380,21 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
         /* This is a reference to a function. We have to analyze it recursively.
          */
         Mark_Required_Functions(fundecl);
+
+        /* Get immediate parent from function.  Required if function is a
+           template.  */
+        ASTContext &ctx = AST->getASTContext();
+        DynTypedNodeList list = ctx.getParents(*fundecl);
+
+        /* Iterate on the list of parents to find the FunctionTemplateDecl and
+           mark for output.  */
+        for (unsigned i = 0; i < list.size(); i++) {
+          const DynTypedNode n = list[i];
+          if (const Decl *d = n.get<FunctionTemplateDecl>()) {
+            Add_Decl_And_Prevs((Decl *)(d));
+          }
+        }
+
       } else {
 
         type = decl->getType().getTypePtr();
@@ -476,7 +493,8 @@ FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
 /** Add a decl to the Dependencies set and all its previous declarations in the
     AST. A function can have multiple definitions but its body may only be
     defined later.  */
-bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl) {
+bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
+{
   bool inserted = false;
   while (decl) {
     if (!Is_Decl_Marked(decl)) {
@@ -495,7 +513,6 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl) {
 
     decl = decl->getPreviousDecl();
   }
-
   return inserted;
 }
 
