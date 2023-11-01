@@ -201,6 +201,11 @@ void PrettyPrint::Print_InclusionDirective(InclusionDirective *include)
   Out << Get_Source_Text(include->getSourceRange()) << '\n';
 }
 
+void PrettyPrint::Debug_InclusionDirective(InclusionDirective *include)
+{
+  llvm::outs() << Get_Source_Text(include->getSourceRange()) << '\n';
+}
+
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
@@ -438,9 +443,6 @@ void RecursivePrint::Analyze_Includes(void)
        marked for expansion.  */
     if (include != nullptr && include->Should_Be_Expanded() == false) {
       /* If not we can safely remove this decl.  */
-      if (NamedDecl *ndecl = dynamic_cast<NamedDecl*>(*it)) {
-        llvm::outs() << "Deleting " << ndecl->getName() << '\n';
-      }
       it = Decl_Deps.erase(it);
     } else {
       it++;
@@ -577,8 +579,11 @@ void RecursivePrint::Print_Preprocessor_Until(const SourceLocation &loc, bool pr
     /* Print wathever comes first.  */
     if (e) {
       if (MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(e)) {
-        if (print && Is_Macro_Marked(MW.Get_Macro_Info(entity))) {
-          PrettyPrint::Print_Macro_Def(entity);
+        if (print) {
+          MacroInfo *info = MW.Get_Macro_Info(entity);
+          if (Is_Macro_Marked(info) && !MW.Is_Builtin_Macro(info)) {
+            PrettyPrint::Print_Macro_Def(entity);
+          }
         }
       } else if (KeepIncludes) {
         if (InclusionDirective *inc = dyn_cast<InclusionDirective>(e)) {

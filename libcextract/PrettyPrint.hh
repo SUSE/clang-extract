@@ -37,6 +37,7 @@ class PrettyPrint
   static void Debug_Stmt(Stmt *stmt);
   static void Debug_Macro_Def(MacroDefinitionRecord *rec);
   static void Debug_Macro_Undef(MacroDirective *);
+  static void Debug_InclusionDirective(InclusionDirective *);
 
   /** Print a Stmt node into ostream `Out`.  */
   static void Print_Stmt(Stmt *stmt);
@@ -208,7 +209,7 @@ class RecursivePrint
 
   /** Determine if a macro that are marked for output.  */
   inline bool Is_Macro_Marked(MacroInfo *x)
-  { return x && (x->isUsed() || x->isUsedForHeaderGuard()); }
+  { return x && x->isUsed(); }
 
   inline void Unmark_Decl(Decl *decl)
   { Decl_Deps.erase(decl); }

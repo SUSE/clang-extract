@@ -89,7 +89,11 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
       }
 
       bool expand = Is_In_Vector(must_expand, id->getFileName().str());
-      bool output = already_seen_main && !expand;
+
+      /* By default we do not want to expand anything, so do not mark any
+         include included by other includes for output (path from root of
+         size 2).  */
+      bool output = already_seen_main && (stack.size() <= 1) && !expand;
 
       /* Add child to tree.  */
       IncludeNode *child = new IncludeNode(id, output, expand);

@@ -21,6 +21,8 @@ class MacroWalker
 
   MacroDirective* Get_Macro_Directive(MacroDefinitionRecord *record);
 
+  /** Check if macro is a builtin-macro.  */
+  bool Is_Builtin_Macro(MacroInfo *info);
 
   /** Check if IdentifierInfo `tok` is actually an argument of the macro info.  */
   static bool Is_Identifier_Macro_Argument(MacroInfo *info, const IdentifierInfo *tok);

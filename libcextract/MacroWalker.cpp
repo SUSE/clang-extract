@@ -61,6 +61,24 @@ MacroDirective *MacroWalker::Get_Macro_Directive(MacroDefinitionRecord *record)
   return nullptr;
 }
 
+bool MacroWalker::Is_Builtin_Macro(MacroInfo *info)
+{
+  if (info->isBuiltinMacro())
+    return true;
+
+  /* Some cases the isBuiltinMacro method fails on builtin macros.  Try to
+     decide it using the FileInfo.  */
+  OptionalFileEntryRef ref = PrettyPrint::Get_FileEntry(info->getDefinitionLoc());
+  if (!ref.has_value()) {
+    /* This doesn't come from any file, hence it was introduced by the compiler,
+       therefore is a builtin macro.  */
+    return true;
+  }
+
+  /* This comes from a file and therefore is not a builtin macro.  */
+  return false;
+}
+
 bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, StringRef tok_str)
 {
   for (const IdentifierInfo *arg : info->params()) {
