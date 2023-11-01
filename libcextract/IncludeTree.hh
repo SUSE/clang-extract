@@ -97,6 +97,11 @@ class IncludeTree
       return ShouldBeExpanded;
     }
 
+    void Mark_For_Expansion(void);
+
+    /** Check if this node or any of its parents was marked for output.  */
+    bool Has_Parent_Marked_For_Output(void);
+
     /** Dump, for debugging reasons.  */
     void Dump(unsigned ident = 0);
 

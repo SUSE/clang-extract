@@ -89,51 +89,81 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
       }
 
       bool expand = Is_In_Vector(must_expand, id->getFileName().str());
-
-      /* By default we do not want to expand anything, so do not mark any
-         include included by other includes for output (path from root of
-         size 2).  */
-      bool output = already_seen_main && (stack.size() <= 1) && !expand;
+      bool output = already_seen_main && current->Should_Be_Expanded()
+                                      && !expand;
 
       /* Add child to tree.  */
       IncludeNode *child = new IncludeNode(id, output, expand);
       current->Add_Child(child);
       child->Set_Parent(current);
+
+      /* In the case it was marked for expansion, then update parent nodes.  */
+      if (expand)
+        child->Mark_For_Expansion();
+
       stack.push(child);
     }
   }
 
+  /* In the case there is no includes, the Root node is never set to the main
+     file.  Do it now.  */
+  if (already_seen_main == false) {
+    Root->Set_FileEntry(main);
+  }
+
   /* Root node should always be set to expand and not output.  */
   assert(Root->Should_Be_Expanded() && !Root->Should_Be_Output());
+
+  /* Check if the Root has a valid FileEntry.  */
+  assert(Root->Get_FileEntry().has_value());
 }
 
 void IncludeTree::Build_Header_Map(void)
 {
-  auto includes = Get_Includes();
+  std::stack<IncludeNode *> stack;
 
-  for (IncludeNode *include : *includes) {
-    OptionalFileEntryRef file = include->Get_FileEntry();
+  stack.push(Root);
+  while (!stack.empty()) {
+    IncludeNode *node = stack.top();
+    stack.pop();
+
+    OptionalFileEntryRef file = node->Get_FileEntry();
     const FileEntry *fentry = &file->getFileEntry();
-    Map[fentry] = include;
+    Map[fentry] = node;
+
+    int n = node->Get_Num_Childs();
+    while (n > 0) {
+      stack.push(node->Get_Child(--n));
+    }
   }
 }
 
 IncludeNode *IncludeTree::Get(const SourceLocation &loc)
 {
   OptionalFileEntryRef fileref = PrettyPrint::Get_FileEntry(loc);
-  /* In some cases it is impossible to find the SourceLocation of a decl
-     because it was declared all fuzzy.  */
+
+  /* In case we could not find a FileRef, then try the SpellingLocation.  */
+  if (!fileref.has_value()) {
+    SourceManager *SM = PrettyPrint::Get_Source_Manager();
+    fileref = PrettyPrint::Get_FileEntry(SM->getSpellingLoc(loc));
+  }
+
   if (fileref.has_value()) {
     const FileEntry *file = &fileref->getFileEntry();
     return Map[file];
   }
 
+  /* Well, the declaration seems fuzzy, so return that we don't have a file.  */
   return nullptr;
 }
 
 void IncludeTree::Dump(void)
 {
   Root->Dump();
+
+  llvm::outs() << "Tree map:\n";
+  for (auto &p: Map)
+    llvm::outs() << " " << p.first << " => " << p.second << '\n';
 }
 
 /* ----- IncludeNode ------ */
@@ -321,6 +351,40 @@ IncludeNode *IncludeTree::Get(const InclusionDirective *directive)
   return Map[fentry];
 }
 
+bool IncludeNode::Has_Parent_Marked_For_Output(void)
+{
+  IncludeNode *node = this;
+
+  do {
+    if (node->Should_Be_Output()) {
+      return true;
+    }
+    node = node->Get_Parent();
+  } while (node != nullptr);
+
+  return false;
+}
+
+void IncludeNode::Mark_For_Expansion(void)
+{
+  /* Mark childs for output.  */
+  for (IncludeNode *child : Childs) {
+    if (child->Should_Be_Expanded() == false) {
+      child->ShouldBeExpanded = true;
+      child->ShouldBeOutput = false;
+    }
+  }
+
+  /* Mark parent nodes to be expanded.  */
+  IncludeNode *node = this;
+  do {
+    if (!node->ShouldBeExpanded) {
+      node->ShouldBeExpanded = true;
+      node->ShouldBeOutput = false;
+    }
+    node = node->Get_Parent();
+  } while (node != nullptr);
+}
 
 void IncludeTree::IncludeNode::Dump(unsigned ident)
 {

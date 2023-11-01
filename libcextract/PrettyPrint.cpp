@@ -79,6 +79,9 @@ bool PrettyPrint::Is_Range_Valid(const SourceRange &range)
   const SourceLocation begin = range.getBegin();
   const SourceLocation end = range.getEnd();
 
+  if (!begin.isValid() || !end.isValid())
+    return false;
+
   return Is_Before(begin, end) && (begin != end);
 }
 

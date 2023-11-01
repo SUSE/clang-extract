@@ -7,8 +7,22 @@
 
 #define PProcessor (AST->getPreprocessor())
 
+static bool Is_Builtin_Decl(Decl *decl)
+{
+  NamedDecl *ndecl = dyn_cast<NamedDecl>(decl);
+  if (ndecl) {
+    StringRef name = ndecl->getName();
+    if (name.starts_with("__builtin_")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void FunctionDependencyFinder::Find_Functions_Required(
-    std::vector<std::string> const &funcnames) {
+    std::vector<std::string> const &funcnames)
+{
   assert(funcnames.size() > 0);
 
   ASTUnit::top_level_iterator it;
@@ -47,34 +61,38 @@ void FunctionDependencyFinder::Find_Functions_Required(
 }
 
 
-void FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
+bool FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
 {
   if (!decl)
-    return;
+    return false;
 
   /* If the function is already in the FunctionDependency set, then we can
      quickly return because this node was already analyzed.  */
   if (Is_Decl_Marked(decl))
-    return;
+    return false;
 
   if (decl->getBuiltinID() != 0) {
     /* Do not redeclare compiler builtin functions.  */
-    return;
+    return false;
   }
 
+  bool ret;
+
   /* In case this function has a body, we mark its body as well.  */
-  Add_Decl_And_Prevs(decl->hasBody() ? decl->getDefinition() : decl);
+  ret = Add_Decl_And_Prevs(decl->hasBody() ? decl->getDefinition() : decl);
 
   /* Analyze the return type.  */
-  Add_Type_And_Depends(decl->getReturnType().getTypePtr());
+  ret |= Add_Type_And_Depends(decl->getReturnType().getTypePtr());
 
   /* Analyze the function parameters.  */
   for (ParmVarDecl *param : decl->parameters()) {
-    Add_Type_And_Depends(param->getOriginalType().getTypePtr());
+    ret |= Add_Type_And_Depends(param->getOriginalType().getTypePtr());
   }
 
   /* Analyze body, which will add functions in a DFS fashion.  */
-  Mark_Types_In_Function_Body(decl->getBody());
+  ret |= Mark_Types_In_Function_Body(decl->getBody());
+
+  return ret;
 }
 
 bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
@@ -314,6 +332,29 @@ bool FunctionDependencyFinder::Handle_DeclContext(DeclContext *decl)
   return inserted;
 }
 
+bool FunctionDependencyFinder::Handle_Decl(Decl *decl)
+{
+  if (TypeDecl *d = dyn_cast<TypeDecl>(decl)) {
+    return Handle_TypeDecl(d);
+  }
+
+  if (EnumDecl *d = dyn_cast<EnumDecl>(decl)) {
+    return Handle_EnumDecl(d);
+  }
+
+  if (FunctionDecl *d = dyn_cast<FunctionDecl>(decl)) {
+    return Mark_Required_Functions(d);
+  }
+
+  if (VarDecl *d = dyn_cast<VarDecl>(decl)) {
+    bool ret = Mark_Types_In_Function_Body(d->getInit());
+    ret |= Add_Type_And_Depends(d->getType().getTypePtr());
+    return ret;
+  }
+
+  return Add_Decl_And_Prevs(decl);
+}
+
 bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl) {
   /* Mark the enum decl first to avoid problems with the following enums:
 
@@ -332,10 +373,12 @@ bool FunctionDependencyFinder::Handle_EnumDecl(EnumDecl *decl) {
   return true;
 }
 
-void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
+bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 {
   if (!stmt)
-    return;
+    return false;
+
+  bool ret = false;
 
   /* For some akward reason we can't use dynamic_cast<>() on Stmt.  So
      we poke in this classof which seems to work.  */
@@ -350,7 +393,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
       /* Look into the type for a RecordDecl.  */
       if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl)) {
         type = valuedecl->getType().getTypePtr();
-        Add_Type_And_Depends(type);
+        ret |= Add_Type_And_Depends(type);
       }
     }
 
@@ -374,12 +417,12 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
         /* Analyze the original enum to find references to other enum
            constants.  */
         if (enum_decl && !Is_Decl_Marked(enum_decl)) {
-          Handle_EnumDecl(enum_decl);
+          ret |= Handle_EnumDecl(enum_decl);
         }
       } else if (FunctionDecl *fundecl = dynamic_cast<FunctionDecl *>(decl)) {
         /* This is a reference to a function. We have to analyze it recursively.
          */
-        Mark_Required_Functions(fundecl);
+        ret |= Mark_Required_Functions(fundecl);
 
         /* Get immediate parent from function.  Required if function is a
            template.  */
@@ -391,24 +434,24 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
         for (unsigned i = 0; i < list.size(); i++) {
           const DynTypedNode n = list[i];
           if (const Decl *d = n.get<FunctionTemplateDecl>()) {
-            Add_Decl_And_Prevs((Decl *)(d));
+            ret |= Add_Decl_And_Prevs((Decl *)(d));
           }
         }
 
       } else {
 
         type = decl->getType().getTypePtr();
-        Add_Type_And_Depends(type);
+        ret |= Add_Type_And_Depends(type);
 
         if (!Is_Decl_Marked(to_mark)) {
-          Add_Decl_And_Prevs(to_mark);
+          ret |= Add_Decl_And_Prevs(to_mark);
           if (VarDecl *vardecl = dynamic_cast<VarDecl *>(decl)) {
             /* This is a reference to a global variable.  Look for its initializer symbols.  */
             if (vardecl->hasGlobalStorage() && vardecl->hasInit()) {
-              Mark_Types_In_Function_Body(vardecl->getInit());
+              ret |= Mark_Types_In_Function_Body(vardecl->getInit());
             }
             /* Add its type.  */
-            Add_Type_And_Depends(vardecl->getType().getTypePtr());
+            ret |= Add_Type_And_Depends(vardecl->getType().getTypePtr());
           }
         }
       }
@@ -427,12 +470,12 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 
     for (unsigned i = 0; i < num_inputs; i++) {
       Expr *expr = (Expr *)asmstmt->getInputExpr(i);
-      Mark_Types_In_Function_Body(expr);
+      ret |= Mark_Types_In_Function_Body(expr);
     }
 
     for (unsigned i = 0; i < num_outputs; i++) {
       Expr *expr = (Expr *)asmstmt->getOutputExpr(i);
-      Mark_Types_In_Function_Body(expr);
+      ret |= Mark_Types_In_Function_Body(expr);
     }
 
   } else if (OffsetOfExpr::classof(stmt)) {
@@ -453,7 +496,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
       const OffsetOfNode &component = expr->getComponent(i);
       const FieldDecl *field = component.getField();
       RecordDecl *record = (RecordDecl *)field->getParent();
-      Handle_TypeDecl(record);
+      ret |= Handle_TypeDecl(record);
     }
   } else if (UnaryExprOrTypeTraitExpr::classof(stmt)) {
     UnaryExprOrTypeTraitExpr *expr = (UnaryExprOrTypeTraitExpr *)stmt;
@@ -465,7 +508,7 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
   }
 
   if (type) {
-    Add_Type_And_Depends(type);
+    ret |= Add_Type_And_Depends(type);
   }
 
   /* Iterate through the list of all children Statements and repeat the
@@ -475,8 +518,10 @@ void FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
        ++it) {
 
     Stmt *child = *it;
-    Mark_Types_In_Function_Body(child);
+    ret |= Mark_Types_In_Function_Body(child);
   }
+
+  return ret;
 }
 
 /** FunctionDependencyFinder class methods implementation.  */
@@ -496,6 +541,12 @@ FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
 bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
 {
   bool inserted = false;
+
+  /* Do not insert builtin decls.  */
+  if (Is_Builtin_Decl(decl)) {
+    return false;
+  }
+
   while (decl) {
     if (!Is_Decl_Marked(decl)) {
       Dependencies.insert(decl);
@@ -750,6 +801,20 @@ void FunctionDependencyFinder::Include_Enum_Constants_Referenced_By_Macros(
   }
 }
 
+void FunctionDependencyFinder::Insert_Decls_From_Non_Expanded_Includes(void)
+{
+  ASTUnit::top_level_iterator it;
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    Decl *decl = *it;
+
+    const SourceLocation &loc = decl->getLocation();
+    IncludeNode *node = IT.Get(loc);
+    if (node->Has_Parent_Marked_For_Output()) {
+      Handle_Decl(decl);
+    }
+  }
+}
+
 void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions)
 {
   /* Step 1: Compute the closure.  */
@@ -758,6 +823,9 @@ void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
   /* Step 2: Find enum constants which are referenced by macros.  */
   Include_Enum_Constants_Referenced_By_Macros();
 
-  /* Step 3: Remove any declaration that may have been declared twice.  */
+  /* Step 3: Expand the closure to include Decls in non-expanded includes.  */
+  Insert_Decls_From_Non_Expanded_Includes();
+
+  /* Step 4: Remove any declaration that may have been declared twice.  */
   Remove_Redundant_Decls();
 }

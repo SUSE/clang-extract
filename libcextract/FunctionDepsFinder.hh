@@ -58,10 +58,10 @@ class FunctionDependencyFinder
     void Find_Functions_Required(std::vector<std::string> const &funcnames);
 
     /** Mark function represented by `node` and all its callees.  */
-    void Mark_Required_Functions(FunctionDecl *decl);
+    bool Mark_Required_Functions(FunctionDecl *decl);
 
     /** Mark all types reachable from a function body or statement chain.  */
-    void Mark_Types_In_Function_Body(Stmt *stmt);
+    bool Mark_Types_In_Function_Body(Stmt *stmt);
 
     /** Add Type to the list of dependencies. Types are objects that in
         some way represent a variable type.  For example, a type can be
@@ -75,6 +75,8 @@ class FunctionDependencyFinder
     bool Handle_EnumDecl(EnumDecl *decl);
 
     bool Handle_DeclContext(DeclContext *decl);
+
+    bool Handle_Decl(Decl *decl);
 
   /* Handle the corner case where an array was declared as something like
 
@@ -128,6 +130,11 @@ class FunctionDependencyFinder
     /** Analyze macros in order to find references to constants declared in enums,
         like in enum { CONSTANT = 0 }; and then #define MACRO CONSTANT.  */
     void Include_Enum_Constants_Referenced_By_Macros(void);
+
+    /** Insert Decls that comes from #include's which are not expanded.  This
+        is necessary to make sure we don't remove decls that are used in the
+        header program.  */
+    void Insert_Decls_From_Non_Expanded_Includes(void);
 
     int Populate_Need_Undef(void);
 
