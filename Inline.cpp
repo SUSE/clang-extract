@@ -22,6 +22,7 @@ const char *Output_Path = nullptr;
 
 static const char *Elf_Path = nullptr;
 static const char *Ipa_Path = nullptr;
+static const char *Symvers_Path = nullptr;
 
 static std::vector<std::string> Symbols_To_Analyze;
 
@@ -32,6 +33,7 @@ static void Print_Usage(void)
 "   where <ARGS>:\n"
 "     -ipa-files <PATH>        Path to the .ipa-clone file,\n"
 "     -debuginfo <PATH>        Path to the debuginfo file,\n"
+"     -symvers   <PATH>        Path to the Kernel Module.symvers file,\n"
 "     -graphviz  <PATH>        Output into <PATH> into a .dot graphviz format,\n"
 "     -csv       <PATH>        Output into <path> into a .csv table format,\n"
 "     -where-is-inlined        Find where <SYMBOLS> got inlined,\n"
@@ -62,6 +64,12 @@ static void Parse(int argc, char *argv[])
         Elf_Path = argv[++i];
         continue;
       }
+
+      if (strcmp(argv[i], "-symvers") == 0) {
+        Symvers_Path = argv[++i];
+        continue;
+      }
+
     }
 
     if (strcmp(argv[i], "-graphviz") == 0) {
@@ -96,6 +104,10 @@ static void Check_Input(void)
 
   if (Elf_Path == nullptr) {
     printf("WARNING: No debuginfo file found.\n");
+  }
+
+  if (Symvers_Path == nullptr) {
+    printf("WARNING: No Module.symvers file found.\n");
   }
 
   if (Mode != LIST_ALL) {
@@ -154,7 +166,7 @@ int main(int argc, char *argv[])
 {
   Parse(argc, argv);
   Check_Input();
-  InlineAnalysis ia(Elf_Path, Ipa_Path);
+  InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);
 
   if (Mode == LIST_ALL) {
     std::set<std::string> set = ia.Get_All_Symbols();

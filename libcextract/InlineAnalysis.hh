@@ -7,6 +7,7 @@
 
 #include "ElfCXX.hh"
 #include "IpaClonesParser.hh"
+#include "SymversParser.hh"
 
 #include <set>
 #include <string>
@@ -20,8 +21,9 @@ class InlineAnalysis
   public:
   /** Build the analysis class.  elf_path can be NULL if there is no debuginfo
       available, and ipaclone_path can be a directory full of many ipa-clones
-      generated through LTO or not.  */
-  InlineAnalysis(const char *elf_path, const char *ipaclone_path);
+      generated through LTO or not. Symvers can be NULL is we are creating a 
+      userspace livepatch   */
+  InlineAnalysis(const char *elf_path, const char *ipaclone_path, const char *symvers_path);
 
   ~InlineAnalysis(void);
 
@@ -88,4 +90,5 @@ class InlineAnalysis
   ElfObject *ElfObj;
   ElfSymbolCache *ElfCache;
   IpaClones *Ipa;
+  Symvers *Symv;
 };

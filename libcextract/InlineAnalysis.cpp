@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <cxxabi.h>
 
-InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path)
+InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
+                              const char *symvers_path)
 {
   /* Debuginfo information is not needed for inline analysis.  But is desired
      for better precision.  That is why whe declare those objects dynamically.  */
@@ -21,6 +22,10 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path)
   if (ipaclones_path != nullptr) {
     Ipa = new IpaClones(ipaclones_path);
   }
+
+  if (symvers_path != nullptr) {
+    Symv = new Symvers(symvers_path);
+  }
 }
 
 InlineAnalysis::~InlineAnalysis(void)
@@ -31,6 +36,8 @@ InlineAnalysis::~InlineAnalysis(void)
     delete ElfObj;
   if (Ipa)
     delete Ipa;
+  if (Symv)
+    delete Symv;
 }
 
 static int Action_Add_Node2(void *s, IpaCloneNode *n1, IpaCloneNode *n2)
@@ -285,6 +292,11 @@ std::set<std::string> InlineAnalysis::Get_All_Symbols(void)
     }
   }
 
+  if (Symv) {
+    for (auto &map : Symv->Get_Symvers())
+	    set.insert(map.first);
+  }
+
   return set;
 }
 
@@ -338,6 +350,8 @@ void InlineAnalysis::Print_Symbol_Set(const std::set<std::string> &symbol_set,
     } else {
       fprintf(out,"Type\tAvailable?\n");
     }
+  } else if (Symv) {
+    fprintf(out, "Module\n");
   }
 
   i = 0;
@@ -376,6 +390,8 @@ void InlineAnalysis::Print_Symbol_Set(const std::set<std::string> &symbol_set,
       } else {
         fprintf(out,"%s\t%s\n", type_str, bind_str);
       }
+    } else if (Symv) {
+      fprintf(out, "%s\n", Symv->Get_Symbol_Module(s).c_str());
     } else {
       fprintf(out,"\n");
     }
