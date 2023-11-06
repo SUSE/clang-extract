@@ -809,7 +809,7 @@ void FunctionDependencyFinder::Insert_Decls_From_Non_Expanded_Includes(void)
 
     const SourceLocation &loc = decl->getLocation();
     IncludeNode *node = IT.Get(loc);
-    if (node->Has_Parent_Marked_For_Output()) {
+    if (node && node->Has_Parent_Marked_For_Output()) {
       Handle_Decl(decl);
     }
   }

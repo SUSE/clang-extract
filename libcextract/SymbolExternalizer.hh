@@ -39,8 +39,8 @@ class SymbolExternalizer
   class FunctionUpdater
   {
     public:
-    /** A reference to FunctionUpdater's Rewriter instance.  */
-    Rewriter &RW;
+    /** A reference to SymbolExternalizer.  */
+    SymbolExternalizer &SE;
 
     /** The new variable declaration to replace the to be externalized function.  */
     VarDecl *NewSymbolDecl;
@@ -48,8 +48,12 @@ class SymbolExternalizer
     /** Name of the to be replaced function.  */
     const std::string &OldSymbolName;
 
-    FunctionUpdater(Rewriter &rw, VarDecl *new_decl, const std::string &old_decl_name, bool was_function)
-    : RW(rw), NewSymbolDecl(new_decl), OldSymbolName(old_decl_name), WasFunction(was_function)
+    FunctionUpdater(SymbolExternalizer &se, VarDecl *new_decl,
+                    const std::string &old_decl_name, bool was_function)
+    : SE(se),
+      NewSymbolDecl(new_decl),
+      OldSymbolName(old_decl_name),
+      WasFunction(was_function)
     {}
 
     /** Sweeps the function and update any reference to the old function, replacing
@@ -81,7 +85,9 @@ class SymbolExternalizer
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
       system.  */
-  bool Commit_Changes_To_Source(void);
+  bool Commit_Changes_To_Source(IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &ofs,
+                                IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> &mfs,
+                                std::vector<std::string> &headers_to_expand);
 
   std::string Get_Modifications_To_Main_File(void);
 

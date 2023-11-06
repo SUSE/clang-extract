@@ -33,6 +33,9 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 }
 /****************************** End hack.  ***********************************/
 
+using namespace clang;
+using namespace llvm;
+
 static std::unordered_set<std::string *> StringPool;
 
 void Free_String_Pool(void)
@@ -79,7 +82,7 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
         }
 
         /* Issue a text modification.  */
-        RW.ReplaceText(range, new_name);
+        SE.RW.ReplaceText(range, new_name);
       } else {
         /* If we did not get the old symbol, it mostly means that the
            references comes from a macro.  */
@@ -172,11 +175,20 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
   return ret;
 }
 
-bool SymbolExternalizer::Commit_Changes_To_Source(void)
+bool SymbolExternalizer::Commit_Changes_To_Source(
+                          IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &ofs,
+                          IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> &mfs,
+                          std::vector<std::string> &includes_to_expand)
 {
   SourceManager &sm = AST->getSourceManager();
   clang::SourceManager::fileinfo_iterator it;
   bool modified = false;
+
+  ofs = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(
+                 new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
+  mfs = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(
+                 new vfs::InMemoryFileSystem);
+  ofs->pushOverlay(mfs);
 
   /* Iterate into all files we may have opened, most probably headers that are
      #include'd.  */
@@ -184,7 +196,8 @@ bool SymbolExternalizer::Commit_Changes_To_Source(void)
     const FileEntry *fentry = it->getFirst();
 
     /* Our updated file buffer.  */
-    const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(sm.translateFile(fentry));
+    FileID id = sm.translateFile(fentry);
+    const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
 
     /* If we have modifications, then update the buffer.  */
     if (rewritebuf) {
@@ -193,10 +206,17 @@ bool SymbolExternalizer::Commit_Changes_To_Source(void)
          target buffer directly, but clang doesn't seems to provide such
          interface, so we expand them into a temporary string and them pass
          it to the SourceManager.  */
-      std::string *modified_str = new std::string(rewritebuf->begin(), rewritebuf->end());
-      StringPool.insert(modified_str);
-      auto new_membuff = llvm::MemoryBuffer::getMemBuffer(*modified_str);
-      sm.overrideFileContents(fentry, std::move(new_membuff));
+      std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
+      if (mfs->addFile(fentry->getName(),
+                       0, MemoryBuffer::getMemBufferCopy(modified_str)) == false) {
+        llvm::outs() << "Unable to add " << fentry->getName() << "into InMemoryFS.\n";
+      }
+
+      /* In case this is not the main file, we need to mark it for expansion.  */
+      if (id != sm.getMainFileID()) {
+        StringRef file_name = fentry->getName();
+        includes_to_expand.push_back(file_name.str());
+      }
 
       modified = true;
     }
@@ -233,7 +253,7 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
        functions in order to find if there is a reference to the function we
        externalized.  */
     if (must_update) {
-      FunctionUpdater(RW, new_decl, to_externalize, was_function)
+      FunctionUpdater(*this, new_decl, to_externalize, was_function)
         .Update_References_To_Symbol(decl);
     }
 
@@ -256,6 +276,7 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         /* Remove the text.  */
         RW.RemoveText(decl_range);
 
+        /* Remove node from AST.  */
         topleveldecls->erase(it);
         /* We must decrease the iterator because we deleted an element from the
            vector.  */
@@ -362,8 +383,4 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
   for (const std::string &to_externalize : to_externalize_array) {
     _Externalize_Symbol(to_externalize);
   }
-
-  /* Update the source file buffer, else when we output based on the original
-     source we would still get references to the old symbol.  */
-  //Commit_Changes_To_Source();
 }

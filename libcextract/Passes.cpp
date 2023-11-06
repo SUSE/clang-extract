@@ -343,20 +343,11 @@ class FunctionExternalizerPass : public Pass
       /* Issue externalization.  */
       SymbolExternalizer externalizer(ctx->AST.get());
       externalizer.Externalize_Symbols(ctx->Externalize);
-
-      /* Create a new Filesystem because we can't delete the previous temp file
-         from the filesystem.  */
-      ctx->OFS = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
-      ctx->MFS = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(new vfs::InMemoryFileSystem);
-      ctx->OFS->pushOverlay(ctx->MFS);
-
-      /* Get the new source code and add it to the filesystem.  */
-      ctx->CodeOutput = externalizer.Get_Modifications_To_Main_File();
-      ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
+      externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), ClangCompat_None, ctx->MFS);
+      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), ClangCompat_None, ctx->OFS);
       PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();

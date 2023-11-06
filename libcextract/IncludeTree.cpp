@@ -88,7 +88,8 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
         current = stack.top();
       }
 
-      bool expand = Is_In_Vector(must_expand, id->getFileName().str());
+      bool expand = Is_In_Vector(must_expand, id->getFileName().str()) ||
+                    Is_In_Vector(must_expand, id->getFile()->getName().str());
       bool output = already_seen_main && current->Should_Be_Expanded()
                                       && !expand;
 
