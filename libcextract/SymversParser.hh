@@ -69,9 +69,14 @@ class Symvers : public Parser
     return container != map.end();
   }
 
-  std::unordered_map<std::string, std::string> Get_Symvers()
+  std::vector<std::string> Get_All_Symbols()
   {
-    return map;
+    std::vector<std::string> vec;
+
+    for (auto sym : map)
+      vec.push_back(sym.first);
+
+    return vec;
   }
 
   /* Get symbol if available in the Symvers file.  Or 0 if not available.  */

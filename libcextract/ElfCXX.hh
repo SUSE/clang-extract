@@ -336,11 +336,12 @@ class ElfSymbolCache
     return 0;
   }
 
+  std::vector<std::string> Get_All_Symbols(void);
+
   /** Dump for debugging reasons.  */
   void Dump_Cache(void);
 
   private:
-
   /** The hash.  */
   typedef std::unordered_map<std::string, unsigned char> SymbolTableHash;
   void Insert_Symbols_Into_Hash(SymbolTableHash &map, ElfSection &section);

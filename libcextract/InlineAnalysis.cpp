@@ -269,20 +269,8 @@ std::set<std::string> InlineAnalysis::Get_All_Symbols(void)
   std::set<std::string> set;
 
   if (Have_Debuginfo()) {
-    for (auto it = ElfObj->section_begin(); it != ElfObj->section_end(); ++it) {
-      ElfSection &section = *it;
-      if (section.Is_Symbol_Table()) {
-        unsigned n = section.Get_Num_Symbols();
-        for (unsigned i = 0; i < n; i++) {
-          ElfSymbol sym = section.Get_Symbol(i);
-          unsigned char type = sym.Get_Type();
-          if (type == STT_FUNC || type == STT_OBJECT) {
-            const char *name = sym.Get_Name();
-            set.insert(std::string(name));
-          }
-        }
-      }
-    }
+    for (auto sym : ElfCache->Get_All_Symbols())
+	    set.insert(sym);
   }
 
   if (Ipa) {
@@ -293,8 +281,8 @@ std::set<std::string> InlineAnalysis::Get_All_Symbols(void)
   }
 
   if (Symv) {
-    for (auto &map : Symv->Get_Symvers())
-	    set.insert(map.first);
+    for (auto &sym : Symv->Get_All_Symbols())
+	    set.insert(sym);
   }
 
   return set;

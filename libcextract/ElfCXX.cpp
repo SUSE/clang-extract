@@ -159,6 +159,28 @@ ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
   }
 }
 
+std::vector<std::string> ElfSymbolCache::Get_All_Symbols(void)
+{
+  std::vector<std::string> vec;
+
+  for (auto it = EO.section_begin(); it != EO.section_end(); ++it) {
+    ElfSection &section = *it;
+    if (section.Is_Symbol_Table()) {
+      unsigned n = section.Get_Num_Symbols();
+      for (unsigned i = 0; i < n; i++) {
+        ElfSymbol sym = section.Get_Symbol(i);
+        unsigned char type = sym.Get_Type();
+        if (type == STT_FUNC || type == STT_OBJECT) {
+          const char *name = sym.Get_Name();
+          vec.push_back(std::string(name));
+        }
+      }
+    }
+  }
+
+  return vec;
+}
+
 void Print_Section(ElfSection &section)
 {
   size_t n = section.Get_Num_Symbols();

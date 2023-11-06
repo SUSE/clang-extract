@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 class Parser
 {
 public:
@@ -14,6 +17,8 @@ public:
   // Some parsers work on files
   void Parse();
   void Parse(const char *path);
+
+  std::vector<std::string> Get_All_Symbols();
 
 protected:
   const char *parser_path;
