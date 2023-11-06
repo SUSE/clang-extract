@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "Parser.hh"
+
 #include <cassert>
 #include <string>
 #include <iterator>
@@ -53,12 +55,12 @@ class Symbol
   *
   * Cache the symbols and modules found for fast access.
   **/
-class Symvers
+class Symvers : public Parser
 {
   public:
   Symvers(const char* path);
 
-  void Parse(const char *path);
+  void Parse();
 
   /* Get symbol if available in the Symvers file.  Or 0 if not available.  */
   inline bool Symbol_Exists(const std::string &sym)

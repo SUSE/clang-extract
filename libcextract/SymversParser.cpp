@@ -6,15 +6,16 @@
 #include <sstream>
 
 Symvers::Symvers(const char *path)
+    : Parser(path)
 {
-  Parse(path);
+  Parse();
 }
 
-void Symvers::Parse(const char *path)
+void Symvers::Parse()
 {
   std::string line;
   std::ifstream f;
-  f.open(path);
+  f.open(parser_path);
 
   if (!f.is_open())
     throw new std::runtime_error("File not found!");
@@ -27,6 +28,7 @@ void Symvers::Parse(const char *path)
    * Any of these can be empty, namespace for example. At this point we only
    * care for the Symbol name and the module associates with it.
    */
+  fprintf(stderr, "INIT\n");
   while (f.good()) {
     std::getline(f, line);
 
@@ -47,8 +49,10 @@ void Symvers::Parse(const char *path)
     std::getline(ss, sym_mod, '\t');
 
     Symbol sym(sym_name, sym_mod);
+    fprintf(stderr, "%s\n", sym_name.c_str());
     Insert_Symbols_Into_Hash(sym);
   }
+  fprintf(stderr, "DONE\n");
 }
 
 void Symvers::Dump(void)

@@ -47,6 +47,7 @@ static const char *Handle_GCC_Symbol_Quirks(char *symbol)
 }
 
 IpaClones::IpaClones(const char *path)
+    : Parser(path)
 {
   if (Is_Directory(path) == false) {
     /* Single file.  We can pass it directly to Parse.  */

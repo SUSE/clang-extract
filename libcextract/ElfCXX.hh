@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "Parser.hh"
+
 #include <elf.h>
 #include <libelf.h>
 #include <gelf.h>
@@ -203,7 +205,7 @@ class ElfSection
   * descriptor used to open the file.  It provies automatic destructor so that
   * there is no need to close the fd or destroy the ELF object manually.
   */
-class ElfObject
+class ElfObject : public Parser
 {
   public:
   /** Open ELF object.  */

@@ -8,6 +8,8 @@
   * parsing and processing those files.
   */
 
+#include "Parser.hh"
+
 #include <set>
 #include <unordered_map>
 #include <string>
@@ -30,7 +32,7 @@ struct IpaCloneNode
 };
 
 /** @brief Parse .ipa-clone files and build an inline graph.  */
-class IpaClones
+class IpaClones : public Parser
 {
   public:
   /** There are two decision cases:
@@ -48,6 +50,10 @@ class IpaClones
 
   /** Construct the IpaClones from a ipa-clones files.  */
   IpaClones(const char *path);
+
+  // IPA clones can point to a directory, so we need to handle paths at this
+  // point.
+  void Parse(const char *path);
 
   /** Construct the IpaClones from a ipa-clones files.  */
   inline IpaClones(const std::string &path)
@@ -98,9 +104,6 @@ class IpaClones
   private:
 
   void Open_Recursive(const char *path);
-
-  /** Parse the file.  */
-  void Parse(const char *path);
 
   /** Set of nodes.  */
   std::unordered_map<std::string, IpaCloneNode> Nodes;

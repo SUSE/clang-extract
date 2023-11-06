@@ -61,14 +61,15 @@ const char *ElfSymbol::Bind_As_String(unsigned link)
 
 /* Build the ELF object from the given path.  */
 ElfObject::ElfObject(const char *path)
-  : ElfObj(nullptr),
+  : Parser(path),
+    ElfObj(nullptr),
     ElfFd(-1)
 {
   /* Libelf quirks.  If not present it fails to load current Linux binaries.  */
   elf_version(EV_CURRENT);
 
   /* Open using Unix File Descriptor, as required by libelf.  */
-  ElfFd = open(path, O_RDONLY);
+  ElfFd = open(parser_path, O_RDONLY);
   if (ElfFd == -1) {
     throw std::runtime_error("File not found!");
   }
