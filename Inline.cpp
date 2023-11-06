@@ -166,6 +166,12 @@ int main(int argc, char *argv[])
 {
   Parse(argc, argv);
   Check_Input();
+
+  if (!Elf_Path && !Ipa_Path && !Symvers_Path) {
+      printf("ERROR: Please inform -debuginfo, -ipa-files or -symvers option.\n\n");
+      Print_Usage();
+  }
+
   InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);
 
   if (Mode == LIST_ALL) {
