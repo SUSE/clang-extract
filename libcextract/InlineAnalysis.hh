@@ -5,6 +5,8 @@
   * being optional, only to improve the analysis quality.
   */
 
+#pragma once
+
 #include "ElfCXX.hh"
 #include "IpaClonesParser.hh"
 #include "SymversParser.hh"
