@@ -128,9 +128,15 @@ void IncludeTree::Build_Header_Map(void)
     IncludeNode *node = stack.top();
     stack.pop();
 
+    /* For Files.  */
     OptionalFileEntryRef file = node->Get_FileEntry();
     const FileEntry *fentry = &file->getFileEntry();
     Map[fentry] = node;
+
+    /* For InclusionDirectives.  */
+    if (node->ID != nullptr) {
+      IncMap[node->ID] = node;
+    }
 
     int n = node->Get_Num_Childs();
     while (n > 0) {
@@ -143,10 +149,11 @@ IncludeNode *IncludeTree::Get(const SourceLocation &loc)
 {
   OptionalFileEntryRef fileref = PrettyPrint::Get_FileEntry(loc);
 
-  /* In case we could not find a FileRef, then try the SpellingLocation.  */
+  /* In case we could not find a FileRef, then try the ExpansionLoc.  */
   if (!fileref.has_value()) {
     SourceManager *SM = PrettyPrint::Get_Source_Manager();
-    fileref = PrettyPrint::Get_FileEntry(SM->getSpellingLoc(loc));
+    const SourceLocation &loc2 = SM->getExpansionLoc(loc);
+    fileref = PrettyPrint::Get_FileEntry(loc2);
   }
 
   if (fileref.has_value()) {
@@ -347,9 +354,7 @@ std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Includes(void)
 
 IncludeNode *IncludeTree::Get(const InclusionDirective *directive)
 {
-  OptionalFileEntryRef ofer = directive->getFile();
-  const FileEntry *fentry = &ofer->getFileEntry();
-  return Map[fentry];
+  return IncMap[directive];
 }
 
 bool IncludeNode::Has_Parent_Marked_For_Output(void)
@@ -387,10 +392,16 @@ void IncludeNode::Mark_For_Expansion(void)
   } while (node != nullptr);
 }
 
+void IncludeTree::IncludeNode::Dump_Single_Node(void)
+{
+  llvm::outs() << File->getName() << " Expand: " << ShouldBeExpanded <<
+                  " Output: " << ShouldBeOutput << '\n';
+}
+
 void IncludeTree::IncludeNode::Dump(unsigned ident)
 {
-  llvm::outs() << std::string(ident, ' ') << File->getName()
-     << " Expand: " << ShouldBeExpanded << " Output: " << ShouldBeOutput << '\n';
+  llvm::outs() << std::string(ident, ' ');
+  Dump_Single_Node();
 
   for (IncludeNode *child : Childs) {
     child->Dump(ident + 1);

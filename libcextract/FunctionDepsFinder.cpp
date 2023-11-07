@@ -352,6 +352,12 @@ bool FunctionDependencyFinder::Handle_Decl(Decl *decl)
     return ret;
   }
 
+  if (StaticAssertDecl *d = dyn_cast<StaticAssertDecl>(decl)) {
+    bool r1 = Mark_Types_In_Function_Body(d->getAssertExpr());
+    bool r2 = Mark_Types_In_Function_Body(d->getMessage());
+    return r1 || r2;
+  }
+
   return Add_Decl_And_Prevs(decl);
 }
 
@@ -494,13 +500,23 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
       /* Get the RecordDecl referenced in the builtin_offsetof and add to the
          dependency list.  */
       const OffsetOfNode &component = expr->getComponent(i);
-      const FieldDecl *field = component.getField();
-      RecordDecl *record = (RecordDecl *)field->getParent();
-      ret |= Handle_TypeDecl(record);
+      if (component.getKind() == OffsetOfNode::Field) {
+        const FieldDecl *field = component.getField();
+        RecordDecl *record = (RecordDecl *)field->getParent();
+        ret |= Handle_TypeDecl(record);
+      }
     }
   } else if (UnaryExprOrTypeTraitExpr::classof(stmt)) {
     UnaryExprOrTypeTraitExpr *expr = (UnaryExprOrTypeTraitExpr *)stmt;
     type = expr->getTypeOfArgument().getTypePtr();
+
+  } else if (TypeTraitExpr::classof(stmt)) {
+    const TypeTraitExpr *expr = (const TypeTraitExpr*)stmt;
+
+    for (TypeSourceInfo *info : expr->getArgs()) {
+      const Type *t = info->getType().getTypePtr();
+      ret |= Add_Type_And_Depends(t);
+    }
   } else if (Expr::classof(stmt)) {
     Expr *expr = (Expr *)stmt;
 
@@ -809,6 +825,7 @@ void FunctionDependencyFinder::Insert_Decls_From_Non_Expanded_Includes(void)
 
     const SourceLocation &loc = decl->getLocation();
     IncludeNode *node = IT.Get(loc);
+
     if (node && node->Has_Parent_Marked_For_Output()) {
       Handle_Decl(decl);
     }
@@ -824,7 +841,14 @@ void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
   Include_Enum_Constants_Referenced_By_Macros();
 
   /* Step 3: Expand the closure to include Decls in non-expanded includes.  */
-  Insert_Decls_From_Non_Expanded_Includes();
+  if (KeepIncludes) {
+    /* TODO: Guarding this with KeepIncludes should actually not be necessary,
+       but we still have bugs when processing the kernel and the closure is not
+       perfect.  By not adding those declarations we avoid hitting cases where
+       it would hang because of a declaration that would be removed in the
+       future anyway.  */
+    Insert_Decls_From_Non_Expanded_Includes();
+  }
 
   /* Step 4: Remove any declaration that may have been declared twice.  */
   Remove_Redundant_Decls();

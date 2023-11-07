@@ -103,6 +103,7 @@ class IncludeTree
     bool Has_Parent_Marked_For_Output(void);
 
     /** Dump, for debugging reasons.  */
+    void Dump_Single_Node(void);
     void Dump(unsigned ident = 0);
 
     private:
@@ -168,6 +169,7 @@ class IncludeTree
 
   /* Hash mapping included file to IncludeNode.  */
   std::unordered_map<const FileEntry *, IncludeTree::IncludeNode *> Map;
+  std::unordered_map<const InclusionDirective *, IncludeTree::IncludeNode *> IncMap;
 
   /** Reference to the preprocessor used by compilation.  */
   Preprocessor &PP;

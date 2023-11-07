@@ -16,7 +16,6 @@ void PrettyPrint::Print_Decl(Decl *decl)
   FunctionDecl *f = dynamic_cast<FunctionDecl*>(decl);
   TagDecl *t = dynamic_cast<TagDecl*>(decl);
   EnumDecl *e = dynamic_cast<EnumDecl*>(decl);
-  TypedefNameDecl *td = dynamic_cast<TypedefDecl*>(decl);
 
   if (f && f->hasBody() && f->isThisDeclarationADefinition()) {
     Print_Decl_Raw(f);
@@ -28,46 +27,6 @@ void PrettyPrint::Print_Decl(Decl *decl)
     /* If the RecordType doesn't have a name, then don't print it.  Except when
        it is an empty named enum declaration, which in this case we must print
        because it contains declared constants.  */
-  } else if (td) {
-    if (SM) {
-      Print_Decl_Raw(decl);
-      Out << ";\n";
-    } else {
-
-    /* The AST dump will hang on the following case:
-
-       typedef struct {
-         attrs
-       } Type;
-
-       That is because clang decompose such constructions in
-
-       struct {
-         attrs
-       };
-
-       typedef struct Type Type;
-
-       but since the struct has no name, Type goes undefined.
-
-       The way we fix that is output the typedef and the TagDecl
-       body, and we avoid outputs of unamed structs.
-
-       This problem does not seem to show up if we are printing
-       from source location.  */
-
-      TagDecl *tagdecl = td->getAnonDeclWithTypedefName();
-
-      if (tagdecl && tagdecl->getName() == "") {
-        Out << "typedef ";
-        tagdecl->getDefinition()->print(Out, PPolicy);
-        Out << " " << td->getName() << ";\n";
-      } else {
-        decl->print(Out, PPolicy);
-        Out << ";\n";
-      }
-    }
-
   } else {
     Print_Decl_Raw(decl);
     Out << ";\n";
@@ -148,7 +107,40 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
        to AST dump.  */
     if (decl_source.equals("")) {
       /* TODO: warn user that we had to fallback to AST dump.  */
-      decl->print(Out, LangOpts);
+
+      if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {
+        /* The AST dump will hang on the following case:
+
+           typedef struct {
+             attrs
+           } Type;
+
+           That is because clang decompose such constructions in
+
+           struct {
+             attrs
+           };
+
+           typedef struct Type Type;
+
+           but since the struct has no name, Type goes undefined.
+
+           The way we fix that is output the typedef and the TagDecl
+           body, and we avoid outputs of unamed structs.
+
+           This problem does not seem to show up if we are printing
+           from source location.  */
+        TagDecl *tagdecl = typedecl->getAnonDeclWithTypedefName();
+        if (tagdecl && tagdecl->getName() == "") {
+          Out << "typedef ";
+          tagdecl->getDefinition()->print(Out, PPolicy);
+          Out << " " << typedecl->getName();
+        } else {
+          decl->print(Out, PPolicy);
+        }
+      } else {
+        decl->print(Out, LangOpts);
+      }
     } else {
       Out << decl_source;
     }
@@ -160,7 +152,12 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
 void PrettyPrint::Debug_Decl(Decl *decl)
 {
-  llvm::outs() << Get_Source_Text(decl->getSourceRange()) << '\n';
+#undef Out
+  auto o = Out;
+  Out = &llvm::outs();
+  Print_Decl(decl);;
+  Out = o;
+#define Out (*Out)
 }
 
 void PrettyPrint::Debug_Stmt(Stmt *stmt)
