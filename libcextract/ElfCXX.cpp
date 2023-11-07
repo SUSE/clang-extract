@@ -69,7 +69,7 @@ ElfObject::ElfObject(const char *path)
   elf_version(EV_CURRENT);
 
   /* Open using Unix File Descriptor, as required by libelf.  */
-  ElfFd = open(parser_path, O_RDONLY);
+  ElfFd = open(parser_path.c_str(), O_RDONLY);
   if (ElfFd == -1) {
     throw std::runtime_error("File not found!");
   }

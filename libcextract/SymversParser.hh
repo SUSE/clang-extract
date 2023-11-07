@@ -58,7 +58,7 @@ class Symbol
 class Symvers : public Parser
 {
   public:
-  Symvers(const char* path);
+  Symvers(const std::string &path);
 
   void Parse();
 

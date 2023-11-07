@@ -5,13 +5,13 @@
 #include <stdlib.h>
 #include <cxxabi.h>
 
-InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
-                              const char *symvers_path)
+InlineAnalysis::InlineAnalysis(const std::string &elf_path, const std::string &ipaclones_path,
+                              const std::string &symvers_path)
 {
   /* Debuginfo information is not needed for inline analysis.  But is desired
      for better precision.  That is why whe declare those objects dynamically.  */
 
-  if (elf_path != nullptr) {
+  if (!elf_path.empty()) {
     ElfObj = new ElfObject(elf_path);
     ElfCache = new ElfSymbolCache(*ElfObj);
   } else {
@@ -19,11 +19,11 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
     ElfCache = nullptr;
   }
 
-  if (ipaclones_path != nullptr) {
+  if (!ipaclones_path.empty()) {
     Ipa = new IpaClones(ipaclones_path);
   }
 
-  if (symvers_path != nullptr) {
+  if (!symvers_path.empty()) {
     Symv = new Symvers(symvers_path);
   }
 }

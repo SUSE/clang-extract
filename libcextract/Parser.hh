@@ -10,7 +10,7 @@
 class Parser
 {
 public:
-  Parser(const char *path)
+  Parser(const std::string &path)
     : parser_path(path)
   {}
 
@@ -22,5 +22,5 @@ public:
   bool Needs_Externalization(const std::string &symbol);
 
 protected:
-  const char *parser_path;
+  const std::string &parser_path;
 };

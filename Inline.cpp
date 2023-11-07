@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
+#include <string>
 
 enum MODE {
   LIST_ALL,
@@ -20,9 +21,9 @@ static enum MODE Mode = LIST_ALL;
 
 const char *Output_Path = nullptr;
 
-static const char *Elf_Path = nullptr;
-static const char *Ipa_Path = nullptr;
-static const char *Symvers_Path = nullptr;
+static std::string Elf_Path;
+static std::string Ipa_Path;
+static std::string Symvers_Path;
 
 static std::vector<std::string> Symbols_To_Analyze;
 
@@ -56,17 +57,17 @@ static void Parse(int argc, char *argv[])
       }
 
       if (strcmp(argv[i], "-ipa-files") == 0) {
-        Ipa_Path = argv[++i];
+        Ipa_Path = std::string(argv[++i]);
         continue;
       }
 
       if (strcmp(argv[i], "-debuginfo") == 0) {
-        Elf_Path = argv[++i];
+        Elf_Path = std::string(argv[++i]);
         continue;
       }
 
       if (strcmp(argv[i], "-symvers") == 0) {
-        Symvers_Path = argv[++i];
+        Symvers_Path = std::string(argv[++i]);
         continue;
       }
 
@@ -98,15 +99,15 @@ static void Parse(int argc, char *argv[])
 
 static void Check_Input(void)
 {
-  if (Ipa_Path == nullptr) {
+  if (Ipa_Path.empty()) {
     printf("WARNING: No IPA files found.\n");
   }
 
-  if (Elf_Path == nullptr) {
+  if (Elf_Path.empty()) {
     printf("WARNING: No debuginfo file found.\n");
   }
 
-  if (Symvers_Path == nullptr) {
+  if (Symvers_Path.empty()) {
     printf("WARNING: No Module.symvers file found.\n");
   }
 
@@ -128,7 +129,7 @@ static void Check_Input(void)
 static void Print_Symbol_Set(InlineAnalysis &ia, std::set<std::string> &set)
 {
   if (Output == TERMINAL) {
-    if (Output_Path == nullptr) {
+    if (Output_Path== nullptr) {
       ia.Print_Symbol_Set(set);
     } else {
       FILE *out = fopen(Output_Path, "w");
@@ -167,7 +168,7 @@ int main(int argc, char *argv[])
   Parse(argc, argv);
   Check_Input();
 
-  if (!Elf_Path && !Ipa_Path && !Symvers_Path) {
+  if (Elf_Path.empty() && Ipa_Path.empty() && Symvers_Path.empty()) {
       printf("ERROR: Please inform -debuginfo, -ipa-files or -symvers option.\n\n");
       Print_Usage();
   }

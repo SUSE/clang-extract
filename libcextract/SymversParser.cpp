@@ -5,7 +5,7 @@
 #include <string>
 #include <sstream>
 
-Symvers::Symvers(const char *path)
+Symvers::Symvers(const std::string &path)
     : Parser(path)
 {
   Parse();
