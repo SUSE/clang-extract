@@ -80,6 +80,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
     return true;
   }
+  if (prefix("-DCE_SYMVERS_FILE=", str)) {
+    SymversPath = Extract_Single_Arg(str);
+
+    return true;
+  }
   if (!strcmp("-DCE_NO_EXTERNALIZATION", str)) {
     DisableExternalization = true;
 

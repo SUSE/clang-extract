@@ -50,6 +50,11 @@ class ArgvParser
     return OutputFile;
   }
 
+  inline std::string &Get_Symvers_Path(void)
+  {
+    return SymversPath;
+  }
+
   inline bool Is_Externalization_Disabled(void)
   {
     return DisableExternalization;
@@ -77,6 +82,7 @@ class ArgvParser
   std::vector<std::string> SymbolsToExternalize;
   std::vector<std::string> HeadersToExpand;
   std::string OutputFile;
+  std::string SymversPath;
 
   bool DisableExternalization;
   bool WithIncludes;
