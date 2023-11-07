@@ -87,6 +87,12 @@ class Symvers : public Parser
     return container->second;
   }
 
+  // Externalize all symbos that are present on modules
+  bool Needs_Externalization(const std::string &sym)
+  {
+    return Get_Symbol_Module(sym) != "vmlinux";
+  }
+
   /* Cache the symbols from a module.  */
   inline void Insert_Symbols_Into_Hash(Symbol &sym)
   {

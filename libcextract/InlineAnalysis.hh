@@ -53,6 +53,8 @@ class InlineAnalysis
   /** Get the ELF info of a symbol.  */
   unsigned char Get_Symbol_Info(const std::string &sym);
 
+  bool Needs_Externalization(const std::string &sym);
+
   /* Print the symbol set in a table-like format, for terminal output.  */
   void Print_Symbol_Set(const std::set<std::string> &set, bool csv=false, FILE *out=stdout);
 

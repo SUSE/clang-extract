@@ -260,6 +260,16 @@ static const char *Bind(unsigned link)
   }
 }
 
+bool InlineAnalysis::Needs_Externalization(const std::string &sym)
+{
+  if (Symv)
+    return Symv->Needs_Externalization(sym);
+
+  // FIXME: Add support to Elf too, checking if the module itself contains
+  // symbols that should be externalized.
+  return true;
+}
+
 std::set<std::string> InlineAnalysis::Get_All_Symbols(void)
 {
   /* We have to use the information that the user provide us.  This means that

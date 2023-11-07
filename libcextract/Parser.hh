@@ -19,6 +19,7 @@ public:
   void Parse(const char *path);
 
   std::vector<std::string> Get_All_Symbols();
+  bool Needs_Externalization(const std::string &symbol);
 
 protected:
   const char *parser_path;
