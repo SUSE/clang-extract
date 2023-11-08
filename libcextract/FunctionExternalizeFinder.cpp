@@ -36,8 +36,11 @@ static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
   return cg;
 }
 
-FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract, std::vector<std::string> &to_externalize)
-  : AST(ast)
+FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract,
+                                                      std::vector<std::string> &to_externalize,
+                                                      InlineAnalysis *ia)
+  : AST(ast),
+    ia(ia)
 {
   for (const std::string &name : to_extract) {
     MustNotExternalize.insert(name);
@@ -80,7 +83,9 @@ bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
 
   const std::string &name = decl->getName().str();
 
-  if (!Must_Not_Externalize(name)) {
+  // Don't even check for symbols that are marked to not be externalized, like
+  // functions to be extracted.
+  if (!Must_Not_Externalize(name) && ia->Needs_Externalization(name)) {
     externalized = Mark_For_Externalization(name);
   }
 

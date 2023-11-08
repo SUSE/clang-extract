@@ -302,7 +302,8 @@ class FunctionExternalizeFinderPass : public Pass
       /* Find which symbols must be externalized.  */
       FunctionExternalizeFinder fef(ctx->AST.get(),
           ctx->FuncExtractNames,
-          ctx->Externalize);
+          ctx->Externalize,
+          &ctx->ia);
       ctx->Externalize = fef.Get_To_Externalize();
 
       return true;

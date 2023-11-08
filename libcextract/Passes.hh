@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ArgvParser.hh"
+#include "InlineAnalysis.hh"
 #include "clang/Frontend/ASTUnit.h"
 
 using namespace llvm;
@@ -28,7 +29,8 @@ class PassManager {
     {
       public:
         Context(ArgvParser &args)
-          : FuncExtractNames(args.Get_Functions_To_Extract()),
+          : ia("", "", args.Get_Symvers_Path()),
+            FuncExtractNames(args.Get_Functions_To_Extract()),
             Externalize(args.Get_Symbols_To_Externalize()),
             OutputFile(args.Get_Output_File()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
@@ -48,6 +50,8 @@ class PassManager {
 
         /** The in-memory file system used to hold our temporary code.  */
         IntrusiveRefCntPtr<vfs::InMemoryFileSystem> MFS;
+
+        InlineAnalysis ia;
 
         /** List of functions to extract.  */
         std::vector<std::string> &FuncExtractNames;

@@ -1,5 +1,6 @@
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Frontend/ASTUnit.h"
+#include "InlineAnalysis.hh"
 
 #include <vector>
 #include <unordered_set>
@@ -9,7 +10,9 @@ using namespace clang;
 class FunctionExternalizeFinder
 {
   public:
-  FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract, std::vector<std::string> &to_exernalize);
+  FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract,
+                                          std::vector<std::string> &to_exernalize,
+                                          InlineAnalysis *ia);
 
   bool Should_Externalize(CallGraphNode *node);
   bool Should_Externalize(FunctionDecl *decl);
@@ -51,4 +54,5 @@ class FunctionExternalizeFinder
   std::unordered_set<std::string> MustNotExternalize;
 
   ASTUnit *AST;
+  InlineAnalysis *ia;
 };
