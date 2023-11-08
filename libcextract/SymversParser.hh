@@ -83,7 +83,9 @@ class Symvers : public Parser
   std::string Get_Symbol_Module(const std::string &sym)
   {
     auto container = map.find(sym);
-    assert(container != map.end());
+    // Symbol not found
+    if (container == map.end())
+      return {};
     return container->second;
   }
 
