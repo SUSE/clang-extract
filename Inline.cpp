@@ -1,4 +1,5 @@
 #include "InlineAnalysis.hh"
+#include "NonLLVMMisc.hh"
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
@@ -21,9 +22,9 @@ static enum MODE Mode = LIST_ALL;
 
 const char *Output_Path = nullptr;
 
-static std::string Elf_Path;
-static std::string Ipa_Path;
-static std::string Symvers_Path;
+static const char *Elf_Path = nullptr;
+static const char *Ipa_Path = nullptr;
+static const char *Symvers_Path = nullptr;
 
 static std::vector<std::string> Symbols_To_Analyze;
 
@@ -57,17 +58,17 @@ static void Parse(int argc, char *argv[])
       }
 
       if (strcmp(argv[i], "-ipa-files") == 0) {
-        Ipa_Path = std::string(argv[++i]);
+        Ipa_Path = argv[++i];
         continue;
       }
 
       if (strcmp(argv[i], "-debuginfo") == 0) {
-        Elf_Path = std::string(argv[++i]);
+        Elf_Path = argv[++i];
         continue;
       }
 
       if (strcmp(argv[i], "-symvers") == 0) {
-        Symvers_Path = std::string(argv[++i]);
+        Symvers_Path = argv[++i];
         continue;
       }
 
@@ -97,17 +98,19 @@ static void Parse(int argc, char *argv[])
   }
 }
 
-static void Check_Input(void)
+#define NULL_OR_EMPTY_STRING()
+
+static int Check_Input(void)
 {
-  if (Ipa_Path.empty()) {
+  if (is_null_or_empty(Ipa_Path)) {
     printf("WARNING: No IPA files found.\n");
   }
 
-  if (Elf_Path.empty()) {
+  if (is_null_or_empty(Elf_Path)) {
     printf("WARNING: No debuginfo file found.\n");
   }
 
-  if (Symvers_Path.empty()) {
+  if (is_null_or_empty(Symvers_Path)) {
     printf("WARNING: No Module.symvers file found.\n");
   }
 
@@ -115,6 +118,7 @@ static void Check_Input(void)
     if (Symbols_To_Analyze.size() == 0) {
       printf("ERROR: No symbol to analyze.\n\n");
       Print_Usage();
+      return 1;
     }
   }
 
@@ -122,8 +126,19 @@ static void Check_Input(void)
     if (Mode == LIST_ALL) {
       printf("ERROR: Graphviz output requires -where-is-inlined or -compute-closure\n\n");
       Print_Usage();
+      return 1;
     }
   }
+
+  if (is_null_or_empty(Elf_Path) &&
+      is_null_or_empty(Ipa_Path) &&
+      is_null_or_empty(Symvers_Path)) {
+      printf("ERROR: Please inform -debuginfo, -ipa-files or -symvers option.\n\n");
+      Print_Usage();
+      return 1;
+  }
+
+  return 0;
 }
 
 static void Print_Symbol_Set(InlineAnalysis &ia, std::set<std::string> &set)
@@ -166,11 +181,8 @@ static void Print_Symbol_Set(InlineAnalysis &ia, std::set<std::string> &set)
 int main(int argc, char *argv[])
 {
   Parse(argc, argv);
-  Check_Input();
-
-  if (Elf_Path.empty() && Ipa_Path.empty() && Symvers_Path.empty()) {
-      printf("ERROR: Please inform -debuginfo, -ipa-files or -symvers option.\n\n");
-      Print_Usage();
+  if (int ret = Check_Input()) {
+    return ret;
   }
 
   InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);

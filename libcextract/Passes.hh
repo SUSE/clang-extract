@@ -29,8 +29,7 @@ class PassManager {
     {
       public:
         Context(ArgvParser &args)
-          : ia("", "", args.Get_Symvers_Path()),
-            FuncExtractNames(args.Get_Functions_To_Extract()),
+          : FuncExtractNames(args.Get_Functions_To_Extract()),
             Externalize(args.Get_Symbols_To_Externalize()),
             OutputFile(args.Get_Output_File()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
@@ -38,7 +37,11 @@ class PassManager {
             DumpPasses(args.Should_Dump_Passes()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
-            PassNum(0)
+            DebuginfoPath(args.Get_Debuginfo_Path()),
+            IpaclonesPath(args.Get_Ipaclones_Path()),
+            SymversPath(args.Get_Symvers_Path()),
+            PassNum(0),
+            IA(DebuginfoPath, IpaclonesPath, SymversPath)
         {
         }
 
@@ -51,8 +54,6 @@ class PassManager {
 
         /** The in-memory file system used to hold our temporary code.  */
         IntrusiveRefCntPtr<vfs::InMemoryFileSystem> MFS;
-
-        InlineAnalysis ia;
 
         /** List of functions to extract.  */
         std::vector<std::string> &FuncExtractNames;
@@ -78,6 +79,15 @@ class PassManager {
         /** The arguments that will be sent to clang when building the AST.  */
         std::vector<const char *> &ClangArgs;
 
+        /* Path to Debuginfo, if exists.  */
+        const char *DebuginfoPath;
+
+        /* Path to Ipaclones, if exists.  */
+        const char *IpaclonesPath;
+
+        /* Path to Symvers, if exists.  */
+        const char *SymversPath;
+
         /** Current pass number in the passes list.  */
         int PassNum;
 
@@ -86,6 +96,11 @@ class PassManager {
 
         /** Generated code by the pass.  */
         std::string CodeOutput;
+
+        /* InlineAnalysis object that will persists through the entire analysis.
+           Avoid rebuilding it as it may require parsing several very large
+           files, thus becoming very slow.  */
+        InlineAnalysis IA;
     };
 
   private:

@@ -36,17 +36,39 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 using namespace clang;
 using namespace llvm;
 
-static std::unordered_set<std::string *> StringPool;
-
-void Free_String_Pool(void)
+static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
 {
-  for (auto it = StringPool.begin(); it != StringPool.end(); ++it) {
-    std::string *elem = *it;
-    delete elem;
+  const SourceManager &sm = ast->getSourceManager();
+
+  /* Get a more precise source range of declaration.  */
+  SourceLocation start = range.getBegin();
+
+  /* Some declarations start with macro expansion, which the Rewriter
+     class simple rejects.  Get one which it will accept.  */
+  if (!start.isFileID()) {
+    start = sm.getExpansionLoc(start);
   }
 
-  StringPool.clear();
+  SourceLocation end = Lexer::getLocForEndOfToken(
+      range.getEnd(),
+      0,
+      sm,
+      ast->getLangOpts());
+
+  SourceRange new_range(start, end);
+  return new_range;
 }
+
+static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const Decl *decl)
+{
+  return Get_Range_For_Rewriter(ast, decl->getSourceRange());
+}
+
+static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const Stmt *stmt)
+{
+  return Get_Range_For_Rewriter(ast, stmt->getSourceRange());
+}
+
 
 bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
 {
@@ -237,7 +259,7 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
   return std::string(main_buf.begin(), main_buf.end());
 }
 
-void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
+void SymbolExternalizer::Externalize_Non_Extern_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
   VarDecl *new_decl = nullptr;
@@ -288,8 +310,6 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
          a variable declaration node of proper type.  */
       else if (!new_decl) {
 
-        SourceManager &sm = AST->getSourceManager();
-
         /* The TopLevelDecls attribute from the AST is private, but we need to
            access that in order to remove nodes from the AST toplevel vector,
            else we can't remove further declarations of the function we need
@@ -305,31 +325,13 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         new_decl->print(outstr, AST->getLangOpts());
         outstr << ";\n";
 
-        /* Get source location of old function declaration.  */
-        SourceLocation decl_start;
-        SourceLocation decl_end;
-        decl_start = decl->getSourceRange().getBegin();
-
-        /* Some declarations start with macro expansion, which the Rewriter
-           class simple rejects.  Get one which it will accept.  */
-        if (!decl_start.isFileID()) {
-          decl_start = sm.getExpansionLoc(decl_start);
-        }
-
-        decl_end = Lexer::getLocForEndOfToken(
-            decl->getSourceRange().getEnd(),
-            0,
-            AST->getSourceManager(),
-            AST->getLangOpts());
-
-        SourceRange decl_range(decl_start, decl_end);
+        SourceRange decl_range = Get_Range_For_Rewriter(AST, decl);
 
         /* Replace if the given source text is actually something.  */
         if (PrettyPrint::Get_Source_Text(decl_range) != "") {
           /* Replace text content of old declaration.  */
           assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
         }
-
 
         must_update = true;
         was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
@@ -342,6 +344,48 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
         /* Slaps the new node into the position of where was the function
            to be externalized.  */
         *it = new_decl;
+      }
+    }
+  }
+}
+
+void SymbolExternalizer::Externalize_Extern_Symbol(const std::string &to_externalize)
+{
+  ASTUnit::top_level_iterator it;
+  std::vector<Decl *> *topleveldecls = Get_Pointer_To_Toplev(AST);
+
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
+    if (decl && decl->getName() == to_externalize) {
+      /* Now checks if this is a function or a variable delcaration.  */
+      if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
+        /* In the case it is a function we need to remove its declaration that
+           have a body.  */
+        if (func->hasBody()) {
+          FunctionDecl *with_body = func->getDefinition();
+          if (with_body == func) {
+            /* Damn. This function do not have a prototype, we will have to
+               craft it ourself.  */
+            Stmt *body = with_body->getBody();
+            SourceRange body_range = Get_Range_For_Rewriter(AST, body);
+            RW.ReplaceText(body_range, ";\n");
+
+            /* Remove the body from the AST.  */
+            with_body->setBody(nullptr);
+          } else {
+            SourceRange decl_range = Get_Range_For_Rewriter(AST, with_body);
+            RW.RemoveText(decl_range);
+            topleveldecls->erase(it);
+
+            /* We must decrease the iterator because we deleted an element from the
+               vector.  */
+            it--;
+          }
+          func = func->getDefinition();
+        }
+        return;
+      } else if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+
       }
     }
   }
@@ -433,13 +477,20 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
 
 void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 {
-  _Externalize_Symbol(to_externalize);
+  /* If the symbol is available in the debuginfo and is an EXTERN symbol, we
+     do not need to rewrite it, but rather we need to erase any declaration
+     with body of it.  */
+  if (IA.Is_Externally_Visible(to_externalize)) {
+    Externalize_Extern_Symbol(to_externalize);
+  } else {
+    Externalize_Non_Extern_Symbol(to_externalize);
+  }
 }
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
 
   for (const std::string &to_externalize : to_externalize_array) {
-    _Externalize_Symbol(to_externalize);
+    Externalize_Symbol(to_externalize);
   }
 }

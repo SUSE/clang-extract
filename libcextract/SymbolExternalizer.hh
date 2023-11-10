@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MacroWalker.hh"
+#include "InlineAnalysis.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Rewrite/Core/Rewriter.h>
@@ -29,10 +30,11 @@ using namespace clang;
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast)
+  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia)
     : AST(ast),
       MW(ast->getPreprocessor()),
-      RW(ast->getSourceManager(), ast->getLangOpts())
+      RW(ast->getSourceManager(), ast->getLangOpts()),
+      IA(ia)
   {
   }
 
@@ -93,7 +95,8 @@ class SymbolExternalizer
 
   private:
 
-  void _Externalize_Symbol(const std::string &to_externalize);
+  void Externalize_Non_Extern_Symbol(const std::string &to_externalize);
+  void Externalize_Extern_Symbol(const std::string &to_externalize);
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 
@@ -105,4 +108,7 @@ class SymbolExternalizer
 
   /** Clang's Rewriter class used to auxiliate us with changes in the source code.  */
   Rewriter RW;
+
+  /** Reference to the InlineAnalysis in the PassManager::Context instance.  */
+  InlineAnalysis &IA;
 };

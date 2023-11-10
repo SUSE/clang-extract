@@ -38,11 +38,17 @@ static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
   return cg;
 }
 
-FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract,
-                                                      std::vector<std::string> &to_externalize,
-                                                      InlineAnalysis *ia)
-  : AST(ast),
-    ia(ia)
+FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast,
+                                                std::vector<std::string> &to_extract,
+                                                std::vector<std::string> &to_externalize,
+                                                bool keep_includes,
+                                                InlineAnalysis &ia)
+  : MustExternalize(to_externalize.begin(), to_externalize.end()),
+    MustNotExternalize(to_extract.begin(), to_extract.end()),
+    ToExtract(to_extract.begin(), to_extract.end()),
+    KeepIncludes(keep_includes),
+    AST(ast),
+    IA(ia)
 {
   Run_Analysis();
 
@@ -81,17 +87,44 @@ bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
       return false;
     }
 
-    /* There is no point in externalizing an inline function.  */
+    /* If the function is declared inline then do not externalize it.  */
     if (func->isInlined()) {
       return false;
     }
 
     /* If the symbol needs to be externalized, then do it.  */
-    if (ia->Needs_Externalization(decl->getName().str())) {
+    if (IA.Needs_Externalization(decl->getName().str())) {
       return true;
     }
 
-    return false;;
+    /* TODO: Get mangled name.  */
+    const std::string &func_name = decl->getNameAsString();
+    unsigned char syminfo = IA.Get_Symbol_Info(func_name);
+    if (syminfo == 0) {
+      /* No symbol information.  Hence do not externalize so that it is copied
+         to the output.  */
+      return false;
+    }
+
+    unsigned char bind = ElfSymbol::Bind_Of(syminfo);
+    switch (bind) {
+      case STB_LOCAL:
+        /* Local function.  We should externalize it.  */
+        return true;
+        break;
+
+      case STB_GLOBAL:
+        /* Global function.  We should externalize it, but carefully.  */
+        return true;
+        break;
+
+      case STB_WEAK:
+        /* Global function from another library. Do nothing in this case.  */
+        return false;
+        break;
+    }
+
+    return false;
   }
 
   /* In case the declarator is a variable.  */
@@ -103,7 +136,7 @@ bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
     }
 
     /* If the symbol needs to be externalized, then do it.  */
-    if (ia->Needs_Externalization(decl->getName().str())) {
+    if (IA.Needs_Externalization(decl->getName().str())) {
       return true;
     }
 

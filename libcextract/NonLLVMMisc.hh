@@ -26,6 +26,12 @@ inline bool prefix(const char *a, const char *b)
   return !strncmp(a, b, strlen(a));
 }
 
+/** Check if a string is null or empty.  */
+inline bool is_null_or_empty(const char *str)
+{
+  return str == nullptr || *str == '\0';
+}
+
 /** Get a single line from a file, removing its newline.
   *
   * NOTE: if this function return a valid pointer, it must be free'd.
@@ -40,3 +46,6 @@ std::vector<std::string> Extract_Args(const char *str);
 
 /** Extract argument that are specified after the '=' sign.  */
 std::string Extract_Single_Arg(const char *str);
+
+/** Extract argument that are specified after the '=' sign.  */
+const char *Extract_Single_Arg_C(const char *str);

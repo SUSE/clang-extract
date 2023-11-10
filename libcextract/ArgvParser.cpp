@@ -36,14 +36,14 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   // TODO: Review these options from time to time in order to remove them as
   // soon as they are supported by clang
   std::vector<const char *> gcc_args = {
-    "-mpreferred-stack-boundary=3",
+    "-mpreferred-stack-boundary=",
     "-mindirect-branch=thunk-extern",
     "-mindirect-branch-register",
     "-fno-var-tracking-assignments",
     "-fconserve-stack",
     "-mrecord-mcount",
     "-fconserve-stack",
-    "-falign-jumps=1",
+    "-falign-jumps=",
     "-fasan-shadow-offset=0xdffffc0000000000",
     "-fno-allow-store-data-races",
     "-Wno-alloc-size-larger-than",
@@ -56,14 +56,16 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     "-Wno-stringop-overflow",
     "-Wno-stringop-truncation",
     "-Werror=designated-init",
-    "-Wimplicit-fallthrough=5",
+    "-Wimplicit-fallthrough=",
   };
 
   /* Ignore gcc arguments that are not known to clang */
   /* FIXME: Use std::find... */
-  for (const char *arg : gcc_args)
-  	if (prefix(arg, str))
-		return true;
+  for (const char *arg : gcc_args) {
+    if (prefix(arg, str)) {
+      return true;
+    }
+  }
 
   if (prefix("-DCE_EXTRACT_FUNCTIONS=", str)) {
     FunctionsToExtract = Extract_Args(str);
@@ -77,11 +79,6 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_OUTPUT_FILE=", str)) {
     OutputFile = Extract_Single_Arg(str);
-
-    return true;
-  }
-  if (prefix("-DCE_SYMVERS_FILE=", str)) {
-    SymversPath = Extract_Single_Arg(str);
 
     return true;
   }
@@ -105,6 +102,20 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
     return true;
   }
+  if (prefix("-DCE_DEBUGINFO_PATH=", str)) {
+    DebuginfoPath = Extract_Single_Arg_C(str);
 
+    return true;
+  }
+  if (prefix("-DCE_IPACLONES_PATH=", str)) {
+    IpaclonesPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (prefix("-DCE_SYMVERS_FILE=", str)) {
+    SymversPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
   return false;
 }

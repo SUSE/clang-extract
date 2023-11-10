@@ -8,6 +8,8 @@
   * parsing and processing those files.
   */
 
+#pragma once
+
 #include "Parser.hh"
 
 #include <set>

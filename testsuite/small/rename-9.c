@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_EXPORT_SYMBOLS=CRYPTO_strdup" }*/
 
 char CRYPTO_strdup(const char *, const char *, int);
 

@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_EXPORT_SYMBOLS=g" }*/
 static int g()
 {
   volatile int x = 3;

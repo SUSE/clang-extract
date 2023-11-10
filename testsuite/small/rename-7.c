@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_EXPORT_SYMBOLS=bbb" }*/
 /* { dg-xfail }*/
 #define A bbb
 #define B bbb

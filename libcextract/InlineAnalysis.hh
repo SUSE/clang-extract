@@ -23,9 +23,9 @@ class InlineAnalysis
   public:
   /** Build the analysis class.  elf_path can be NULL if there is no debuginfo
       available, and ipaclone_path can be a directory full of many ipa-clones
-      generated through LTO or not. Symvers can be NULL is we are creating a 
+      generated through LTO or not. Symvers can be NULL is we are creating a
       userspace livepatch   */
-  InlineAnalysis(const std::string &elf_path, const std::string &ipaclone_path, const std::string &symvers_path);
+  InlineAnalysis(const char *elf_path, const char *ipaclone_path, const char *symvers_path);
 
   ~InlineAnalysis(void);
 
@@ -53,7 +53,11 @@ class InlineAnalysis
   /** Get the ELF info of a symbol.  */
   unsigned char Get_Symbol_Info(const std::string &sym);
 
+
   bool Needs_Externalization(const std::string &sym);
+
+  /** Check if symbol is externally visible.  */
+  bool Is_Externally_Visible(const std::string &sym);
 
   /* Print the symbol set in a table-like format, for terminal output.  */
   void Print_Symbol_Set(const std::set<std::string> &set, bool csv=false, FILE *out=stdout);

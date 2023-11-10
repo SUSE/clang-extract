@@ -1,3 +1,5 @@
+#include "InlineAnalysis.hh"
+
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "InlineAnalysis.hh"
@@ -10,9 +12,11 @@ using namespace clang;
 class FunctionExternalizeFinder
 {
   public:
-  FunctionExternalizeFinder(ASTUnit *ast, std::vector<std::string> &to_extract,
-                                          std::vector<std::string> &to_exernalize,
-                                          InlineAnalysis *ia);
+  FunctionExternalizeFinder(ASTUnit *ast,
+                            std::vector<std::string> &to_extract,
+                            std::vector<std::string> &to_exernalize,
+                            bool keep_includes,
+                            InlineAnalysis &IA);
 
   bool Should_Externalize(CallGraphNode *node);
   bool Should_Externalize(const DeclaratorDecl *decl);
@@ -75,6 +79,7 @@ class FunctionExternalizeFinder
     return AnalyzedNodes.find(node) != AnalyzedNodes.end();
   }
 
+  bool KeepIncludes;
   ASTUnit *AST;
-  InlineAnalysis *ia;
+  InlineAnalysis &IA;
 };

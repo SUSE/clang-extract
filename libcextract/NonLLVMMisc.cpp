@@ -59,7 +59,7 @@ std::vector<std::string> Extract_Args(const char *str)
 
 std::string Extract_Single_Arg(const char *str)
 {
-  const char *params = strchr(str, '=') + 1;
+  const char *params = Extract_Single_Arg_C(str);
   char buf[strlen(params) + 1];
   const char *tok;
 
@@ -67,4 +67,10 @@ std::string Extract_Single_Arg(const char *str)
   tok = strtok(buf, ",");
 
   return std::string(tok);
+}
+
+const char *Extract_Single_Arg_C(const char *str)
+{
+  const char *params = strchr(str, '=') + 1;
+  return params;
 }

@@ -50,11 +50,6 @@ class ArgvParser
     return OutputFile;
   }
 
-  inline std::string &Get_Symvers_Path(void)
-  {
-    return SymversPath;
-  }
-
   inline bool Is_Externalization_Disabled(void)
   {
     return DisableExternalization;
@@ -70,6 +65,21 @@ class ArgvParser
     return DumpPasses;
   }
 
+  inline const char *Get_Debuginfo_Path(void)
+  {
+    return DebuginfoPath;
+  }
+
+  inline const char *Get_Ipaclones_Path(void)
+  {
+    return IpaclonesPath;
+  }
+
+  inline const char *Get_Symvers_Path(void)
+  {
+    return SymversPath;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -82,9 +92,12 @@ class ArgvParser
   std::vector<std::string> SymbolsToExternalize;
   std::vector<std::string> HeadersToExpand;
   std::string OutputFile;
-  std::string SymversPath;
 
   bool DisableExternalization;
   bool WithIncludes;
   bool DumpPasses;
+
+  const char *DebuginfoPath;
+  const char *IpaclonesPath;
+  const char *SymversPath;
 };

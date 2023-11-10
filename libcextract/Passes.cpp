@@ -302,7 +302,8 @@ class FunctionExternalizeFinderPass : public Pass
       FunctionExternalizeFinder fef(ctx->AST.get(),
           ctx->FuncExtractNames,
           ctx->Externalize,
-          &ctx->ia);
+          ctx->KeepIncludes,
+          ctx->IA);
       ctx->Externalize = fef.Get_To_Externalize();
 
       return true;
@@ -341,7 +342,7 @@ class FunctionExternalizerPass : public Pass
     virtual bool Run_Pass(PassManager::Context *ctx)
     {
       /* Issue externalization.  */
-      SymbolExternalizer externalizer(ctx->AST.get());
+      SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA);
       externalizer.Externalize_Symbols(ctx->Externalize);
       externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 

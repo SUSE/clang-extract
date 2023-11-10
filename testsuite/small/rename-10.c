@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=g" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=g -DCE_EXPORT_SYMBOLS=f" }*/
 #define MACRO int
 
 MACRO f();

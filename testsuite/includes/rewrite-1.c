@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=g -DCE_KEEP_INCLUDES" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=g -DCE_KEEP_INCLUDES -DCE_EXPORT_SYMBOLS=f" }*/
 
 #include "header-1.h"
 

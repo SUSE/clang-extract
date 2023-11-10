@@ -5,13 +5,13 @@
 #include <stdlib.h>
 #include <cxxabi.h>
 
-InlineAnalysis::InlineAnalysis(const std::string &elf_path, const std::string &ipaclones_path,
-                              const std::string &symvers_path)
+InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
+                              const char *symvers_path)
 {
   /* Debuginfo information is not needed for inline analysis.  But is desired
      for better precision.  That is why whe declare those objects dynamically.  */
 
-  if (!elf_path.empty()) {
+  if (elf_path) {
     ElfObj = new ElfObject(elf_path);
     ElfCache = new ElfSymbolCache(*ElfObj);
   } else {
@@ -19,11 +19,11 @@ InlineAnalysis::InlineAnalysis(const std::string &elf_path, const std::string &i
     ElfCache = nullptr;
   }
 
-  if (!ipaclones_path.empty()) {
+  if (ipaclones_path) {
     Ipa = new IpaClones(ipaclones_path);
   }
 
-  if (!symvers_path.empty()) {
+  if (symvers_path) {
     Symv = new Symvers(symvers_path);
   }
 }
@@ -235,6 +235,20 @@ unsigned char InlineAnalysis::Get_Symbol_Info(const std::string &sym)
 
   /* If symbol is not here there is nothing I can do.  */
   return ret;
+}
+
+bool InlineAnalysis::Is_Externally_Visible(const std::string &sym)
+{
+  unsigned char info = Get_Symbol_Info(sym);
+  if (info > 0) {
+    unsigned bind = ElfSymbol::Bind_Of(info);
+    if (bind == STB_GLOBAL || bind == STB_WEAK) {
+      /* Global or comes from a library.  */
+      return true;
+    }
+  }
+
+  return false;
 }
 
 static const char *Bind(unsigned link)
