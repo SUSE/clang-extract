@@ -5,9 +5,17 @@
 #include <string>
 #include <algorithm>
 
-static bool Is_In_Vector(std::vector<std::string> const &v, const std::string &str)
+static bool In_Set(std::unordered_set<std::string> &set, const std::string &str,
+                   bool remove_if_exists)
 {
-  return std::find(v.begin(), v.end(), str) != v.end();
+  if (set.find(str) != set.end()) {
+    if (remove_if_exists) {
+      set.erase(str);
+    }
+    return true;
+  }
+
+  return false;
 }
 
 /* ----- IncludeTree ------ */
@@ -38,7 +46,9 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
        because the includes are parsed in a DFS fashion, hence the stack.
     4. Add the found include as a child and update its parent.  */
 
-
+  std::unordered_set<std::string> must_expand_set(must_expand.begin(),
+                                                  must_expand.end());
+  MacroWalker mw(PP);
   bool already_seen_main = false;
   SourceManager *SM = PrettyPrint::Get_Source_Manager();
   OptionalFileEntryRef main = SM->getFileEntryRefForID(SM->getMainFileID());
@@ -88,8 +98,9 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
         current = stack.top();
       }
 
-      bool expand = Is_In_Vector(must_expand, id->getFileName().str()) ||
-                    Is_In_Vector(must_expand, id->getFile()->getName().str());
+      bool expand = In_Set(must_expand_set, id->getFileName().str(), /*remove=*/true) ||
+                    In_Set(must_expand_set, id->getFile()->getName().str(),
+                           /*remove=*/true);
       bool output = already_seen_main && current->Should_Be_Expanded()
                                       && !expand;
 
@@ -103,6 +114,20 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
         child->Mark_For_Expansion();
 
       stack.push(child);
+    } else if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
+      MacroInfo *info = mw.Get_Macro_Info(def);
+      if (info && info->isUsedForHeaderGuard()) {
+        const SourceRange &range = def->getSourceRange();
+        OptionalFileEntryRef this_file = PrettyPrint::Get_FileEntry(range.getBegin());
+
+        /* Pop the stack until we find which HeaderNode we currently are.  */
+        IncludeNode *current = stack.top();
+        while (!current->Is_Same_File(this_file)) {
+          stack.pop();
+          current = stack.top();
+        }
+        current->Set_HeaderGuard(def);
+      }
     }
   }
 
@@ -131,7 +156,13 @@ void IncludeTree::Build_Header_Map(void)
     /* For Files.  */
     OptionalFileEntryRef file = node->Get_FileEntry();
     const FileEntry *fentry = &file->getFileEntry();
-    Map[fentry] = node;
+    if (Map.find(fentry) != Map.end()) {
+      /* FIXME: Find a way to correcly map the FileEntry to the node instead of
+         discarding future appearances.  */
+      llvm::outs() << "WARNING: file " << fentry->getName() << " is included more than once.\n";
+    } else {
+      Map[fentry] = node;
+    }
 
     /* For InclusionDirectives.  */
     if (node->ID != nullptr) {
@@ -179,6 +210,7 @@ void IncludeTree::Dump(void)
 IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include, bool output, bool expand)
   : ID(include),
     File(ID->getFile()),
+    HeaderGuard(nullptr),
     ShouldBeOutput(output),
     ShouldBeExpanded(expand),
     Parent(nullptr)
@@ -187,6 +219,7 @@ IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include, bool output, 
 
 IncludeTree::IncludeNode::IncludeNode(void)
   : ID(nullptr),
+    HeaderGuard(nullptr),
     ShouldBeOutput(false),
     ShouldBeExpanded(true),
     Parent(nullptr)
@@ -392,6 +425,17 @@ void IncludeNode::Mark_For_Expansion(void)
   } while (node != nullptr);
 }
 
+void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
+{
+  if (HeaderGuard == nullptr) {
+    HeaderGuard = guard;
+  } else {
+    llvm::outs() << "WARNING: Attempt to redefine HeaderGuard of " <<
+                    Get_Filename() << " with ";
+    PrettyPrint::Debug_Macro_Def(guard);
+  }
+}
+
 void IncludeTree::IncludeNode::Dump_Single_Node(void)
 {
   llvm::outs() << File->getName() << " Expand: " << ShouldBeExpanded <<
@@ -400,7 +444,7 @@ void IncludeTree::IncludeNode::Dump_Single_Node(void)
 
 void IncludeTree::IncludeNode::Dump(unsigned ident)
 {
-  llvm::outs() << std::string(ident, ' ');
+  llvm::outs() << std::string(ident*2, ' ');
   Dump_Single_Node();
 
   for (IncludeNode *child : Childs) {

@@ -35,6 +35,7 @@ class PassManager {
             OutputFile(args.Get_Output_File()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
             KeepIncludes(args.Should_Keep_Includes()),
+            DumpPasses(args.Should_Dump_Passes()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             PassNum(0)
@@ -67,6 +68,9 @@ class PassManager {
 
         /** Should we keep the includes whenever is possible?  */
         bool KeepIncludes;
+
+        /** Should the passes dump something?  */
+        bool DumpPasses;
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;

@@ -12,7 +12,6 @@ int main(void)
 /* { dg-final { scan-tree-dump "typedef __SIZE_TYPE__ size_t;" } } */
 /* { dg-final { scan-tree-dump "#define __need___va_list" } } */
 /* { dg-final { scan-tree-dump "#include <stdarg.h>" } } */
-/* { dg-final { scan-tree-dump "#undef __need___va_list" } } */
 /* { dg-final { scan-tree-dump "#include <bits/types/__fpos_t.h>" } } */
 /* { dg-final { scan-tree-dump "#include <bits/types/__fpos64_t.h>" } } */
 /* { dg-final { scan-tree-dump "#include <bits/types/__FILE.h>" } } */

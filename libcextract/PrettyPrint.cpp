@@ -417,18 +417,28 @@ void RecursivePrint::Analyze_Includes(void)
     return;
   }
 
+  MacroWalker mw(AST->getPreprocessor());
+
   /* Remove any macros that are provided by an include that should be output.  */
   PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
       SourceLocation loc = def->getLocation();
-      IncludeNode *include = IT.Get(loc);
-
-      if (include != nullptr && include->Should_Be_Expanded() == false) {
-        MacroDirective *macrodir = MW.Get_Macro_Directive(def);
-        if (macrodir) {
-          MacroInfo *macro = macrodir->getMacroInfo();
-          macro->setIsUsed(false);
+      if (IncludeNode *include = IT.Get(loc)) {
+        if (include->Should_Be_Expanded() == false) {
+          MacroDirective *macrodir = MW.Get_Macro_Directive(def);
+          if (macrodir) {
+            MacroInfo *macro = macrodir->getMacroInfo();
+            macro->setIsUsed(false);
+          }
+        } else {
+          /* In the case the header should be expanded, insert the macro from HeaderGuard.  */
+          MacroDefinitionRecord *guard = include->Get_HeaderGuard();
+          if (guard) {
+            if (MacroInfo *guardinfo = mw.Get_Macro_Info(guard)) {
+              guardinfo->setIsUsed(true);
+            }
+          }
         }
       }
     }
@@ -516,7 +526,17 @@ void RecursivePrint::Populate_Need_Undef(void)
 
         /* In case the macro isn't undefined then its location is invalid.  */
         if (undef_loc.isValid()) {
-          NeedsUndef.push_back(directive);
+          /* Check if the undef location actually points to an expanded include
+             or the main file.  */
+          IncludeNode *node = IT.Get(undef_loc);
+          if (KeepIncludes && node) {
+            if (node->Should_Be_Expanded()) {
+              NeedsUndef.push_back(directive);
+            }
+          } else {
+            /* If we somehow lost the undef location, then mark it to output.  */
+            NeedsUndef.push_back(directive);
+          }
         }
       }
     }

@@ -15,7 +15,7 @@ class FunctionExternalizeFinder
                                           InlineAnalysis *ia);
 
   bool Should_Externalize(CallGraphNode *node);
-  bool Should_Externalize(FunctionDecl *decl);
+  bool Should_Externalize(const DeclaratorDecl *decl);
 
   void Run_Analysis(void);
 
@@ -31,6 +31,11 @@ class FunctionExternalizeFinder
   inline bool Must_Not_Externalize(const std::string &name)
   {
     return MustNotExternalize.find(name) != MustNotExternalize.end();
+  }
+
+  inline bool Must_Not_Externalize(const DeclaratorDecl *decl)
+  {
+    return Must_Not_Externalize(decl->getName().str());
   }
 
   inline bool Is_Marked_For_Externalization(const std::string &name)
@@ -52,6 +57,23 @@ class FunctionExternalizeFinder
 
   std::unordered_set<std::string> MustExternalize;
   std::unordered_set<std::string> MustNotExternalize;
+  std::unordered_set<std::string> ToExtract;
+
+  inline bool Should_Extract(const std::string &name)
+  {
+    return ToExtract.find(name) != ToExtract.end();
+  }
+
+  inline bool Should_Extract(const FunctionDecl *func)
+  {
+    return Should_Extract(func->getName().str());
+  }
+
+  std::unordered_set<const CallGraphNode *> AnalyzedNodes;
+  bool Is_Already_Analyzed(const CallGraphNode* node)
+  {
+    return AnalyzedNodes.find(node) != AnalyzedNodes.end();
+  }
 
   ASTUnit *AST;
   InlineAnalysis *ia;

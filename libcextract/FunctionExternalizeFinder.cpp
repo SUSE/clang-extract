@@ -1,6 +1,8 @@
 #include "FunctionExternalizeFinder.hh"
 #include "FunctionDepsFinder.hh"
 
+bool Is_Builtin_Decl(const Decl *decl);
+
 /** Build CallGraph from AST.
  *
  * The CallGraph is a datastructure in which nodes are functions and edges
@@ -42,14 +44,6 @@ FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast, std::vector<s
   : AST(ast),
     ia(ia)
 {
-  for (const std::string &name : to_extract) {
-    MustNotExternalize.insert(name);
-  }
-
-  for (const std::string &name : to_externalize) {
-    MustExternalize.insert(name);
-  }
-
   Run_Analysis();
 
   /* Compute intersection.  They must be empty.  */
@@ -68,29 +62,79 @@ bool FunctionExternalizeFinder::Should_Externalize(CallGraphNode *node)
   return Should_Externalize(dynamic_cast<FunctionDecl *>(node->getDecl()));
 }
 
-bool FunctionExternalizeFinder::Should_Externalize(FunctionDecl *decl)
+bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
 {
-  if (!decl)
+  if (!decl || Must_Not_Externalize(decl)) {
     return false;
+  }
 
-  return true;
+  /* Builtin stuff inserted by the compiled should never be externalized.  */
+  if (Is_Builtin_Decl(decl)) {
+    return false;
+  }
+
+  /* In case the declarator is a function.  */
+  if (const FunctionDecl *func = dyn_cast<const FunctionDecl>(decl)) {
+
+    /* If the function is marked for extraction then we don't externalize it.  */
+    if (Should_Extract(func)) {
+      return false;
+    }
+
+    /* There is no point in externalizing an inline function.  */
+    if (func->isInlined()) {
+      return false;
+    }
+
+    /* If the symbol needs to be externalized, then do it.  */
+    if (ia->Needs_Externalization(decl->getName().str())) {
+      return true;
+    }
+
+    return false;;
+  }
+
+  /* In case the declarator is a variable.  */
+  if (const VarDecl *var = dyn_cast<const VarDecl>(decl)) {
+
+    /* If the variable is not global there is no point in externalizing it.  */
+    if (!var->hasGlobalStorage()) {
+      return false;
+    }
+
+    /* If the symbol needs to be externalized, then do it.  */
+    if (ia->Needs_Externalization(decl->getName().str())) {
+      return true;
+    }
+
+    return false;
+  }
+
+  return false;
 }
 
 bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
 {
   bool externalized = false;
-  NamedDecl *decl = dynamic_cast<NamedDecl *>(node->getDecl());
+  FunctionDecl *decl = dynamic_cast<FunctionDecl *>(node->getDecl());
 
-  const std::string &name = decl->getName().str();
+  if (!decl)
+    return false;
 
-  // Don't even check for symbols that are marked to not be externalized, like
-  // functions to be extracted.
-  if (!Must_Not_Externalize(name) && ia->Needs_Externalization(name)) {
-    externalized = Mark_For_Externalization(name);
+  if (Is_Already_Analyzed(node)) {
+    return false;
   }
 
-  if (!externalized) {
-    Externalize_Variables(dynamic_cast<FunctionDecl *>(decl));
+  AnalyzedNodes.insert(node);
+
+  if (Should_Externalize(decl)) {
+    externalized = Mark_For_Externalization(decl->getName().str());
+    externalized = true;
+  } else {
+    /* Else check if we need to externalize any of its variables.  */
+    externalized = Externalize_Variables(decl);
+
+    /* Continue looking.  */
     CallGraphNode::const_iterator child_it;
     for (child_it = node->begin(); child_it != node->end(); ++child_it) {
       CallGraphNode *child = child_it->Callee;
@@ -130,7 +174,7 @@ bool FunctionExternalizeFinder::Externalize_Variables(Stmt *stmt)
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
     VarDecl *decl = dynamic_cast<VarDecl *>(expr->getDecl());
 
-    if (decl && decl->hasGlobalStorage()) {
+    if (Should_Externalize(decl)) {
       externalized = Mark_For_Externalization(decl->getName().str());
     }
   }
@@ -155,8 +199,12 @@ void FunctionExternalizeFinder::Run_Analysis(void)
 
   for (it = cg->begin(); it != cg->end(); ++it) {
     CallGraphNode *node = (*it).getSecond().get();
-    if (Should_Externalize(node)) {
-      Analyze_Node(node);
+    if (node->getDecl()) {
+      if (FunctionDecl *func = node->getDefinition()) {
+        if (Should_Extract(func)) {
+          Analyze_Node(node);
+        }
+      }
     }
   }
 

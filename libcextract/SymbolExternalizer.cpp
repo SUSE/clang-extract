@@ -324,8 +324,12 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
 
         SourceRange decl_range(decl_start, decl_end);
 
-        /* Replace text content of old declaration.  */
-        assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
+        /* Replace if the given source text is actually something.  */
+        if (PrettyPrint::Get_Source_Text(decl_range) != "") {
+          /* Replace text content of old declaration.  */
+          assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
+        }
+
 
         must_update = true;
         was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
@@ -341,6 +345,53 @@ void SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize)
       }
     }
   }
+}
+
+/** Given a MacroExpansion object, we try to get the location of where the token
+    appears on it.
+
+    TODO: clang may provide a way of doing this with a tokenizer, so maybe this
+    code can become cleaner with it.  */
+static std::vector<SourceRange>
+Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp, const char *id)
+{
+  std::vector<SourceRange> ret = {};
+  const SourceRange &range = exp->getSourceRange();
+
+  /* Get the Macro expansion as the user wrote.  */
+  StringRef string = PrettyPrint::Get_Source_Text(range);
+
+  /* Tokenize away the function-like macro stuff or expression, we only want
+     the identifier.  */
+  const char *token_vector = " (),;+-*/^|&{}";
+
+  /* Create temporary buff, strtok modifies it.  */
+  unsigned len = string.size();
+  char buf[len + 1];
+  memcpy(buf, string.data(), len);
+  buf[len] = '\0';
+
+  char *tok = strtok(buf, token_vector);
+  while (tok != nullptr) {
+    if (strcmp(tok, id) == 0) {
+      /* Found.  */
+      ptrdiff_t distance = (ptrdiff_t)(tok - buf);
+      assert(distance > 0);
+
+      /* Compute the distance from the original SourceRange of the
+         MacroExpansion.  */
+      int32_t offset = (int32_t) distance;
+      SourceLocation start = range.getBegin().getLocWithOffset(offset);
+      SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
+
+      /* Add to the list of output.  */
+      ret.push_back(SourceRange(start, end));
+    }
+
+    tok = strtok(nullptr, token_vector);
+  }
+
+  return ret;
 }
 
 void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with)
@@ -367,6 +418,14 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
             RW.ReplaceText(range, replace_with);
           }
         }
+      }
+    } else if (MacroExpansion *exp = dyn_cast<MacroExpansion>(entity)) {
+      /* We must look for references to externalized variables in funcion-like
+          macro expansions on the program's toplevel.  */
+      auto ranges = Get_Range_Of_Identifier_In_Macro_Expansion(exp, to_look_for.c_str());
+
+      for (SourceRange &tok_range : ranges) {
+        RW.ReplaceText(tok_range, replace_with);
       }
     }
   }

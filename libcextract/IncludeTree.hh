@@ -81,7 +81,6 @@ class IncludeTree
     /** Get Filename.  */
     StringRef Get_Filename(void);
 
-
     inline InclusionDirective *Get_InclusionDirective(void)
     {
       return ID;
@@ -95,6 +94,11 @@ class IncludeTree
     inline bool Should_Be_Expanded(void)
     {
       return ShouldBeExpanded;
+    }
+
+    inline MacroDefinitionRecord *Get_HeaderGuard(void)
+    {
+      return HeaderGuard;
     }
 
     void Mark_For_Expansion(void);
@@ -117,11 +121,17 @@ class IncludeTree
     /* Set the File referenced.  Used when building the tree.  */
     void Set_FileEntry(OptionalFileEntryRef file);
 
+    /* Set the macro defintion as the HeaderGuard.  */
+    void Set_HeaderGuard(MacroDefinitionRecord *guard);
+    
     /** Object from the PreprocessingRecord representing an #include.  */
     InclusionDirective *ID;
 
     /** Referece to the actual #include'd file.  */
     OptionalFileEntryRef File;
+
+    /** Macro definition which happens to be the headerguard for this header.  */
+    MacroDefinitionRecord *HeaderGuard;
 
     bool ShouldBeOutput : 1;
     bool ShouldBeExpanded : 1;

@@ -7,12 +7,16 @@
 
 #define PProcessor (AST->getPreprocessor())
 
-static bool Is_Builtin_Decl(Decl *decl)
+bool Is_Builtin_Decl(const Decl *decl)
 {
-  NamedDecl *ndecl = dyn_cast<NamedDecl>(decl);
+  const NamedDecl *ndecl = dyn_cast<const NamedDecl>(decl);
   if (ndecl) {
     StringRef name = ndecl->getName();
     if (name.starts_with("__builtin_")) {
+      return true;
+    }
+
+    if (name.starts_with("__compiletime_assert_")) {
       return true;
     }
   }

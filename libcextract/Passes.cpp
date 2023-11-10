@@ -242,8 +242,6 @@ class ClosurePass : public Pass
         return false;
       }
 
-      ctx->CodeOutput = std::string();
-
       /* Set output stream to a file if we set to print to a file.  */
       if (PrintToFile) {
         std::string output_path = ctx->OutputFile;
@@ -252,6 +250,7 @@ class ClosurePass : public Pass
         }
         PrettyPrint::Set_Output_To(output_path);
       } else {
+        ctx->CodeOutput = std::string();
         PrettyPrint::Set_Output_Ostream(&code_stream);
       }
 
@@ -294,7 +293,7 @@ class FunctionExternalizeFinderPass : public Pass
   private:
     virtual bool Gate(PassManager::Context *ctx)
     {
-      return !ctx->ExternalizationDisabled;
+      return !ctx->ExternalizationDisabled && ctx->Externalize.size() == 0;
     }
 
     virtual bool Run_Pass(PassManager::Context *ctx)
@@ -346,6 +345,11 @@ class FunctionExternalizerPass : public Pass
       externalizer.Externalize_Symbols(ctx->Externalize);
       externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 
+      if (ctx->DumpPasses) {
+        /* Something for the poor debugging user.  */
+        ctx->CodeOutput = externalizer.Get_Modifications_To_Main_File();
+      }
+
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
       ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), ClangCompat_None, ctx->OFS);
@@ -359,6 +363,19 @@ class FunctionExternalizerPass : public Pass
     {
       std::error_code ec;
       llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
+      /* Dump the filesystem first.  */
+      out << "/*  LLVM in-memory virtual filesystem.\n";
+      ctx->MFS->print(out);
+      out << "*/\n";
+
+      /* The list of headers that should be expanded.  */
+      out << "/*  Headers to expand:\n";
+      for (const std::string &h : ctx->HeadersToExpand) {
+        out << "  " << h << '\n';
+      }
+      out << "*/\n";
+
+      /* Then the code.  */
       out << ctx->CodeOutput;
     }
 };
@@ -385,8 +402,6 @@ PassManager::~PassManager()
 
 void PassManager::Run_Passes(ArgvParser &args)
 {
-  bool dump_passes = args.Should_Dump_Passes();
-
   /* Build context object to avoid using global variables.  */
   Context ctx(args);
 
@@ -396,7 +411,7 @@ void PassManager::Run_Passes(ArgvParser &args)
     if (pass->Gate(&ctx)) {
       bool pass_success = pass->Run_Pass(&ctx);
 
-      if (dump_passes) {
+      if (ctx.DumpPasses) {
         pass->Dump_Result(&ctx);
       }
 
