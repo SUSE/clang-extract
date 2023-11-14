@@ -119,14 +119,6 @@ class FunctionDependencyFinder
         definition of A and get the last one above the expansion of U.  */
     bool Backtrack_Macro_Expansion(MacroInfo *info, const SourceLocation &loc);
 
-    /** Print output expanding all #includes.  */
-    void Print_Without_Headers(void);
-    void Print_Without_Headers(ASTUnit::top_level_iterator &it, MacroIterator &macro_it, SourceLocation until, bool print = true);
-
-    /** Iterate on the PreprocessingRecord through `it` until the end of the
-        PreprocessingRecord is reached, printing all macros reached in this path.  */
-    void Print_Remaining_Macros(MacroIterator &it);
-
     /** Analyze macros in order to find references to constants declared in enums,
         like in enum { CONSTANT = 0 }; and then #define MACRO CONSTANT.  */
     void Include_Enum_Constants_Referenced_By_Macros(void);

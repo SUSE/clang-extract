@@ -6,6 +6,7 @@
 
 #include "IncludeTree.hh"
 #include "MacroWalker.hh"
+#include "TopLevelASTIterator.hh"
 
 using namespace clang;
 
@@ -157,12 +158,6 @@ static inline bool Is_Loc_Before(const SourceLocation &a, const SourceLocation &
   return PrettyPrint::Is_Before(a, b);
 }
 
-struct MacroIterator
-{
-  clang::PreprocessingRecord::iterator macro_it;
-  unsigned undef_it;
-};
-
 class RecursivePrint
 {
   public:
@@ -180,24 +175,12 @@ class RecursivePrint
   /** Print a Macro Defintion into ostream `Out`.  */
   void Print_Macro(MacroDefinitionRecord *rec);
 
+  void Print_Preprocessed(PreprocessedEntity *prep);
+
   /** Print a Macro Undef into ostream `Out`.  */
   void Print_Macro_Undef(MacroDirective *directive);
 
   protected:
-
-  /** Iterate on the PreprocessingRecord through `it` until `loc` is reached,
-      printing all macros reached in this path.  */
-  void Print_Preprocessor_Until(const SourceLocation &loc, bool print=true);
-
-  /* Populate the NeedsUndef vector whith macros that needs to be undefined
-     somewhere in the code.  */
-  void Populate_Need_Undef(void);
-
-  /** Iterate on the PreprocessingRecord through `it` until `loc` is reached.  */
-  inline void Skip_Preprocessor_Until(const SourceLocation &loc)
-  {
-    Print_Preprocessor_Until(loc, false);
-  }
 
   /** Remove decls and macros that are already covered by includes that are
       marked for output.  */
@@ -218,10 +201,10 @@ class RecursivePrint
   { x->setIsUsed(false); }
 
   ASTUnit *AST;
+  TopLevelASTIterator ASTIterator;
   MacroWalker MW;
   std::unordered_set<Decl *> &Decl_Deps;
   IncludeTree &IT;
-  MacroIterator MI;
   bool KeepIncludes;
 
   /* Vector of MacroDirective of macros that needs to be undefined somewhere in

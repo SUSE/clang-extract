@@ -6,6 +6,7 @@
 #include "FunctionExternalizeFinder.hh"
 #include "SymbolExternalizer.hh"
 #include "ClangCompat.hh"
+#include "TopLevelASTIterator.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
