@@ -146,6 +146,7 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
 
 void IncludeTree::Build_Header_Map(void)
 {
+  static bool warned = false;
   std::stack<IncludeNode *> stack;
 
   stack.push(Root);
@@ -159,7 +160,10 @@ void IncludeTree::Build_Header_Map(void)
     if (Map.find(fentry) != Map.end()) {
       /* FIXME: Find a way to correcly map the FileEntry to the node instead of
          discarding future appearances.  */
-      llvm::outs() << "WARNING: file " << fentry->getName() << " is included more than once.\n";
+      if (warned == false) {
+        llvm::outs() << "WARNING: project #include's the same file multiple times.  Only the first is registered.\n";
+        warned = true;
+      }
     } else {
       Map[fentry] = node;
     }
