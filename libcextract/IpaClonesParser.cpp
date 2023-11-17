@@ -206,9 +206,13 @@ void IpaClones::Parse(const char *path)
 #pragma GCC diagnostic pop
 
       const char *happened = lexer.Lex();
+
+      const char *cleaned_caller_name = nullptr;
+      const char *cleaned_callee_name = nullptr;
+
       if (!strcmp(happened, "inlining to")) {
-        const char *cleaned_caller_name = Handle_GCC_Symbol_Quirks((char*)clone_asm_name);
-        const char *cleaned_callee_name = Handle_GCC_Symbol_Quirks((char*)original_asm_name);
+        cleaned_caller_name = Handle_GCC_Symbol_Quirks((char*)clone_asm_name);
+        cleaned_callee_name = Handle_GCC_Symbol_Quirks((char*)original_asm_name);
 
         /* Inlining a symbol to itself makes no sense.  Yet this can happen if
            they were actually two symbols that we merged into one on
@@ -216,7 +220,12 @@ void IpaClones::Parse(const char *path)
         if (strcmp(cleaned_callee_name, cleaned_caller_name) == 0) {
           continue;
         }
+      } else if (!strcmp(happened, "isra")) {
+        cleaned_caller_name = clone_asm_name;
+        cleaned_callee_name = original_asm_name;
+      }
 
+      if (cleaned_caller_name && cleaned_callee_name) {
         /* This node has been inlined into.  */
         IpaCloneNode *callee = Get_Or_Create_Node(cleaned_callee_name);
         IpaCloneNode *caller = Get_Or_Create_Node(cleaned_caller_name);

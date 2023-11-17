@@ -371,13 +371,14 @@ void InlineAnalysis::Print_Symbol_Set(const std::set<std::string> &symbol_set,
 
   if (have_debuginfo) {
     if (csv) {
-      fprintf(out,"Type;Available?\n");
+      fprintf(out,"Type;Available?");
     } else {
-      fprintf(out,"Type\tAvailable?\n");
+      fprintf(out,"Type\tAvailable?");
     }
   } else if (Symv) {
-    fprintf(out, "Module\n");
+    fprintf(out, "Module");
   }
+  fprintf(out, "\n");
 
   i = 0;
   for (std::string s : symbol_set) {

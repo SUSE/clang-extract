@@ -36,10 +36,11 @@ static void Print_Usage(void)
 "     -ipa-files <PATH>        Path to the .ipa-clone file,\n"
 "     -debuginfo <PATH>        Path to the debuginfo file,\n"
 "     -symvers   <PATH>        Path to the Kernel Module.symvers file,\n"
-"     -graphviz  <PATH>        Output into <PATH> into a .dot graphviz format,\n"
-"     -csv       <PATH>        Output into <path> into a .csv table format,\n"
+"     -graphviz                Output as a .dot graphviz format,\n"
+"     -csv                     Output as a .csv table format,\n"
 "     -where-is-inlined        Find where <SYMBOLS> got inlined,\n"
-"     -compute-closure         Find symbols that got inlined into <SYMBOLS>\n"
+"     -compute-closure         Find symbols that got inlined into <SYMBOLS>,\n"
+"     -o         <PATH>        Output to file in <PATH>.\n"
   );
   exit(0);
 }
