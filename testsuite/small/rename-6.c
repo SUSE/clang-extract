@@ -1,4 +1,4 @@
-/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f,g" }*/
+/* { dg-options "-DCE_EXTRACT_FUNCTIONS=f,g, -DCE_EXPORT_SYMBOLS=a" }*/
 static int a;
 
 void f(int x)

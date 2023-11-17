@@ -354,7 +354,8 @@ class FunctionExternalizerPass : public Pass
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(), ClangCompat_None, ctx->OFS);
+      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(),
+                        ClangCompat_None, ctx->OFS);
       PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();

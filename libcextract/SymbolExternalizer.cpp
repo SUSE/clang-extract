@@ -205,6 +205,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
   SourceManager &sm = AST->getSourceManager();
   clang::SourceManager::fileinfo_iterator it;
   bool modified = false;
+  bool main_file_inserted = false;
 
   ofs = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(
                  new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
@@ -231,17 +232,31 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
       std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
       if (mfs->addFile(fentry->getName(),
                        0, MemoryBuffer::getMemBufferCopy(modified_str)) == false) {
-        llvm::outs() << "Unable to add " << fentry->getName() << "into InMemoryFS.\n";
+        llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
       }
 
       /* In case this is not the main file, we need to mark it for expansion.  */
       if (id != sm.getMainFileID()) {
         StringRef file_name = fentry->getName();
         includes_to_expand.push_back(file_name.str());
+      } else {
+        main_file_inserted = true;
       }
 
       modified = true;
     }
+  }
+
+  /* Make sure we inserted the main file.  */
+  if (main_file_inserted == false) {
+      FileID id = sm.getMainFileID();
+      const FileEntry *fentry = sm.getFileEntryForID(id);
+      const std::string &main_file_content = Get_Modifications_To_Main_File();
+      if (mfs->addFile(fentry->getName(),
+                       0,
+                       MemoryBuffer::getMemBufferCopy(main_file_content)) == false) {
+        llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
+      }
   }
 
   return modified;
@@ -259,7 +274,7 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
   return std::string(main_buf.begin(), main_buf.end());
 }
 
-void SymbolExternalizer::Externalize_Non_Extern_Symbol(const std::string &to_externalize)
+void SymbolExternalizer::Strongly_Externalize_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
   VarDecl *new_decl = nullptr;
@@ -349,7 +364,7 @@ void SymbolExternalizer::Externalize_Non_Extern_Symbol(const std::string &to_ext
   }
 }
 
-void SymbolExternalizer::Externalize_Extern_Symbol(const std::string &to_externalize)
+void SymbolExternalizer::Weakly_Externalize_Symbol(const std::string &to_externalize)
 {
   ASTUnit::top_level_iterator it;
   std::vector<Decl *> *topleveldecls = Get_Pointer_To_Toplev(AST);
@@ -481,9 +496,9 @@ void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
      do not need to rewrite it, but rather we need to erase any declaration
      with body of it.  */
   if (IA.Is_Externally_Visible(to_externalize)) {
-    Externalize_Extern_Symbol(to_externalize);
+    Weakly_Externalize_Symbol(to_externalize);
   } else {
-    Externalize_Non_Extern_Symbol(to_externalize);
+    Strongly_Externalize_Symbol(to_externalize);
   }
 }
 

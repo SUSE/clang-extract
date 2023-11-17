@@ -14,6 +14,10 @@ public:
     : parser_path(path)
   {}
 
+  Parser(const char *path)
+    : parser_path(std::string(path))
+  {}
+
   // Some parsers work on files
   void Parse();
   void Parse(const char *path);
@@ -22,5 +26,5 @@ public:
   bool Needs_Externalization(const std::string &symbol);
 
 protected:
-  const std::string &parser_path;
+  const std::string parser_path;
 };

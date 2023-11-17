@@ -237,20 +237,6 @@ unsigned char InlineAnalysis::Get_Symbol_Info(const std::string &sym)
   return ret;
 }
 
-bool InlineAnalysis::Is_Externally_Visible(const std::string &sym)
-{
-  unsigned char info = Get_Symbol_Info(sym);
-  if (info > 0) {
-    unsigned bind = ElfSymbol::Bind_Of(info);
-    if (bind == STB_GLOBAL || bind == STB_WEAK) {
-      /* Global or comes from a library.  */
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static const char *Bind(unsigned link)
 {
   switch (link) {
@@ -274,15 +260,42 @@ static const char *Bind(unsigned link)
   }
 }
 
-bool InlineAnalysis::Needs_Externalization(const std::string &sym)
+ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym)
 {
-  if (Symv)
-    return Symv->Needs_Externalization(sym);
+  if (Symv) {
+    bool symv_externalize = Symv->Needs_Externalization(sym);
+    if (symv_externalize) {
+      return ExternalizationType::STRONG;
+    }
+  }
 
-  // FIXME: Add support to Elf too, checking if the module itself contains
-  // symbols that should be externalized.
-  return true;
+  unsigned char info = Get_Symbol_Info(sym);
+  if (info > 0) {
+    unsigned bind = ElfSymbol::Bind_Of(info);
+    switch (bind) {
+      case STB_GLOBAL:
+        return ExternalizationType::WEAK;
+        break;
+      case STB_LOCAL:
+        return ExternalizationType::STRONG;
+        break;
+
+      case STB_WEAK:
+      default:
+        return ExternalizationType::NONE;
+        break;
+    }
+  }
+
+  /* No debuginfo provided, there is nothing we can do.  */
+  return ExternalizationType::NONE;
 }
+
+bool InlineAnalysis::Is_Externally_Visible(const std::string &sym)
+{
+  return Needs_Externalization(sym) != ExternalizationType::NONE;
+}
+
 
 std::set<std::string> InlineAnalysis::Get_All_Symbols(void)
 {

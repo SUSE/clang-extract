@@ -95,8 +95,8 @@ class SymbolExternalizer
 
   private:
 
-  void Externalize_Non_Extern_Symbol(const std::string &to_externalize);
-  void Externalize_Extern_Symbol(const std::string &to_externalize);
+  void Strongly_Externalize_Symbol(const std::string &to_externalize);
+  void Weakly_Externalize_Symbol(const std::string &to_externalize);
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 

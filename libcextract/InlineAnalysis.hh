@@ -18,6 +18,12 @@
 
 struct IpaCloneNode;
 
+enum ExternalizationType {
+  NONE = 0,
+  WEAK,
+  STRONG,
+};
+
 class InlineAnalysis
 {
   public:
@@ -53,8 +59,7 @@ class InlineAnalysis
   /** Get the ELF info of a symbol.  */
   unsigned char Get_Symbol_Info(const std::string &sym);
 
-
-  bool Needs_Externalization(const std::string &sym);
+  ExternalizationType Needs_Externalization(const std::string &sym);
 
   /** Check if symbol is externally visible.  */
   bool Is_Externally_Visible(const std::string &sym);
