@@ -293,7 +293,7 @@ ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym
 
 bool InlineAnalysis::Is_Externally_Visible(const std::string &sym)
 {
-  return Needs_Externalization(sym) != ExternalizationType::NONE;
+  return Needs_Externalization(sym) != ExternalizationType::STRONG;
 }
 
 

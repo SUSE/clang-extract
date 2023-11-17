@@ -7,6 +7,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 /** Stringfy constant integer token in `s`.  */
 #define STRINGFY_VALUE(s) STRINGFY(s)
@@ -30,6 +31,13 @@ inline bool prefix(const char *a, const char *b)
 inline bool is_null_or_empty(const char *str)
 {
   return str == nullptr || *str == '\0';
+}
+
+template <typename T>
+void Remove_Duplicates(std::vector<T>& vec)
+{
+  std::sort(vec.begin(), vec.end());
+  vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
 }
 
 /** Get a single line from a file, removing its newline.

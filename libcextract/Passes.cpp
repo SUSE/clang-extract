@@ -7,6 +7,7 @@
 #include "SymbolExternalizer.hh"
 #include "ClangCompat.hh"
 #include "TopLevelASTIterator.hh"
+#include "NonLLVMMisc.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -169,6 +170,65 @@ class BuildASTPass : public Pass
 
     return path;
   }
+};
+
+/** InlinedSymbolsFinder: Add inlined functions to symbol extraction.
+ *
+ * If the user prompted to extract, say function `f`, it may happen that
+ * `f` was inlined somewhere else, say `g`.  This pass also adds `g` into
+ * the extraction list.
+ */
+class InlinedSymbolsFinder : public Pass
+{
+  public:
+    InlinedSymbolsFinder(void)
+    {
+      PassName = "InlinedSymbolsExtraction";
+    }
+
+  private:
+    virtual bool Gate(PassManager::Context *ctx)
+    {
+      /* Only run this if we have IPA clones.  */
+      return ctx->IA.Has_IPA();
+    }
+
+    virtual bool Run_Pass(PassManager::Context *ctx)
+    {
+      InlineAnalysis &IA = ctx->IA;
+      std::set<std::string> set = IA.Get_Where_Symbols_Is_Inlined(ctx->FuncExtractNames);
+
+      /* Add something for the poor debugging user.  */
+      if (ctx->DumpPasses) {
+        for (const std::string &name : set) {
+          AddedStuff.push_back(name);
+        }
+      }
+
+      /* Add what we found to the extraction list.  */
+      for (const std::string &name : set) {
+        ctx->FuncExtractNames.push_back(name);
+      }
+
+      /* Remove any duplicate that may have entered into the vector.  */
+      Remove_Duplicates(ctx->FuncExtractNames);
+      return true;
+    }
+
+    virtual void Dump_Result(PassManager::Context *ctx)
+    {
+      std::error_code ec;
+      llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
+      out << "Added because inlined into extraction functions:\n";
+
+      for (const std::string &str : AddedStuff) {
+        out << "  " << str << '\n';
+      }
+
+      AddedStuff.clear();
+    }
+
+    std::vector<std::string> AddedStuff;
 };
 
 /** ClosurePass: Compute the closure of functions and output then.
@@ -388,6 +448,7 @@ PassManager::PassManager()
   /* Declare the pass list.  Passes will run in this order.  */
   Passes = {
     new BuildASTPass(),
+    new InlinedSymbolsFinder(),
     new ClosurePass(/*PrintToFile=*/false),
     new FunctionExternalizeFinderPass(),
     new FunctionExternalizerPass(),

@@ -80,6 +80,12 @@ class InlineAnalysis
   /** Dump for debugging concerns.  */
   void Dump(void);
 
+  /** Check if we have Ipa-clones information.  */
+  inline bool Has_IPA(void)
+  {
+    return Ipa;
+  }
+
   /** Demangle C++ symbol.
 
       C++ symbols are mangled in order to be unique for the linker. For example,
