@@ -495,9 +495,15 @@ void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
   /* If the symbol is available in the debuginfo and is an EXTERN symbol, we
      do not need to rewrite it, but rather we need to erase any declaration
      with body of it.  */
-  if (IA.Is_Externally_Visible(to_externalize)) {
-    Weakly_Externalize_Symbol(to_externalize);
+  if (IA.Can_Decide_Visibility()) {
+    if (IA.Is_Externally_Visible(to_externalize)) {
+      Weakly_Externalize_Symbol(to_externalize);
+    } else {
+      Strongly_Externalize_Symbol(to_externalize);
+    }
   } else {
+    /* Well, we don't have information so we simply strongly externalize
+       everything.  */
     Strongly_Externalize_Symbol(to_externalize);
   }
 }

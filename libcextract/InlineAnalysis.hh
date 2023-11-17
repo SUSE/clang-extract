@@ -77,14 +77,25 @@ class InlineAnalysis
     return ElfObj && ElfCache;
   }
 
-  /** Dump for debugging concerns.  */
-  void Dump(void);
-
   /** Check if we have Ipa-clones information.  */
-  inline bool Has_IPA(void)
+  inline bool Have_IPA(void)
   {
     return Ipa;
   }
+
+  inline bool Have_Symvers(void)
+  {
+    return Symv;
+  }
+
+  inline bool Can_Decide_Visibility(void)
+  {
+    return Have_Debuginfo() || Have_Symvers();
+  }
+
+  /** Dump for debugging concerns.  */
+  void Dump(void);
+
 
   /** Demangle C++ symbol.
 

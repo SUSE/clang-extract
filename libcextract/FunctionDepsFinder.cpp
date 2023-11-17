@@ -37,6 +37,11 @@ void FunctionDependencyFinder::Find_Functions_Required(
     if (!decl)
       continue;
 
+    decl = decl->getDefinition();
+
+    if (!decl)
+      continue;
+
     /* Find the function which name matches our funcname.  */
     for (const std::string &funcname : funcnames) {
       if (decl->getNameAsString() == funcname) {
@@ -83,7 +88,7 @@ bool FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
   bool ret;
 
   /* In case this function has a body, we mark its body as well.  */
-  ret = Add_Decl_And_Prevs(decl->hasBody() ? decl->getDefinition() : decl);
+  ret = Add_Decl_And_Prevs(decl->isStatic() ? decl->getDefinition() : decl);
 
   /* Analyze the return type.  */
   ret |= Add_Type_And_Depends(decl->getReturnType().getTypePtr());
@@ -94,7 +99,8 @@ bool FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
   }
 
   /* Analyze body, which will add functions in a DFS fashion.  */
-  ret |= Mark_Types_In_Function_Body(decl->getBody());
+  if (decl->hasBody() || decl->isStatic())
+    ret |= Mark_Types_In_Function_Body(decl->getBody());
 
   return ret;
 }
@@ -573,12 +579,19 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
       inserted = true;
     }
 
-    DeclContext *context = decl->getDeclContext();
-    if (context) {
-      Decl *d = cast<Decl>(context);
-      if (d && !Is_Decl_Marked(d)) {
-        Dependencies.insert(d);
-        inserted = true;
+
+    /* Get immediate parent from function.  Required if function is a
+       template.  */
+    ASTContext &ctx = AST->getASTContext();
+    DynTypedNodeList list = ctx.getParents(*decl);
+
+    /* Iterate on the list of parents to find the FunctionTemplateDecl and
+       mark for output.  */
+    for (unsigned i = 0; i < list.size(); i++) {
+      const DynTypedNode n = list[i];
+      Decl *d = (Decl *) n.get<const Decl>();
+      if (d != nullptr) {
+        inserted |= Add_Decl_And_Prevs(d);
       }
     }
 

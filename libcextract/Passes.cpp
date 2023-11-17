@@ -190,7 +190,7 @@ class InlinedSymbolsFinder : public Pass
     virtual bool Gate(PassManager::Context *ctx)
     {
       /* Only run this if we have IPA clones.  */
-      return ctx->IA.Has_IPA();
+      return ctx->IA.Have_IPA();
     }
 
     virtual bool Run_Pass(PassManager::Context *ctx)
