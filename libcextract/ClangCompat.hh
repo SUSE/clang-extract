@@ -14,7 +14,7 @@ namespace ClangCompat
 {
 #if __clang_major__ >= 16
 # define ClangCompat_None std::nullopt
-# define ClangCompat_GetTokenPtr(token) &(token).value()
+# define ClangCompat_GetTokenPtr(token) (token).has_value() ? &(token).value() : nullptr
 #else
 # define ClangCompat_None clang::None
 # define ClangCompat_GetTokenPtr(token) (token).getPointer()
