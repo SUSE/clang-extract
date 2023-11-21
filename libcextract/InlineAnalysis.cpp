@@ -156,8 +156,9 @@ void InlineAnalysis::Get_Graphviz_Of_Inlines(const std::vector<std::string> &sym
 {
   FILE *file = fopen(output_path, "w");
   if (file == nullptr) {
-    std::cout << "ERROR: Unable to open file " << output_path << " to write\n";
-    abort();
+    throw std::runtime_error("ERROR: Unable to open file " +
+                             std::string(output_path) +
+                             " to write");
   }
 
   fprintf(file, "strict digraph {");
@@ -189,8 +190,9 @@ void InlineAnalysis::Get_Graphviz_Of_Inline_Closure(const std::vector<std::strin
 {
   FILE *file = fopen(output_path, "w");
   if (file == nullptr) {
-    std::cout << "ERROR: Unable to open file " << output_path << " to write\n";
-    abort();
+    throw std::runtime_error("Unable to open file " +
+                             std::string(output_path) +
+                             " to write");
   }
 
   fprintf(file, "strict digraph {");

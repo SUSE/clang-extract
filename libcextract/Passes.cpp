@@ -8,6 +8,7 @@
 #include "ClangCompat.hh"
 #include "TopLevelASTIterator.hh"
 #include "NonLLVMMisc.hh"
+#include "Error.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -62,7 +63,7 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
       TU_Complete, false, false, false);
 
   if (AU == nullptr) {
-    std::cerr << "Could not create the AST";
+    DiagsClass::Emit_Error("Unable to create ASTUnit object.");
     return false;
   }
 
@@ -470,22 +471,27 @@ PassManager::~PassManager()
 void PassManager::Run_Passes(ArgvParser &args)
 {
   /* Build context object to avoid using global variables.  */
-  Context ctx(args);
+  try {
+    Context ctx(args);
 
-  /* Run the pass list.  */
-  for (Pass *pass : Passes) {
-    ctx.PassNum++;
-    if (pass->Gate(&ctx)) {
-      bool pass_success = pass->Run_Pass(&ctx);
+    /* Run the pass list.  */
+    for (Pass *pass : Passes) {
+      ctx.PassNum++;
+      if (pass->Gate(&ctx)) {
+        bool pass_success = pass->Run_Pass(&ctx);
 
-      if (ctx.DumpPasses) {
-        pass->Dump_Result(&ctx);
-      }
+        if (ctx.DumpPasses) {
+          pass->Dump_Result(&ctx);
+        }
 
-      if (pass_success == false) {
-        std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
-        return;
+        if (pass_success == false) {
+          std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
+          return;
+        }
       }
     }
+  } catch (std::runtime_error &err) {
+    DiagsClass::Emit_Error(err.what());
+    exit(1);
   }
 }

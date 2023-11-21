@@ -67,7 +67,7 @@ void IpaClones::Open_Recursive(const char *path)
 
   if (directory == nullptr) {
     /* Is a directory but isn't?  */
-    throw new std::runtime_error("Path is invalid!");
+    throw std::runtime_error("Path seems invalid: " + std::string(path));
   }
 
   /* Copy path to buffer.  */
@@ -153,7 +153,7 @@ void IpaClones::Parse(const char *path)
 {
   FILE *file = fopen(path, "r");
   if (file == nullptr) {
-    throw new std::runtime_error("File not found!");
+    throw std::runtime_error("Unable to open ipa-clones file: " + std::string(path));
   }
 
   char *line;

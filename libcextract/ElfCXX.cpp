@@ -71,14 +71,14 @@ ElfObject::ElfObject(const char *path)
   /* Open using Unix File Descriptor, as required by libelf.  */
   ElfFd = open(parser_path.c_str(), O_RDONLY);
   if (ElfFd == -1) {
-    throw std::runtime_error("File not found!");
+    throw std::runtime_error("ELF file not found: " + parser_path);
   }
 
   /* Create libelf object and store it in the class variable.  */
   ElfObj = elf_begin(ElfFd, ELF_C_READ, nullptr);
   if (ElfObj == nullptr) {
     close(ElfFd);
-    throw std::runtime_error("libelf error: "
+    throw std::runtime_error("libelf error on file " + parser_path + ": "
                                  + std::string(elf_errmsg(elf_errno())));
   }
 }

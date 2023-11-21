@@ -1,5 +1,6 @@
 #include "IncludeTree.hh"
 #include "PrettyPrint.hh"
+#include "Error.hh"
 
 #include <stack>
 #include <string>
@@ -161,7 +162,9 @@ void IncludeTree::Build_Header_Map(void)
       /* FIXME: Find a way to correcly map the FileEntry to the node instead of
          discarding future appearances.  */
       if (warned == false) {
-        llvm::outs() << "WARNING: project #include's the same file multiple times.  Only the first is registered.\n";
+        const SourceRange &range = node->Get_Include_Spelling_Range();
+        DiagsClass::Emit_Warn("project #include's the same file multiple times."
+                              " Only the first is registered.", range);
         warned = true;
       }
     } else {

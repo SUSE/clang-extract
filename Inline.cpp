@@ -186,34 +186,40 @@ int main(int argc, char *argv[])
     return ret;
   }
 
-  InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);
+  try {
 
-  if (Mode == LIST_ALL) {
-    std::set<std::string> set = ia.Get_All_Symbols();
-    Print_Symbol_Set(ia, set);
-    return 0;
-  }
+    InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);
 
-  if (Mode == WHERE_IS_INLINED) {
-    if (Output == DOT) {
-      ia.Get_Graphviz_Of_Inlines(Symbols_To_Analyze, Output_Path);
-      printf("Output written to %s\n", Output_Path);
-    } else {
-      auto inline_set = ia.Get_Where_Symbols_Is_Inlined(Symbols_To_Analyze);
-      Print_Symbol_Set(ia, inline_set);
+    if (Mode == LIST_ALL) {
+      std::set<std::string> set = ia.Get_All_Symbols();
+      Print_Symbol_Set(ia, set);
+      return 0;
     }
 
-    return 0;
-  }
-  if (Mode == INLINE_CLOSURE) {
-    if (Output == DOT) {
-      ia.Get_Graphviz_Of_Inline_Closure(Symbols_To_Analyze, Output_Path);
-      printf("Output written to %s\n", Output_Path);
-    } else {
-      auto inline_set = ia.Get_Inline_Closure_Of_Symbols(Symbols_To_Analyze);
-      Print_Symbol_Set(ia, inline_set);
+    if (Mode == WHERE_IS_INLINED) {
+      if (Output == DOT) {
+        ia.Get_Graphviz_Of_Inlines(Symbols_To_Analyze, Output_Path);
+        printf("Output written to %s\n", Output_Path);
+      } else {
+        auto inline_set = ia.Get_Where_Symbols_Is_Inlined(Symbols_To_Analyze);
+        Print_Symbol_Set(ia, inline_set);
+      }
+
+      return 0;
     }
-    return 0;
+    if (Mode == INLINE_CLOSURE) {
+      if (Output == DOT) {
+        ia.Get_Graphviz_Of_Inline_Closure(Symbols_To_Analyze, Output_Path);
+        printf("Output written to %s\n", Output_Path);
+      } else {
+        auto inline_set = ia.Get_Inline_Closure_Of_Symbols(Symbols_To_Analyze);
+        Print_Symbol_Set(ia, inline_set);
+      }
+      return 0;
+    }
+  } catch (std::runtime_error &err) {
+    printf("ERROR: %s\n", err.what());
+    abort();
   }
 
   __builtin_unreachable();
