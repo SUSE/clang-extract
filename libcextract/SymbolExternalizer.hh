@@ -8,6 +8,14 @@
 
 using namespace clang;
 
+struct ExternalizerLogEntry
+{
+  std::string OldName;
+  std::string NewName;
+  ExternalizationType Type;
+};
+
+
 /** Class encapsulating the Symbol externalizer mechanism.
  *
  * Livepatched functions very often references static functions or variables
@@ -93,6 +101,11 @@ class SymbolExternalizer
 
   std::string Get_Modifications_To_Main_File(void);
 
+  inline std::vector<ExternalizerLogEntry> &Get_Log_Of_Changed_Names(void)
+  {
+    return Log;
+  }
+
   private:
 
   void Strongly_Externalize_Symbol(const std::string &to_externalize);
@@ -111,4 +124,7 @@ class SymbolExternalizer
 
   /** Reference to the InlineAnalysis in the PassManager::Context instance.  */
   InlineAnalysis &IA;
+
+  /** Log of changed names.  */
+  std::vector<ExternalizerLogEntry> Log;
 };

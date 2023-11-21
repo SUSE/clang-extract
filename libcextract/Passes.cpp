@@ -7,6 +7,7 @@
 #include "SymbolExternalizer.hh"
 #include "ClangCompat.hh"
 #include "TopLevelASTIterator.hh"
+#include "DscFileGenerator.hh"
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
 
@@ -413,6 +414,9 @@ class FunctionExternalizerPass : public Pass
       externalizer.Externalize_Symbols(ctx->Externalize);
       externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 
+      /* Store the changed names.  */
+      ctx->NamesLog = externalizer.Get_Log_Of_Changed_Names();
+
       if (ctx->DumpPasses) {
         /* Something for the poor debugging user.  */
         ctx->CodeOutput = externalizer.Get_Modifications_To_Main_File();
@@ -449,6 +453,40 @@ class FunctionExternalizerPass : public Pass
     }
 };
 
+/** GenerateDscPass: Generate the libpulp .dsc file.
+ *
+ * Check DscFileGenerator class for more information.
+ */
+class GenerateDscPass : public Pass
+{
+  public:
+    GenerateDscPass()
+    {
+      PassName = "GenerateDscPass";
+    }
+
+    virtual bool Gate(PassManager::Context *ctx)
+    {
+      return !is_null_or_empty(ctx->DscOutputPath);
+    }
+
+    virtual bool Run_Pass(PassManager::Context *ctx)
+    {
+      DscFileGenerator DscGen(ctx->DscOutputPath,
+                              ctx->AST.get(),
+                              ctx->FuncExtractNames,
+                              ctx->NamesLog,
+                              ctx->IA);
+      return true;
+
+    }
+
+    virtual void Dump_Result(PassManager::Context *ctx)
+    {
+      /* The dump is the generated file itself.  */
+    }
+};
+
 PassManager::PassManager()
 {
   /* Declare the pass list.  Passes will run in this order.  */
@@ -458,6 +496,7 @@ PassManager::PassManager()
     new ClosurePass(/*PrintToFile=*/false),
     new FunctionExternalizeFinderPass(),
     new FunctionExternalizerPass(),
+    new GenerateDscPass(),
     new ClosurePass(/*PrintToFile=*/true),
   };
 }

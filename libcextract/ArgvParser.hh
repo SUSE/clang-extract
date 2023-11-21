@@ -80,6 +80,11 @@ class ArgvParser
     return SymversPath;
   }
 
+  inline const char *Get_Dsc_Output_Path(void)
+  {
+    return DescOutputPath;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -100,4 +105,6 @@ class ArgvParser
   const char *DebuginfoPath;
   const char *IpaclonesPath;
   const char *SymversPath;
+
+  const char *DescOutputPath;
 };

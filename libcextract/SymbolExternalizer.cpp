@@ -333,6 +333,9 @@ void SymbolExternalizer::Strongly_Externalize_Symbol(const std::string &to_exter
 
         std::string new_name = "klp_" + decl->getName().str();
         new_decl = Create_Externalized_Var(decl, new_name);
+        Log.push_back({.OldName = decl->getName().str(),
+                       .NewName = new_name,
+                       .Type = ExternalizationType::STRONG});
 
         /* Create a string with the new variable type and name.  */
         std::string o;

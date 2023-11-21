@@ -24,6 +24,11 @@ public:
 
   std::vector<std::string> Get_All_Symbols();
   bool Needs_Externalization(const std::string &symbol);
+  inline const std::string &Get_Path(void)
+  {
+    return parser_path;
+  }
+
 
 protected:
   const std::string parser_path;

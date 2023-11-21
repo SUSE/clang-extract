@@ -1,5 +1,6 @@
 #include "ArgvParser.hh"
 #include "NonLLVMMisc.hh"
+#include "Error.hh"
 
 ArgvParser::ArgvParser(int argc, char **argv)
   : ArgsToClang(),
@@ -12,7 +13,8 @@ ArgvParser::ArgvParser(int argc, char **argv)
     DumpPasses(false),
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
-    SymversPath(nullptr)
+    SymversPath(nullptr),
+    DescOutputPath(nullptr)
 {
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
@@ -127,5 +129,15 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
     return true;
   }
+  if (prefix("-DCE_DSC_OUTPUT=", str)) {
+    DescOutputPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (prefix("-DCE_", str)) {
+    DiagsClass::Emit_Error("Unrecognized command-line option: " + std::string(str));
+    exit(1);
+  }
+
   return false;
 }

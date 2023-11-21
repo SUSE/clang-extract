@@ -2,6 +2,7 @@
 
 #include "ArgvParser.hh"
 #include "InlineAnalysis.hh"
+#include "SymbolExternalizer.hh"
 #include "clang/Frontend/ASTUnit.h"
 
 using namespace clang;
@@ -39,6 +40,8 @@ class PassManager {
             DebuginfoPath(args.Get_Debuginfo_Path()),
             IpaclonesPath(args.Get_Ipaclones_Path()),
             SymversPath(args.Get_Symvers_Path()),
+            DscOutputPath(args.Get_Dsc_Output_Path()),
+            NamesLog(),
             PassNum(0),
             IA(DebuginfoPath, IpaclonesPath, SymversPath)
         {
@@ -86,6 +89,12 @@ class PassManager {
 
         /* Path to Symvers, if exists.  */
         const char *SymversPath;
+
+        /* Path to libpulp .dsc file for output.  */
+        const char *DscOutputPath;
+
+        /** Log of changed names.  */
+        std::vector<ExternalizerLogEntry> NamesLog;
 
         /** Current pass number in the passes list.  */
         int PassNum;

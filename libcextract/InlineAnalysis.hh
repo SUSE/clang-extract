@@ -77,6 +77,11 @@ class InlineAnalysis
     return ElfObj && ElfCache;
   }
 
+  inline const std::string &Get_Debuginfo_Path(void)
+  {
+    return ElfObj->Get_Path();
+  }
+
   /** Check if we have Ipa-clones information.  */
   inline bool Have_IPA(void)
   {
