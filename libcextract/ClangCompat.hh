@@ -41,4 +41,14 @@ static inline auto
     return clang::createInvocationFromCommandLine(Args, Diags);
 #endif
   }
+
+  static inline const Type *getTypePtr(const QualType &qtype)
+  {
+#if __clang_major__ >= 17
+    /* Starting from clang-17 it crashes if qtype isNull is true.  */
+    return qtype.isNull() ? nullptr : qtype.getTypePtr();
+#else
+    return qtype.getTypePtr();
+#endif
+  }
 }

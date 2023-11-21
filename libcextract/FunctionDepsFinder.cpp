@@ -91,11 +91,11 @@ bool FunctionDependencyFinder::Mark_Required_Functions(FunctionDecl *decl)
   ret = Add_Decl_And_Prevs(decl->isStatic() ? decl->getDefinition() : decl);
 
   /* Analyze the return type.  */
-  ret |= Add_Type_And_Depends(decl->getReturnType().getTypePtr());
+  ret |= Add_Type_And_Depends(ClangCompat::getTypePtr(decl->getReturnType()));
 
   /* Analyze the function parameters.  */
   for (ParmVarDecl *param : decl->parameters()) {
-    ret |= Add_Type_And_Depends(param->getOriginalType().getTypePtr());
+    ret |= Add_Type_And_Depends(ClangCompat::getTypePtr(param->getOriginalType()));
   }
 
   /* Analyze body, which will add functions in a DFS fashion.  */
@@ -144,7 +144,7 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
     */
 
     if (inserted) {
-      Add_Type_And_Depends(t->desugar().getTypePtr());
+      Add_Type_And_Depends(ClangCompat::getTypePtr(t->desugar()));
     }
 
     return inserted;
@@ -161,11 +161,11 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
     int n = prototype->getNumParams();
 
     /* Add function return type.  */
-    inserted |= Add_Type_And_Depends(prototype->getReturnType().getTypePtr());
+    inserted |= Add_Type_And_Depends(ClangCompat::getTypePtr(prototype->getReturnType()));
 
     /* Add function parameters.  */
     for (int i = 0; i < n; i++) {
-      inserted |= Add_Type_And_Depends(prototype->getParamType(i).getTypePtr());
+      inserted |= Add_Type_And_Depends(ClangCompat::getTypePtr(prototype->getParamType(i)));
     }
 
     return inserted;
@@ -184,7 +184,7 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
       }
     }
 
-    return Add_Type_And_Depends(t->desugar().getTypePtr());
+    return Add_Type_And_Depends(ClangCompat::getTypePtr(t->desugar()));
   }
 
   /* Parse the template arguments.  */
@@ -193,10 +193,10 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
       type->getAs<const TemplateSpecializationType>();
 
     for (TemplateArgument arg : t->template_arguments()) {
-      Add_Type_And_Depends(arg.getAsType().getTypePtr());
+      Add_Type_And_Depends(ClangCompat::getTypePtr(arg.getAsType()));
     }
 
-    return Add_Type_And_Depends(t->desugar().getTypePtr());
+    return Add_Type_And_Depends(ClangCompat::getTypePtr(t->desugar()));
   }
 
   /* Deduced template specialization.  */
@@ -204,18 +204,18 @@ bool FunctionDependencyFinder::Add_Type_And_Depends(const Type *type)
     const DeducedTemplateSpecializationType *t =
               type->getAs<const DeducedTemplateSpecializationType>();
 
-    return Add_Type_And_Depends(t->getDeducedType().getTypePtr());
+    return Add_Type_And_Depends(ClangCompat::getTypePtr(t->getDeducedType()));
   }
 
   if (isa<const ParenType>(type)) {
     const ParenType *t = type->getAs<const ParenType>();
-    return Add_Type_And_Depends(t->desugar().getTypePtr());
+    return Add_Type_And_Depends(ClangCompat::getTypePtr(t->desugar()));
   }
 
   /* Typeof(x).  */
   if (isa<const TypeOfType>(type)) {
     const TypeOfType *t = type->getAs<const TypeOfType>();
-    return Add_Type_And_Depends(t->desugar().getTypePtr());
+    return Add_Type_And_Depends(ClangCompat::getTypePtr(t->desugar()));
   }
 
   if (type->isPointerType() || type->isArrayType()) {
@@ -262,7 +262,7 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
          NULL, yet it specifies an type to a node which needs to be inserted,
          for instance on template specification.  In this case, this type is
          a ElaboratedType and we need to get it through its NestedNameSpecifier.  */
-      Add_Type_And_Depends(tdecl->getUnderlyingType().getTypePtr());
+      Add_Type_And_Depends(ClangCompat::getTypePtr(tdecl->getUnderlyingType()));
     }
   }
 
@@ -273,7 +273,7 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
     /* Handle the template arguments.  */
     const TemplateArgumentList &list = templtspecial->getTemplateArgs();
     for (unsigned i = 0; i < list.size(); i++) {
-       const Type *t = list[i].getAsType().getTypePtr();
+       const Type *t = ClangCompat::getTypePtr(list[i].getAsType());
        Add_Type_And_Depends(t);
     }
 
@@ -298,7 +298,7 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
          bodyless declaration results in a crash from clang's side.  */
       if (cxxrdecl->hasDefinition()) {
         for (CXXBaseSpecifier base : cxxrdecl->bases()) {
-          const Type *type = base.getType().getTypePtr();
+          const Type *type = ClangCompat::getTypePtr(base.getType());
           Add_Type_And_Depends(type);
         }
       }
@@ -330,7 +330,7 @@ bool FunctionDependencyFinder::Handle_DeclContext(DeclContext *decl)
     /* Handle fields in case of structs and classes.  */
     if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(d)) {
       Handle_Array_Size(valuedecl);
-      Add_Type_And_Depends(valuedecl->getType().getTypePtr());
+      Add_Type_And_Depends(ClangCompat::getTypePtr(valuedecl->getType()));
     } else if (CXXMethodDecl *method = dynamic_cast<CXXMethodDecl *>(d)) {
       /* Handle C++ declarations that can be done inside structs and classes.  */
       Mark_Required_Functions(method);
@@ -358,7 +358,7 @@ bool FunctionDependencyFinder::Handle_Decl(Decl *decl)
 
   if (VarDecl *d = dyn_cast<VarDecl>(decl)) {
     bool ret = Mark_Types_In_Function_Body(d->getInit());
-    ret |= Add_Type_And_Depends(d->getType().getTypePtr());
+    ret |= Add_Type_And_Depends(ClangCompat::getTypePtr(d->getType()));
     return ret;
   }
 
@@ -408,7 +408,7 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     for (Decl *decl : decl_group) {
       /* Look into the type for a RecordDecl.  */
       if (ValueDecl *valuedecl = dynamic_cast<ValueDecl *>(decl)) {
-        type = valuedecl->getType().getTypePtr();
+        type = ClangCompat::getTypePtr(valuedecl->getType());
         ret |= Add_Type_And_Depends(type);
       }
     }
@@ -421,7 +421,7 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     ValueDecl *decl = expr->getDecl();
 
     if (decl) {
-      type = decl->getType().getTypePtr();
+      type = ClangCompat::getTypePtr(decl->getType());
       Decl *to_mark = decl;
 
       /* If the decl is a reference to an enum field then we must add the
@@ -456,7 +456,7 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
 
       } else {
 
-        type = decl->getType().getTypePtr();
+        type = ClangCompat::getTypePtr(decl->getType());
         ret |= Add_Type_And_Depends(type);
 
         if (!Is_Decl_Marked(to_mark)) {
@@ -467,7 +467,7 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
               ret |= Mark_Types_In_Function_Body(vardecl->getInit());
             }
             /* Add its type.  */
-            ret |= Add_Type_And_Depends(vardecl->getType().getTypePtr());
+            ret |= Add_Type_And_Depends(ClangCompat::getTypePtr(vardecl->getType()));
           }
         }
       }
@@ -518,19 +518,19 @@ bool FunctionDependencyFinder::Mark_Types_In_Function_Body(Stmt *stmt)
     }
   } else if (UnaryExprOrTypeTraitExpr::classof(stmt)) {
     UnaryExprOrTypeTraitExpr *expr = (UnaryExprOrTypeTraitExpr *)stmt;
-    type = expr->getTypeOfArgument().getTypePtr();
+    type = ClangCompat::getTypePtr(expr->getTypeOfArgument());
 
   } else if (TypeTraitExpr::classof(stmt)) {
     const TypeTraitExpr *expr = (const TypeTraitExpr*)stmt;
 
     for (TypeSourceInfo *info : expr->getArgs()) {
-      const Type *t = info->getType().getTypePtr();
+      const Type *t = ClangCompat::getTypePtr(info->getType());
       ret |= Add_Type_And_Depends(t);
     }
   } else if (Expr::classof(stmt)) {
     Expr *expr = (Expr *)stmt;
 
-    type = expr->getType().getTypePtr();
+    type = ClangCompat::getTypePtr(expr->getType());
   }
 
   if (type) {
@@ -616,7 +616,7 @@ bool FunctionDependencyFinder::Handle_Array_Size(ValueDecl *decl) {
 
   /* If the type is not an Array Type then there is no point in doing this
      analysis.  */
-  const Type *type = decl->getType().getTypePtr();
+  const Type *type = ClangCompat::getTypePtr(decl->getType());
   if (!type->isConstantArrayType()) {
     return false;
   }
@@ -806,7 +806,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
     else if (DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it)) {
       SourceRange range = decl->getSourceRange();
 
-      const Type *type = decl->getType().getTypePtr();
+      const Type *type = ClangCompat::getTypePtr(decl->getType());
       TagDecl *typedecl = type->getAsTagDecl();
       if (typedecl && Is_Decl_Marked(typedecl)) {
         SourceRange type_range = typedecl->getSourceRange();

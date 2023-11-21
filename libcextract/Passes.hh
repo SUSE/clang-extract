@@ -4,7 +4,6 @@
 #include "InlineAnalysis.hh"
 #include "clang/Frontend/ASTUnit.h"
 
-using namespace llvm;
 using namespace clang;
 
 class Pass;
@@ -50,10 +49,10 @@ class PassManager {
 
         /** The Overlay File System between the real filesystem and the
             in-memory file system.  */
-        IntrusiveRefCntPtr<vfs::OverlayFileSystem> OFS;
+        IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OFS;
 
         /** The in-memory file system used to hold our temporary code.  */
-        IntrusiveRefCntPtr<vfs::InMemoryFileSystem> MFS;
+        IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MFS;
 
         /** List of functions to extract.  */
         std::vector<std::string> &FuncExtractNames;
