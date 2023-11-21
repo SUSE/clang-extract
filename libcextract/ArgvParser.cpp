@@ -24,6 +24,7 @@ void ArgvParser::Insert_Required_Parameters(void)
     // For some reason libtooling do not pass the clang include folder.  Pass this then.
     "-I/usr/lib64/clang/" STRINGFY_VALUE(__clang_major__) "/include",
     "-Wno-gnu-variable-sized-type-not-at-end",
+    "-Wno-unused-function" // May happen when trying to extract a static function.
   };
 
   for (const char *arg : priv_args) {

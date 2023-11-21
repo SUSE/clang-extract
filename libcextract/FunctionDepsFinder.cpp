@@ -580,8 +580,12 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
     }
 
 
-    /* Get immediate parent from function.  Required if function is a
-       template.  */
+    /* getPrevious seems broken.  When trying to add `struct key;` from kernel
+       6.6-rc7 defined in `include/linux/key.h:33`, getPrevious returns
+       `task_struct` which is nonsense: it is not by any means a child of
+       struct key.  Hence we need to open a bug in clang about it (but first
+       check if it was fixed in llvm-17 or llvm-18).  See issue #12.  */
+#if 0
     ASTContext &ctx = AST->getASTContext();
     DynTypedNodeList list = ctx.getParents(*decl);
 
@@ -594,6 +598,7 @@ bool FunctionDependencyFinder::Add_Decl_And_Prevs(Decl *decl)
         inserted |= Add_Decl_And_Prevs(d);
       }
     }
+#endif
 
     decl = decl->getPreviousDecl();
   }

@@ -1,4 +1,5 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
+/* { dg-xfail } */
 
 namespace __gnu_cxx __attribute__ ((__visibility__ ("default")))
 {
