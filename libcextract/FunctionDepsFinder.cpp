@@ -1,3 +1,5 @@
+#include <sstream>
+#include <vector>
 #include "FunctionDepsFinder.hh"
 #include "ClangCompat.hh"
 #include "PrettyPrint.hh"
@@ -28,6 +30,8 @@ void FunctionDependencyFinder::Find_Functions_Required(
     std::vector<std::string> const &funcnames)
 {
   assert(funcnames.size() > 0);
+  /* Vector to verify if all functions passed were found in the source code. */
+  std::vector<std::string> funcs = funcnames;
 
   ASTUnit::top_level_iterator it;
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
@@ -47,8 +51,20 @@ void FunctionDependencyFinder::Find_Functions_Required(
       if (decl->getNameAsString() == funcname) {
         /* Now analyze the function to compute its closure.  */
         Mark_Required_Functions(decl);
+        std::erase(funcs, funcname);
       }
     }
+  }
+
+  if (funcs.size() > 0) {
+    std::stringstream ss;
+    ss << "Some specified functions weren't found in the source code. Aborting." << std::endl;
+    ss << "Functions:";
+    for (const std::string &funcname : funcs) {
+      ss << std::endl << funcname;
+    }
+
+    throw std::runtime_error(ss.str());
   }
 
   /* Handle the corner case where an global array was declared as
