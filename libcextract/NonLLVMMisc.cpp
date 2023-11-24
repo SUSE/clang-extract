@@ -6,6 +6,8 @@
 #include "NonLLVMMisc.hh"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 /** @brief Handle some quirks of getline.  */
 char *getline_easy(FILE *file)
@@ -73,4 +75,14 @@ const char *Extract_Single_Arg_C(const char *str)
 {
   const char *params = strchr(str, '=') + 1;
   return params;
+}
+
+bool check_color_available(void)
+{
+  /* Check if NO_COLOR env variable is set.  */
+  if (getenv("NO_COLOR"))
+    return false;
+
+  const char *term = getenv("TERM");
+  return term && strcmp(term, "dumb") != 0 && isatty(STDOUT_FILENO);
 }

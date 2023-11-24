@@ -50,7 +50,9 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
   /* Built the ASTUnit from the passed command line and set its SourceManager
      to the PrettyPrint class.  */
   DiagnosticOptions *diagopts = new DiagnosticOptions();
-  diagopts->ShowColors = true;
+  if (check_color_available()) {
+    diagopts->ShowColors = true;
+  }
 
   Diags = CompilerInstance::createDiagnostics(diagopts);
   CInvok = ClangCompat::createInvocationFromCommandLine(ctx->ClangArgs, Diags);

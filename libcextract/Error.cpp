@@ -1,5 +1,12 @@
 #include "Error.hh"
 #include "PrettyPrint.hh"
+#include "NonLLVMMisc.hh"
+
+DiagnosticOptionsWithColor::DiagnosticOptionsWithColor(void)
+  : DOpts(new DiagnosticOptions())
+{
+  DOpts->ShowColors = check_color_available();
+}
 
 DiagsClass DiagsClass::sDiag;
 
@@ -25,7 +32,8 @@ void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level l
 
 void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level)
 {
+  bool colored = Is_Colored();
   const std::string ce_message = Append_CE(message);
-  TextDiagnostic::printDiagnosticLevel(llvm::outs(), level, true);
-  TextDiagnostic::printDiagnosticMessage(llvm::outs(), false, ce_message, 0, 0, true);
+  TextDiagnostic::printDiagnosticLevel(llvm::outs(), level, colored);
+  TextDiagnostic::printDiagnosticMessage(llvm::outs(), false, ce_message, 0, 0, colored);
 }

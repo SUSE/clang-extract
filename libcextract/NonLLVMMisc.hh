@@ -57,3 +57,6 @@ std::string Extract_Single_Arg(const char *str);
 
 /** Extract argument that are specified after the '=' sign.  */
 const char *Extract_Single_Arg_C(const char *str);
+
+/** Check if output supports colors.  */
+bool check_color_available(void);

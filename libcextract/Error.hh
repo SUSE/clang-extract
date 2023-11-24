@@ -8,16 +8,18 @@ using namespace clang;
 class DiagnosticOptionsWithColor
 {
   public:
-  DiagnosticOptionsWithColor(void)
-    : DOpts(new DiagnosticOptions())
-  {
-    DOpts->ShowColors = true;
-  }
+  DiagnosticOptionsWithColor(void);
 
   inline DiagnosticOptions *Get_DiagnosticOptions(void)
   {
     return DOpts;
   }
+
+  inline bool Is_Colored(void)
+  {
+    return DOpts->ShowColors;
+  }
+
   private:
   DiagnosticOptions *DOpts;
 };
@@ -52,6 +54,11 @@ class DiagsClass
   static inline DiagsClass &Get_Instance(void)
   {
     return sDiag;
+  }
+
+  static inline bool Is_Colored(void)
+  {
+    return Get_Instance().DOpts.Is_Colored();
   }
 
   static inline void Emit_Message(const StringRef message,
