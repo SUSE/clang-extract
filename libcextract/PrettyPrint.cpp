@@ -20,17 +20,18 @@ void PrettyPrint::Print_Decl(Decl *decl)
 
   if (f && f->hasBody() && f->isThisDeclarationADefinition()) {
     Print_Decl_Raw(f);
-    Out << "\n";
+    Out << "\n\n";
   } else if (e) {
       decl->print(Out, PPolicy);
-      Out << ";\n";
+      Out << ";\n\n";
   } else if (!e && t && t->getName() == "") {
     /* If the RecordType doesn't have a name, then don't print it.  Except when
        it is an empty named enum declaration, which in this case we must print
        because it contains declared constants.  */
   } else {
+    /* Structs and prototypes */
     Print_Decl_Raw(decl);
-    Out << ";\n";
+    Out << ";\n\n";
   }
 }
 
