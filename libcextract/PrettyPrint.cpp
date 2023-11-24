@@ -67,7 +67,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
     SourceLocation furthest = decl_range.getEnd();
     AttrVec &attrvec = decl->getAttrs();
-    bool has_attr;
+    bool has_attr = false;
 
     for (size_t i = 0; i < attrvec.size(); i++) {
       SourceLocation loc = attrvec[i]->getRange().getEnd();

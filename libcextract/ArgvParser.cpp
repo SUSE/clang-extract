@@ -2,9 +2,17 @@
 #include "NonLLVMMisc.hh"
 
 ArgvParser::ArgvParser(int argc, char **argv)
-  : DisableExternalization(false),
+  : ArgsToClang(),
+    FunctionsToExtract(),
+    SymbolsToExternalize(),
+    HeadersToExpand(),
+    OutputFile(),
+    DisableExternalization(false),
     WithIncludes(false),
-    DumpPasses(false)
+    DumpPasses(false),
+    DebuginfoPath(nullptr),
+    IpaclonesPath(nullptr),
+    SymversPath(nullptr)
 {
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {

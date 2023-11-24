@@ -20,7 +20,6 @@ static bool In_Set(std::unordered_set<std::string> &set, const std::string &str,
 }
 
 /* ----- IncludeTree ------ */
-
 IncludeTree::IncludeTree(Preprocessor &pp, std::vector<std::string> const &must_expand)
   : PP(pp)
 {
@@ -231,6 +230,7 @@ IncludeTree::IncludeNode::IncludeNode(void)
     ShouldBeExpanded(true),
     Parent(nullptr)
 {
+  memset(&File, 0, sizeof(File));
 }
 
 IncludeTree::IncludeNode::~IncludeNode(void)
@@ -413,21 +413,23 @@ bool IncludeNode::Has_Parent_Marked_For_Output(void)
 
 void IncludeNode::Mark_For_Expansion(void)
 {
-  /* Mark childs for output.  */
-  for (IncludeNode *child : Childs) {
-    if (child->Should_Be_Expanded() == false) {
-      child->ShouldBeExpanded = true;
-      child->ShouldBeOutput = false;
-    }
-  }
-
-  /* Mark parent nodes to be expanded.  */
   IncludeNode *node = this;
+
   do {
-    if (!node->ShouldBeExpanded) {
+    /* Mark childs for output.  */
+    for (IncludeNode *child : node->Childs) {
+      if (child->Should_Be_Expanded() == false) {
+        child->ShouldBeExpanded = false;
+        child->ShouldBeOutput = true;
+      }
+    }
+
+    /* Mark parent nodes to be expanded.  */
+    if (node->ShouldBeExpanded == false) {
       node->ShouldBeExpanded = true;
       node->ShouldBeOutput = false;
     }
+
     node = node->Get_Parent();
   } while (node != nullptr);
 }
@@ -437,9 +439,8 @@ void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
   if (HeaderGuard == nullptr) {
     HeaderGuard = guard;
   } else {
-    llvm::outs() << "WARNING: Attempt to redefine HeaderGuard of " <<
-                    Get_Filename() << " with ";
-    PrettyPrint::Debug_Macro_Def(guard);
+    std::string message = "Attempt to redefine headerguard of " + Get_Filename().str();
+    DiagsClass::Emit_Warn(message, guard->getSourceRange());
   }
 }
 

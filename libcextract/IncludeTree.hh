@@ -123,7 +123,7 @@ class IncludeTree
 
     /* Set the macro defintion as the HeaderGuard.  */
     void Set_HeaderGuard(MacroDefinitionRecord *guard);
-    
+
     /** Object from the PreprocessingRecord representing an #include.  */
     InclusionDirective *ID;
 

@@ -7,6 +7,10 @@
 
 InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
                               const char *symvers_path)
+  : ElfObj(nullptr),
+    ElfCache(nullptr),
+    Ipa(nullptr),
+    Symv(nullptr)
 {
   /* Debuginfo information is not needed for inline analysis.  But is desired
      for better precision.  That is why whe declare those objects dynamically.  */
@@ -14,9 +18,6 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
   if (elf_path) {
     ElfObj = new ElfObject(elf_path);
     ElfCache = new ElfSymbolCache(*ElfObj);
-  } else {
-    ElfObj = nullptr;
-    ElfCache = nullptr;
   }
 
   if (ipaclones_path) {

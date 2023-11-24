@@ -332,7 +332,10 @@ bool FunctionDependencyFinder::Handle_TypeDecl(TypeDecl *decl)
       };
 
       in this case we have to recursively analyze the nested types as well.  */
-    Handle_DeclContext(rdecl);
+    rdecl = rdecl->getDefinition();
+    if (rdecl != nullptr) {
+      Handle_DeclContext(rdecl);
+    }
   }
 
   return inserted;
