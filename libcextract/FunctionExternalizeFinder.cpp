@@ -25,15 +25,7 @@ bool Is_Builtin_Decl(const Decl *decl);
 static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
 {
   CallGraph *cg = new CallGraph();
-
-  /* Iterate trough all nodes in toplevel.  */
-  clang::ASTUnit::top_level_iterator it;
-  for (it = ast->top_level_begin(); it != ast->top_level_end(); ++it) {
-    Decl *decl = *it;
-
-    /* Add decl node to the callgraph.  */
-    cg->addToCallGraph(decl);
-  }
+  cg->TraverseAST(ast->getASTContext());
 
   return cg;
 }
@@ -70,7 +62,10 @@ bool FunctionExternalizeFinder::Should_Externalize(CallGraphNode *node)
 
 bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
 {
-  if (!decl || Must_Not_Externalize(decl)) {
+  if (!decl)
+    return false;
+
+  if (Must_Not_Externalize(decl)) {
     return false;
   }
 
@@ -126,13 +121,24 @@ bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
   return false;
 }
 
-bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
+bool FunctionExternalizeFinder::Analyze_Function(FunctionDecl *decl)
 {
-  bool externalized = false;
-  FunctionDecl *decl = dynamic_cast<FunctionDecl *>(node->getDecl());
-
   if (!decl)
     return false;
+
+  if (Should_Externalize(decl)) {
+    Mark_For_Externalization(decl->getName().str());
+    return true;
+  } else {
+    /* Else check if we need to externalize any of its variables.  */
+    Externalize_Variables(decl);
+    return false;
+  }
+}
+
+bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
+{
+  FunctionDecl *decl = dynamic_cast<FunctionDecl *>(node->getDecl());
 
   if (Is_Already_Analyzed(node)) {
     return false;
@@ -140,25 +146,17 @@ bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
 
   AnalyzedNodes.insert(node);
 
-  if (Should_Externalize(decl)) {
-    externalized = Mark_For_Externalization(decl->getName().str());
-    externalized = true;
+  if (Analyze_Function(decl)) {
+    return true;
   } else {
-    /* Else check if we need to externalize any of its variables.  */
-    externalized = Externalize_Variables(decl);
-
     /* Continue looking.  */
     CallGraphNode::const_iterator child_it;
     for (child_it = node->begin(); child_it != node->end(); ++child_it) {
       CallGraphNode *child = child_it->Callee;
-
-      if (Should_Externalize(child)) {
-        Analyze_Node(child);
-      }
+      Analyze_Node(child);
     }
+    return false;
   }
-
-  return externalized;
 }
 
 bool FunctionExternalizeFinder::Externalize_Variables(FunctionDecl *decl)
@@ -207,10 +205,10 @@ bool FunctionExternalizeFinder::Externalize_Variables(Stmt *stmt)
 
 void FunctionExternalizeFinder::Run_Analysis(void)
 {
+  //CallGraphWithBodylessFunctions *cg = Build_CallGraph_From_AST(AST);
   CallGraph *cg = Build_CallGraph_From_AST(AST);
-  CallGraph::const_iterator it;
 
-  for (it = cg->begin(); it != cg->end(); ++it) {
+  for (auto it = cg->begin(); it != cg->end(); ++it) {
     CallGraphNode *node = (*it).getSecond().get();
     if (node->getDecl()) {
       if (FunctionDecl *func = node->getDefinition()) {

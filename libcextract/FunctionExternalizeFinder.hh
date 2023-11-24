@@ -28,6 +28,7 @@ class FunctionExternalizeFinder
   private:
 
   bool Analyze_Node(CallGraphNode *);
+  bool Analyze_Function(FunctionDecl *);
 
   bool Externalize_Variables(FunctionDecl *decl);
   bool Externalize_Variables(Stmt *stmt);
