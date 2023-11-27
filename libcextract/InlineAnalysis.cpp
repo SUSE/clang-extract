@@ -441,3 +441,11 @@ const char *InlineAnalysis::Demangle_Symbol(const char *symbol)
     return demangled;
   }
 }
+
+std::string InlineAnalysis::Get_Symbol_Module(std::string sym)
+{
+  if (Symv)
+    return Symv->Get_Symbol_Module(sym);
+
+  return {};
+}

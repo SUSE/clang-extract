@@ -119,6 +119,8 @@ class InlineAnalysis
     return Demangle_Symbol(symbol.c_str());
   }
 
+  std::string Get_Symbol_Module(std::string sym);
+
   private:
   /** Put color information in the graphviz .DOT file.  */
   void Print_Node_Colors(const std::set<IpaCloneNode *> &set, FILE *fp);

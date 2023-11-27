@@ -105,6 +105,9 @@ void DscFileGenerator::Local_Symbols(void)
         throw std::runtime_error("Unable to find symbol " + entry.NewName + " in the AST");
       }
       Out << "\n#" << entry.OldName << ":" << entry.NewName;
+      std::string mod = IA.Get_Symbol_Module(entry.OldName);
+      if (!mod.empty())
+        Out << ":" << mod;
     }
   }
 }
