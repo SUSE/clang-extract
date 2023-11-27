@@ -35,6 +35,7 @@ class PassManager {
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
             KeepIncludes(args.Should_Keep_Includes()),
             DumpPasses(args.Should_Dump_Passes()),
+            RenameSymbols(args.Should_Rename_Symbols()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             DebuginfoPath(args.Get_Debuginfo_Path()),
@@ -74,6 +75,9 @@ class PassManager {
 
         /** Should the passes dump something?  */
         bool DumpPasses;
+
+        /** Should symbols marked for extraction be renamed?  */
+        bool RenameSymbols;
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;

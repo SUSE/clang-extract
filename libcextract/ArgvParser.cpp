@@ -11,6 +11,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     DisableExternalization(false),
     WithIncludes(false),
     DumpPasses(false),
+    RenameSymbols(false),
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
@@ -131,6 +132,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_DSC_OUTPUT=", str)) {
     DescOutputPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (!strcmp("-DCE_RENAME_SYMBOLS", str)) {
+    RenameSymbols = true;
 
     return true;
   }

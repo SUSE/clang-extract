@@ -35,7 +35,7 @@ DscFileGenerator::DscFileGenerator(
       ASTUnit *ast,
       const std::vector<std::string> &funcs_to_extract,
       const std::vector<ExternalizerLogEntry> &log,
-      InlineAnalysis &ia) 
+      InlineAnalysis &ia)
   : OutputPath(output),
     Out(OutputPath, EC),
     AST(ast),
@@ -66,12 +66,33 @@ void DscFileGenerator::Target_ELF(void)
 
 void DscFileGenerator::Global_Functions(void)
 {
-  for (const std::string &func_name : FuncsToExtract) {
-    NamedDecl *decl = Get_Decl_From_Identifier(AST, func_name);
-    if (decl == nullptr) {
-      throw std::runtime_error("Unable to find symbol " + func_name + " in the AST");
+  bool have_renamed_symbols = false;
+  for (const ExternalizerLogEntry &entry : ExternalizerLog) {
+    if (entry.Type == ExternalizationType::RENAME) {
+      have_renamed_symbols = true;
+      break;
     }
-    Out << '\n' << func_name << ":" << func_name;
+  }
+
+  if (have_renamed_symbols) {
+    for (const ExternalizerLogEntry &entry : ExternalizerLog) {
+      if (entry.Type == ExternalizationType::RENAME) {
+        NamedDecl *decl = Get_Decl_From_Identifier(AST, entry.NewName);
+        if (decl == nullptr) {
+          throw std::runtime_error("Unable to find symbol " + entry.NewName
+                                                            + " in the AST");
+        }
+        Out << '\n' << entry.OldName << ":" << entry.NewName;
+      }
+    }
+  } else {
+    for (const std::string &func_name : FuncsToExtract) {
+      NamedDecl *decl = Get_Decl_From_Identifier(AST, func_name);
+      if (decl == nullptr) {
+        throw std::runtime_error("Unable to find symbol " + func_name + " in the AST");
+      }
+      Out << '\n' << func_name << ":" << func_name;
+    }
   }
 }
 

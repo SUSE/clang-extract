@@ -85,6 +85,11 @@ class ArgvParser
     return DescOutputPath;
   }
 
+  inline bool Should_Rename_Symbols(void)
+  {
+    return RenameSymbols;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -101,6 +106,7 @@ class ArgvParser
   bool DisableExternalization;
   bool WithIncludes;
   bool DumpPasses;
+  bool RenameSymbols;
 
   const char *DebuginfoPath;
   const char *IpaclonesPath;

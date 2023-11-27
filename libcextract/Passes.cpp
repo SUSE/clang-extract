@@ -404,7 +404,7 @@ class FunctionExternalizerPass : public Pass
   private:
     virtual bool Gate(PassManager::Context *ctx)
     {
-      return ctx->Externalize.size() > 0;
+      return ctx->Externalize.size() > 0 || ctx->RenameSymbols;
     }
 
     virtual bool Run_Pass(PassManager::Context *ctx)
@@ -412,6 +412,11 @@ class FunctionExternalizerPass : public Pass
       /* Issue externalization.  */
       SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA);
       externalizer.Externalize_Symbols(ctx->Externalize);
+      if (ctx->RenameSymbols) {
+        /* The FuncExtractNames will be modified, as the function will be
+           renamed.  */
+        externalizer.Rename_Symbols(ctx->FuncExtractNames);
+      }
       externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 
       /* Store the changed names.  */

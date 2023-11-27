@@ -53,12 +53,12 @@ class SymbolExternalizer
     SymbolExternalizer &SE;
 
     /** The new variable declaration to replace the to be externalized function.  */
-    VarDecl *NewSymbolDecl;
+    ValueDecl *NewSymbolDecl;
 
     /** Name of the to be replaced function.  */
     const std::string &OldSymbolName;
 
-    FunctionUpdater(SymbolExternalizer &se, VarDecl *new_decl,
+    FunctionUpdater(SymbolExternalizer &se, ValueDecl *new_decl,
                     const std::string &old_decl_name, bool was_function)
     : SE(se),
       NewSymbolDecl(new_decl),
@@ -92,6 +92,10 @@ class SymbolExternalizer
   void Externalize_Symbol(const std::string &to_externalize);
   void Externalize_Symbols(std::vector<std::string> const &to_externalize_array);
 
+  void Rename_Symbols(std::vector<std::string> &to_rename_array);
+
+  bool _Externalize_Symbol(const std::string &to_externalize, ExternalizationType type);
+
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
       system.  */
@@ -110,6 +114,7 @@ class SymbolExternalizer
 
   void Strongly_Externalize_Symbol(const std::string &to_externalize);
   void Weakly_Externalize_Symbol(const std::string &to_externalize);
+  void _Externalize_Symbol(const std::string &to_externalize);
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 

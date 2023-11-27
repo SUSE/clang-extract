@@ -22,6 +22,7 @@ enum ExternalizationType {
   NONE = 0,
   WEAK,
   STRONG,
+  RENAME=100, /* Used to indicate that the function only requires a rename.  */
 };
 
 class InlineAnalysis

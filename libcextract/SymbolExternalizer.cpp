@@ -33,6 +33,9 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 }
 /****************************** End hack.  ***********************************/
 
+#define EXTERNALIZED_PREFIX "klp_"
+#define RENAME_PREFIX      "klpe_"
+
 using namespace clang;
 using namespace llvm;
 
@@ -276,151 +279,18 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 
 void SymbolExternalizer::Strongly_Externalize_Symbol(const std::string &to_externalize)
 {
-  ASTUnit::top_level_iterator it;
-  VarDecl *new_decl = nullptr;
-  bool must_update = false;
-  bool was_function = false;
-
-  std::vector<Decl *> *topleveldecls = nullptr;
-
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
-    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
-
-    /* If we externalized some function, then we must start analyzing for further
-       functions in order to find if there is a reference to the function we
-       externalized.  */
-    if (must_update) {
-      FunctionUpdater(*this, new_decl, to_externalize, was_function)
-        .Update_References_To_Symbol(decl);
-    }
-
-    if (decl && decl->getName() == to_externalize) {
-
-      /* If we externalized this function, then all further delcarations of
-         this function shall be discarded.  */
-      if (must_update) {
-
-        /* Get source location of old function declaration.  */
-        SourceLocation decl_start = decl->getSourceRange().getBegin();
-        SourceLocation decl_end = Lexer::getLocForEndOfToken(
-            decl->getSourceRange().getEnd(),
-            0,
-            AST->getSourceManager(),
-            AST->getLangOpts());
-
-        SourceRange decl_range(decl_start, decl_end);
-
-        /* Remove the text.  */
-        RW.RemoveText(decl_range);
-
-        /* Remove node from AST.  */
-        topleveldecls->erase(it);
-        /* We must decrease the iterator because we deleted an element from the
-           vector.  */
-        it--;
-      }
-
-      /* If we found the first instance of the function we want to externalize,
-         then proceed to create and replace the function declaration node with
-         a variable declaration node of proper type.  */
-      else if (!new_decl) {
-
-        /* The TopLevelDecls attribute from the AST is private, but we need to
-           access that in order to remove nodes from the AST toplevel vector,
-           else we can't remove further declarations of the function we need
-           to externalize.  */
-        topleveldecls = Get_Pointer_To_Toplev(AST);
-
-        std::string new_name = "klp_" + decl->getName().str();
-        new_decl = Create_Externalized_Var(decl, new_name);
-        Log.push_back({.OldName = decl->getName().str(),
-                       .NewName = new_name,
-                       .Type = ExternalizationType::STRONG});
-
-        /* Create a string with the new variable type and name.  */
-        std::string o;
-        llvm::raw_string_ostream outstr(o);
-        new_decl->print(outstr, AST->getLangOpts());
-        outstr << ";\n";
-
-        SourceRange decl_range = Get_Range_For_Rewriter(AST, decl);
-
-        /* Replace if the given source text is actually something.  */
-        if (PrettyPrint::Get_Source_Text(decl_range) != "") {
-          /* Replace text content of old declaration.  */
-          assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
-        }
-
-        must_update = true;
-        was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
-
-        /* Update any macros that may reference the symbol.  */
-        std::string replacement = was_function ? new_decl->getName().str() : "*(" + new_decl->getName().str() + ")";
-
-        Rewrite_Macros(to_externalize, replacement);
-
-        /* Slaps the new node into the position of where was the function
-           to be externalized.  */
-        *it = new_decl;
-      }
-    }
-  }
+  _Externalize_Symbol(to_externalize, ExternalizationType::STRONG);
 }
 
 void SymbolExternalizer::Weakly_Externalize_Symbol(const std::string &to_externalize)
 {
-  ASTUnit::top_level_iterator it;
-  std::vector<Decl *> *topleveldecls = Get_Pointer_To_Toplev(AST);
-
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
-    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
-    if (decl && decl->getName() == to_externalize) {
-      /* Now checks if this is a function or a variable delcaration.  */
-      if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
-        /* In the case it is a function we need to remove its declaration that
-           have a body.  */
-        if (func->hasBody()) {
-          FunctionDecl *with_body = func->getDefinition();
-          if (with_body == func) {
-            /* Damn. This function do not have a prototype, we will have to
-               craft it ourself.  */
-            Stmt *body = with_body->getBody();
-            SourceRange body_range = Get_Range_For_Rewriter(AST, body);
-            RW.ReplaceText(body_range, ";\n");
-
-            /* Remove the body from the AST.  */
-            with_body->setBody(nullptr);
-          } else {
-            SourceRange decl_range = Get_Range_For_Rewriter(AST, with_body);
-            RW.RemoveText(decl_range);
-            topleveldecls->erase(it);
-
-            /* We must decrease the iterator because we deleted an element from the
-               vector.  */
-            it--;
-          }
-          func = func->getDefinition();
-        }
-        return;
-      } else if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
-
-      }
-    }
-  }
+  _Externalize_Symbol(to_externalize, ExternalizationType::WEAK);
 }
 
-/** Given a MacroExpansion object, we try to get the location of where the token
-    appears on it.
-
-    TODO: clang may provide a way of doing this with a tokenizer, so maybe this
-    code can become cleaner with it.  */
 static std::vector<SourceRange>
-Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp, const char *id)
+Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
 {
   std::vector<SourceRange> ret = {};
-  const SourceRange &range = exp->getSourceRange();
-
-  /* Get the Macro expansion as the user wrote.  */
   StringRef string = PrettyPrint::Get_Source_Text(range);
 
   /* Tokenize away the function-like macro stuff or expression, we only want
@@ -454,6 +324,17 @@ Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp, const char
   }
 
   return ret;
+}
+
+/** Given a MacroExpansion object, we try to get the location of where the token
+    appears on it.
+
+    TODO: clang may provide a way of doing this with a tokenizer, so maybe this
+    code can become cleaner with it.  */
+static std::vector<SourceRange>
+Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp, const char *id)
+{
+  return Get_Range_Of_Identifier_In_SrcRange(exp->getSourceRange(), id);
 }
 
 void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with)
@@ -493,6 +374,156 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
   }
 }
 
+bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
+                                             ExternalizationType type)
+{
+  ASTUnit::top_level_iterator it;
+  bool first = true;
+  ValueDecl *new_decl = nullptr;
+  bool must_update = false;
+  bool was_function = false;
+  bool externalized = false;
+
+  /* The TopLevelDecls attribute from the AST is private, but we need to
+     access that in order to remove nodes from the AST toplevel vector,
+     else we can't remove further declarations of the function we need
+     to externalize.  */
+  std::vector<Decl *> *topleveldecls = Get_Pointer_To_Toplev(AST);
+
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
+
+    /* If we externalized some function, then we must start analyzing for further
+       functions in order to find if there is a reference to the function we
+       externalized.  */
+    if (must_update) {
+      FunctionUpdater(*this, new_decl, to_externalize, was_function)
+        .Update_References_To_Symbol(decl);
+    }
+
+    if (decl && decl->getName() == to_externalize) {
+      if (type == ExternalizationType::STRONG) {
+        if (first) {
+          /* If we found the first instance of the function we want to externalize,
+             then proceed to create and replace the function declaration node with
+             a variable declaration node of proper type.  */
+            std::string new_name = EXTERNALIZED_PREFIX + decl->getName().str();
+          new_decl = Create_Externalized_Var(decl, new_name);
+          Log.push_back({.OldName = decl->getName().str(),
+                         .NewName = new_name,
+                         .Type = ExternalizationType::STRONG});
+
+          /* Create a string with the new variable type and name.  */
+          std::string o;
+          llvm::raw_string_ostream outstr(o);
+          new_decl->print(outstr, AST->getLangOpts());
+          outstr << ";\n";
+
+          SourceRange decl_range = Get_Range_For_Rewriter(AST, decl);
+
+          /* Replace if the given source text is actually something.  */
+          if (PrettyPrint::Get_Source_Text(decl_range) != "") {
+            /* Replace text content of old declaration.  */
+            assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
+          }
+
+          must_update = true;
+          was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
+
+          /* Update any macros that may reference the symbol.  */
+          std::string replacement = was_function ? new_decl->getName().str() : "*(" + new_decl->getName().str() + ")";
+
+          Rewrite_Macros(to_externalize, replacement);
+
+          /* Slaps the new node into the position of where was the function
+             to be externalized.  */
+          *it = new_decl;
+          first = false;
+          externalized = true;
+
+        } else {
+          /* If we externalized this function, then all further delcarations of
+             this function shall be discarded.  */
+
+          /* Get source location of old function declaration.  */
+          SourceLocation decl_start = decl->getSourceRange().getBegin();
+          SourceLocation decl_end = Lexer::getLocForEndOfToken(
+              decl->getSourceRange().getEnd(),
+              0,
+              AST->getSourceManager(),
+              AST->getLangOpts());
+
+          SourceRange decl_range(decl_start, decl_end);
+
+          /* Remove the text.  */
+          RW.RemoveText(decl_range);
+
+          /* Remove node from AST.  */
+          topleveldecls->erase(it);
+          /* We must decrease the iterator because we deleted an element from the
+             vector.  */
+          it--;
+        }
+      } else if (type == ExternalizationType::WEAK) {
+        /* Now checks if this is a function or a variable delcaration.  */
+        if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
+          /* In the case it is a function we need to remove its declaration that
+             have a body.  */
+          if (func->hasBody()) {
+            FunctionDecl *with_body = func->getDefinition();
+            externalized = true;
+            if (with_body == func) {
+              /* Damn. This function do not have a prototype, we will have to
+                 craft it ourself.  */
+              Stmt *body = with_body->getBody();
+              SourceRange body_range = Get_Range_For_Rewriter(AST, body);
+              RW.ReplaceText(body_range, ";\n");
+
+              /* Remove the body from the AST.  */
+              with_body->setBody(nullptr);
+            } else {
+              SourceRange decl_range = Get_Range_For_Rewriter(AST, with_body);
+              RW.RemoveText(decl_range);
+              topleveldecls->erase(it);
+
+              /* We must decrease the iterator because we deleted an element from the
+                 vector.  */
+              it--;
+            }
+          }
+        }
+      } else if (type == ExternalizationType::RENAME) {
+        /* Get SourceRange where the function identifier is.  */
+        SourceRange id_range = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(), decl->getName().str().c_str())[0];
+
+
+        std::string new_name = RENAME_PREFIX + decl->getName().str();
+        Log.push_back({.OldName = decl->getName().str(),
+                       .NewName = new_name,
+                       .Type = ExternalizationType::RENAME});
+
+        /* Rename the declaration.  */
+        IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
+        DeclarationName new_decl_name(new_id);
+        decl->setDeclName(new_decl_name);
+        new_decl = decl;
+
+        /* Replace text content of old declaration.  */
+        assert(RW.ReplaceText(id_range, new_name) == false && "Location not RW.");
+
+        must_update = true;
+        was_function = true;
+
+        /* Update any macros that may reference the symbol.  */
+        Rewrite_Macros(to_externalize, new_name);
+        externalized = true;
+      }
+    }
+  }
+
+  return externalized;
+}
+
 void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 {
   /* If the symbol is available in the debuginfo and is an EXTERN symbol, we
@@ -513,8 +544,17 @@ void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
-
   for (const std::string &to_externalize : to_externalize_array) {
     Externalize_Symbol(to_externalize);
+  }
+}
+
+void SymbolExternalizer::Rename_Symbols(std::vector<std::string> &to_rename_array)
+{
+  for (std::string &to_externalize : to_rename_array) {
+    if (_Externalize_Symbol(to_externalize, ExternalizationType::RENAME)) {
+      /* Update the function names for the ClosurePass.  */
+      to_externalize = RENAME_PREFIX + to_externalize;
+    }
   }
 }
