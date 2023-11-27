@@ -65,6 +65,11 @@ class ArgvParser
     return DumpPasses;
   }
 
+  inline bool Is_Kernel(void)
+  {
+    return Kernel;
+  }
+
   inline const char *Get_Debuginfo_Path(void)
   {
     return DebuginfoPath;
@@ -107,6 +112,7 @@ class ArgvParser
   bool WithIncludes;
   bool DumpPasses;
   bool RenameSymbols;
+  bool Kernel;
 
   const char *DebuginfoPath;
   const char *IpaclonesPath;

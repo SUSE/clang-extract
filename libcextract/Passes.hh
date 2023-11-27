@@ -36,6 +36,7 @@ class PassManager {
             KeepIncludes(args.Should_Keep_Includes()),
             DumpPasses(args.Should_Dump_Passes()),
             RenameSymbols(args.Should_Rename_Symbols()),
+            Kernel(args.Is_Kernel()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             DebuginfoPath(args.Get_Debuginfo_Path()),
@@ -78,6 +79,9 @@ class PassManager {
 
         /** Should symbols marked for extraction be renamed?  */
         bool RenameSymbols;
+
+        /** If the source code comes from Linux Kernel */
+        bool Kernel;
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;

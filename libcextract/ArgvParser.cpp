@@ -12,6 +12,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     WithIncludes(false),
     DumpPasses(false),
     RenameSymbols(false),
+    Kernel(false),
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
@@ -78,6 +79,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     if (prefix(arg, str)) {
       return true;
     }
+  }
+
+  if (!strncmp("-D__KERNEL__", str, 12)) {
+    Kernel = true;
+    return false;
   }
 
   if (prefix("-DCE_EXTRACT_FUNCTIONS=", str)) {
