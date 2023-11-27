@@ -495,12 +495,14 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
       } else if (type == ExternalizationType::RENAME) {
         /* Get SourceRange where the function identifier is.  */
         SourceRange id_range = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(), decl->getName().str().c_str())[0];
-
-
         std::string new_name = RENAME_PREFIX + decl->getName().str();
-        Log.push_back({.OldName = decl->getName().str(),
-                       .NewName = new_name,
-                       .Type = ExternalizationType::RENAME});
+        if (first) {
+          /* Only register the first decl rename of the same variable.  */
+          Log.push_back({.OldName = decl->getName().str(),
+                         .NewName = new_name,
+                         .Type = ExternalizationType::RENAME});
+          first = false;
+        }
 
         /* Rename the declaration.  */
         IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
