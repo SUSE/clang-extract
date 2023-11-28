@@ -1,9 +1,11 @@
 #include "ElfCXX.hh"
+#include "NonLLVMMisc.hh"
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
 #include <stdexcept>
 #include <iostream>
+#include <string.h>
 
 const char *ElfSymbol::Get_Name(void)
 {
@@ -174,6 +176,24 @@ std::vector<std::string> ElfSymbolCache::Get_All_Symbols(void)
           const char *name = sym.Get_Name();
           vec.push_back(std::string(name));
         }
+      }
+    } else if (!strncmp(section.Get_Name(), ".modinfo", 8)) {
+      Elf_Data *data = section.Get_Data();
+
+      size_t size = data->d_size;
+      char *cdata = (char *)data->d_buf;
+
+      while (size) {
+        size_t len = strlen(cdata);
+
+        /* Module name found */
+        if (prefix("name=", cdata)) {
+            Mod = std::string(cdata).erase(0, 5);
+            break;
+        }
+
+        cdata += len + 1;
+        size -= len + 1;
       }
     }
   }

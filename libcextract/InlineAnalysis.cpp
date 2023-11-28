@@ -18,6 +18,7 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
   if (elf_path) {
     ElfObj = new ElfObject(elf_path);
     ElfCache = new ElfSymbolCache(*ElfObj);
+    ElfCache->Get_All_Symbols();
   }
 
   if (ipaclones_path) {
@@ -26,6 +27,7 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
 
   if (symvers_path) {
     Symv = new Symvers(symvers_path);
+    Symv->Get_All_Symbols();
   }
 }
 
@@ -442,10 +444,21 @@ const char *InlineAnalysis::Demangle_Symbol(const char *symbol)
   }
 }
 
+/*
+ * Check if Kernel module was found on Symvers or ELF object. Returns empty is
+ * the module was not found, or if the LP is not from a kernel source.
+ */
 std::string InlineAnalysis::Get_Symbol_Module(std::string sym)
 {
-  if (Symv)
-    return Symv->Get_Symbol_Module(sym);
+  std::string mod;
+  if (Symv) {
+    mod = Symv->Get_Symbol_Module(sym);
+    if (!mod.empty())
+      return mod;
+  }
+
+  if (Have_Debuginfo())
+    return ElfCache->Get_Symbol_Module(sym);
 
   return {};
 }

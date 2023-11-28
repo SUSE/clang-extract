@@ -336,6 +336,11 @@ class ElfSymbolCache
     return 0;
   }
 
+  std::string Get_Symbol_Module(const std::string &)
+  {
+    return Mod;
+  }
+
   std::vector<std::string> Get_All_Symbols(void);
 
   /** Dump for debugging reasons.  */
@@ -351,6 +356,9 @@ class ElfSymbolCache
 
   /** Hash symbols from symtab into their value.  */
   SymbolTableHash SymtabMap;
+
+  /** Kernel module name, if .modinfo section is present. */
+  std::string Mod;
 
   /** Reference to the ElfObject used to build this object.  */
   ElfObject &EO;
