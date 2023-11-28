@@ -526,18 +526,20 @@ void RecursivePrint::Print_Decl(Decl *decl)
     SourceManager &sm = AST->getSourceManager();
     ASTContext &ctx = AST->getASTContext();
     RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
-    if (decl->getBeginLoc().isValid() && !Have_Location_Comment(sm, comment)) {
-      PresumedLoc presumed = sm.getPresumedLoc(decl->getBeginLoc());
-      unsigned line = presumed.getLine();
-      unsigned col = presumed.getColumn();
-      const std::string &filename = sm.getFilename(decl->getBeginLoc()).str();
+    if (decl->getBeginLoc().isValid()) {
+      if (!Have_Location_Comment(sm, comment)) {
+        PresumedLoc presumed = sm.getPresumedLoc(decl->getBeginLoc());
+        unsigned line = presumed.getLine();
+        unsigned col = presumed.getColumn();
+        const std::string &filename = sm.getFilename(decl->getBeginLoc()).str();
 
-      std::string comment = "clang-extract: from " + filename + ":" +
-                            std::to_string(line) + ":" + std::to_string(col);
-      PrettyPrint::Print_Comment(comment);
-    } else {
-      /* Just output what it had.  */
-      PrettyPrint::Print_RawComment(sm, comment);
+        std::string comment = "clang-extract: from " + filename + ":" +
+                              std::to_string(line) + ":" + std::to_string(col);
+        PrettyPrint::Print_Comment(comment);
+      } else {
+        /* Just output what it had.  */
+        PrettyPrint::Print_RawComment(sm, comment);
+      }
     }
     PrettyPrint::Print_Decl(decl);
   }
