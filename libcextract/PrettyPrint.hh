@@ -55,6 +55,10 @@ class PrettyPrint
 
   static void Print_Attr(Attr *attr);
 
+  static void Print_Comment(const std::string &comment);
+
+  static void Print_RawComment(SourceManager &sm, RawComment *comment);
+
   static void Debug_SourceLoc(const SourceLocation &loc);
 
   static bool Contains_From_LineCol(const SourceRange &a, const SourceRange &b);
