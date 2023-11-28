@@ -18,7 +18,6 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
   if (elf_path) {
     ElfObj = new ElfObject(elf_path);
     ElfCache = new ElfSymbolCache(*ElfObj);
-    ElfCache->Get_All_Symbols();
   }
 
   if (ipaclones_path) {
@@ -27,7 +26,6 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
 
   if (symvers_path) {
     Symv = new Symvers(symvers_path);
-    Symv->Get_All_Symbols();
   }
 }
 

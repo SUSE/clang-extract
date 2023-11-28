@@ -155,6 +155,28 @@ ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
         Insert_Symbols_Into_Hash(SymtabMap, section);
         break;
 
+      case SHT_PROGBITS:
+        /* Search for the module name, if the ELF object is a kernel module. */
+        if (!strncmp(section.Get_Name(), ".modinfo", 8)) {
+          Elf_Data *data = section.Get_Data();
+
+          size_t size = data->d_size;
+          char *cdata = (char *)data->d_buf;
+
+          while (size) {
+            size_t len = strlen(cdata);
+
+            /* Module name found */
+            if (prefix("name=", cdata)) {
+                Mod = std::string(cdata).erase(0, 5);
+                break;
+            }
+
+            cdata += len + 1;
+            size -= len + 1;
+          }
+        }
+        break;
       default:
         break;
     }
@@ -165,37 +187,12 @@ std::vector<std::string> ElfSymbolCache::Get_All_Symbols(void)
 {
   std::vector<std::string> vec;
 
-  for (auto it = EO.section_begin(); it != EO.section_end(); ++it) {
-    ElfSection &section = *it;
-    if (section.Is_Symbol_Table()) {
-      unsigned n = section.Get_Num_Symbols();
-      for (unsigned i = 0; i < n; i++) {
-        ElfSymbol sym = section.Get_Symbol(i);
-        unsigned char type = sym.Get_Type();
-        if (type == STT_FUNC || type == STT_OBJECT) {
-          const char *name = sym.Get_Name();
-          vec.push_back(std::string(name));
-        }
-      }
-    } else if (!strncmp(section.Get_Name(), ".modinfo", 8)) {
-      Elf_Data *data = section.Get_Data();
+  for (auto const &i : DynsymMap) {
+    vec.push_back(i.first);
+  }
 
-      size_t size = data->d_size;
-      char *cdata = (char *)data->d_buf;
-
-      while (size) {
-        size_t len = strlen(cdata);
-
-        /* Module name found */
-        if (prefix("name=", cdata)) {
-            Mod = std::string(cdata).erase(0, 5);
-            break;
-        }
-
-        cdata += len + 1;
-        size -= len + 1;
-      }
-    }
+  for (auto const &i : SymtabMap) {
+    vec.push_back(i.first);
   }
 
   return vec;
