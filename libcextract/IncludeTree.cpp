@@ -103,9 +103,10 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
                            /*remove=*/true);
       bool output = already_seen_main && current->Should_Be_Expanded()
                                       && !expand;
+      bool is_from_minus_include = !already_seen_main;
 
       /* Add child to tree.  */
-      IncludeNode *child = new IncludeNode(id, output, expand);
+      IncludeNode *child = new IncludeNode(id, output, expand, is_from_minus_include);
       current->Add_Child(child);
       child->Set_Parent(current);
 
@@ -213,12 +214,15 @@ void IncludeTree::Dump(void)
 
 /* ----- IncludeNode ------ */
 
-IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include, bool output, bool expand)
+IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include,
+                                      bool output, bool expand,
+                                      bool is_from_minus_include)
   : ID(include),
     File(ID->getFile()),
     HeaderGuard(nullptr),
     ShouldBeOutput(output),
     ShouldBeExpanded(expand),
+    IsFromMinusInclude(is_from_minus_include),
     Parent(nullptr)
 {
 }
@@ -228,6 +232,7 @@ IncludeTree::IncludeNode::IncludeNode(void)
     HeaderGuard(nullptr),
     ShouldBeOutput(false),
     ShouldBeExpanded(true),
+    IsFromMinusInclude(false),
     Parent(nullptr)
 {
   memset(&File, 0, sizeof(File));
@@ -418,7 +423,7 @@ void IncludeNode::Mark_For_Expansion(void)
   do {
     /* Mark childs for output.  */
     for (IncludeNode *child : node->Childs) {
-      if (child->Should_Be_Expanded() == false) {
+      if (child->Should_Be_Expanded() == false && !child->Is_From_Minus_Include()) {
         child->ShouldBeExpanded = false;
         child->ShouldBeOutput = true;
       }

@@ -35,7 +35,8 @@ class IncludeTree
     /** Build the IncludeNode from a single InclusionDirective taken from the
         PreprocessingDirective history.  Set if header must be marked to `output`
         or `expanded` when printed.  */
-    IncludeNode(InclusionDirective *include, bool output = true, bool expand = false);
+    IncludeNode(InclusionDirective *include, bool output = true, bool expand = false,
+                bool is_from_minus_inclue = false);
 
     /** Build an IncludeNode to a null file, which is not #include'd
         anywhere but is the root of everything.  */
@@ -46,7 +47,10 @@ class IncludeTree
 
     /* Check if #include comes from -include, which is handled a little
        differently.  */
-    bool Is_From_Minus_Include(void);
+    inline bool Is_From_Minus_Include(void)
+    {
+      return IsFromMinusInclude;
+    }
 
     /** Get file which includes this file.  If this is included in multiple
         locations you will have to transverse the tree to find the other
@@ -135,6 +139,7 @@ class IncludeTree
 
     bool ShouldBeOutput : 1;
     bool ShouldBeExpanded : 1;
+    bool IsFromMinusInclude : 1;
 
     /** Who included me?  */
     IncludeNode *Parent;
