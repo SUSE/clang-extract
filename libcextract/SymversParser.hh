@@ -89,10 +89,18 @@ class Symvers : public Parser
     return container->second;
   }
 
-  // Externalize all symbos that are present on modules
+  // Externalize all sympos that are present on modules
   bool Needs_Externalization(const std::string &sym)
   {
-    return Get_Symbol_Module(sym) != "vmlinux";
+    /*
+     * If the symbol is not present in the Symvers, it means that the symbol is
+     * not exported, so return false to force InlineAnalysis to check in the
+     * other parsers.
+     */
+    std::string mod = Get_Symbol_Module(sym);
+    if (mod.empty())
+      return false;
+    return mod != "vmlinux";
   }
 
   /* Cache the symbols from a module.  */
