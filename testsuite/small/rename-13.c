@@ -17,5 +17,5 @@ struct AAA* g(int x)
   return &aa;
 }
 
-/* { dg-final { scan-tree-dump "struct AAA\* klpe_g\(int x\)" } } */
+/* { dg-final { scan-tree-dump "struct AAA\* klpp_g\(int x\)" } } */
 /* { dg-final { scan-tree-dump "f\(x\);" } } */

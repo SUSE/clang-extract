@@ -8,5 +8,5 @@ int g()
   return f();
 }
 
-/* { dg-final { scan-tree-dump "static int \(\*klp_f\)\(\);" } } */
-/* { dg-final { scan-tree-dump "return klp_f\(\);" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(\);" } } */
+/* { dg-final { scan-tree-dump "return klpe_f\(\);" } } */

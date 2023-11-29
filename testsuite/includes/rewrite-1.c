@@ -7,6 +7,6 @@ int g(void)
   return f();
 }
 
-/* { dg-final { scan-tree-dump "static int \(\*klp_f\)\(void\);" } } */
-/* { dg-final { scan-tree-dump "klp_f\(\)" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(void\);" } } */
+/* { dg-final { scan-tree-dump "klpe_f\(\)" } } */
 /* { dg-final { scan-tree-dump-not "#include \"header-1.h\"" } } */

@@ -8,5 +8,5 @@ int main(void)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump "klp_printf\(\"Hello, world!\\n\"\)" } } */
+/* { dg-final { scan-tree-dump "klpe_printf\(\"Hello, world!\\n\"\)" } } */
 /* { dg-final { scan-tree-dump-not "#include <stdio.h>" } } */

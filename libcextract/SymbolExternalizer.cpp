@@ -33,8 +33,8 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 }
 /****************************** End hack.  ***********************************/
 
-#define EXTERNALIZED_PREFIX "klp_"
-#define RENAME_PREFIX      "klpe_"
+#define EXTERNALIZED_PREFIX "klpe_"
+#define RENAME_PREFIX      "klpp_"
 
 using namespace clang;
 using namespace llvm;

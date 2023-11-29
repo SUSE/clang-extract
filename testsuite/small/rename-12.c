@@ -11,5 +11,5 @@ int f(void)
 }
 
 /* { dg-final { scan-tree-dump-not "static int g" } } */
-/* { dg-final { scan-tree-dump "static int \(\*klp_g\)\(\);" } } */
-/* { dg-final { scan-tree-dump "int klpe_f\(void\)\n{\n *return klp_g\(\)" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(\);" } } */
+/* { dg-final { scan-tree-dump "int klpp_f\(void\)\n{\n *return klpe_g\(\)" } } */
