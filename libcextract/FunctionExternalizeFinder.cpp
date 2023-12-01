@@ -1,34 +1,6 @@
 #include "FunctionExternalizeFinder.hh"
 #include "FunctionDepsFinder.hh"
-
-bool Is_Builtin_Decl(const Decl *decl);
-
-/** Build CallGraph from AST.
- *
- * The CallGraph is a datastructure in which nodes are functions and edges
- * represents function call points. For example:
- *
- * void f();
- * void g() { f(); f(); }
- *
- * Resuluts in the following CallGraph:
- *
- * (f) -> (g)
- *     -> (g)
- *
- * There are two edges to `g` because there are two callpoints to it.
- * Hence, the resulting graph is not `simple` in Graph Theory nomenclature. But
- * for the analysis we are doing it is suffice to be, so perhaps some extra
- * performance can be archived if we could remove duplicated edges.
- *
- */
-static CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
-{
-  CallGraph *cg = new CallGraph();
-  cg->TraverseAST(ast->getASTContext());
-
-  return cg;
-}
+#include "LLVMMisc.hh"
 
 FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast,
                                                 std::vector<std::string> &to_extract,

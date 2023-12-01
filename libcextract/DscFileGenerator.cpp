@@ -1,34 +1,9 @@
 #include "DscFileGenerator.hh"
 #include "PrettyPrint.hh"
-#include "clang/AST/DeclContextInternals.h"
 #include "Error.hh"
+#include "LLVMMisc.hh"
 
 #include <stdexcept>
-
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-static NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const IdentifierInfo &info)
-{
-  TranslationUnitDecl *tu = ast->getASTContext().getTranslationUnitDecl();
-  StoredDeclsMap *map = tu->getLookupPtr();
-  if (map == nullptr) {
-    /* We need to build it.  */
-    map = tu->buildLookup();
-  }
-  assert(map && "Lookup map is null.");
-
-  DeclarationName dn(&info);
-  auto found = map->find(dn);
-  const StoredDeclsList &x = found->second;
-
-  return x.getAsDecl();
-}
-
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-static NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const StringRef name)
-{
-  IdentifierTable &IdTbl = ast->getPreprocessor().getIdentifierTable();
-  return Get_Decl_From_Identifier(ast, IdTbl.get(name));
-}
 
 DscFileGenerator::DscFileGenerator(
       const char *output,

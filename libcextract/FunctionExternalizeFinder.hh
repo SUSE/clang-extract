@@ -25,7 +25,7 @@ class FunctionExternalizeFinder
 
   std::vector<std::string> Get_To_Externalize(void);
 
-  private:
+  protected:
 
   bool Analyze_Node(CallGraphNode *);
   bool Analyze_Function(FunctionDecl *);
