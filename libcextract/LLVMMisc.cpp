@@ -92,3 +92,59 @@ CallGraph *Build_CallGraph_From_AST(ASTUnit *ast)
   return cg;
 }
 
+
+FunctionDecl *Get_Bodyless_Decl(FunctionDecl *decl)
+{
+  while (decl) {
+    if (decl->hasBody()) {
+      decl = decl->getPreviousDecl();
+    } else {
+      return decl;
+    }
+  }
+
+  return nullptr;
+}
+
+FunctionDecl *Get_Bodyless_Or_Itself(FunctionDecl *decl)
+{
+  FunctionDecl *bodyless = Get_Bodyless_Decl(decl);
+  return bodyless ? bodyless : decl;
+}
+
+TagDecl *Get_Bodyless_Decl(TagDecl *decl)
+{
+  while (decl) {
+    if (decl->isCompleteDefinition()) {
+      decl = decl->getPreviousDecl();
+    } else {
+      return decl;
+    }
+  }
+
+  return nullptr;
+}
+
+TagDecl *Get_Bodyless_Or_Itself(TagDecl *decl)
+{
+  TagDecl *bodyless = Get_Bodyless_Decl(decl);
+  return bodyless ? bodyless : decl;
+}
+
+Decl *Get_Bodyless_Decl(Decl *decl)
+{
+  if (TagDecl *tag = dyn_cast<TagDecl>(decl)) {
+    return Get_Bodyless_Decl(tag);
+  } else if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
+    return Get_Bodyless_Decl(func);
+  }
+
+  return nullptr;
+}
+
+Decl *Get_Bodyless_Or_Itself(Decl *decl)
+{
+  Decl *bodyless = Get_Bodyless_Decl(decl);
+  return bodyless ? bodyless : decl;
+}
+

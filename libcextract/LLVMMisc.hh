@@ -50,3 +50,15 @@ const StoredDeclsList &Get_Stored_Decl_List_From_Identifier(ASTUnit *ast,
  *
  */
 CallGraph *Build_CallGraph_From_AST(ASTUnit *ast);
+
+/* Look into previous versions of `decl` for a declaration in the AST without
+   a body.  */
+FunctionDecl *Get_Bodyless_Decl(FunctionDecl *decl);
+TagDecl      *Get_Bodyless_Decl(TagDecl *decl);
+Decl         *Get_Bodyless_Decl(Decl *decl);
+
+/* Look into previous versions of `decl` for a declaration in the AST without
+   a body.  If not found, it returns itself (the version with body).  */
+FunctionDecl *Get_Bodyless_Or_Itself(FunctionDecl *decl);
+TagDecl      *Get_Bodyless_Or_Itself(TagDecl *decl);
+Decl         *Get_Bodyless_Or_Itself(Decl *decl);
