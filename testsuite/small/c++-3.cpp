@@ -1,5 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail }*/
 
 /* Unused function should be removed.  */
 

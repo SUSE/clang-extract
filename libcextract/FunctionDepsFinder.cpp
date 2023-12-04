@@ -174,6 +174,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     VISITOR_STOP     = false,  // Return this for the AST tranversal to stop completely;
   };
 
+#define TRY_TO(CALL_EXPR)                    \
+  if ((CALL_EXPR) == VISITOR_STOP)           \
+    return VISITOR_STOP
+
 #define DO_NOT_RUN_IF_ALREADY_ANALYZED(decl) \
   if (Already_Analyzed(decl) == true)        \
     return VISITOR_CONTINUE
@@ -211,7 +215,11 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     }
 
     /* Mark function for output.  */
-    Closure.Add_Decl_And_Prevs(decl->isStatic() ? decl->getDefinition() : decl);
+    FunctionDecl *to_mark = decl->isStatic() ? decl->getDefinition() : decl;
+    if (to_mark == nullptr) {
+      to_mark = decl; //FIXME: Declared static function in closure without a body?
+    }
+    Closure.Add_Decl_And_Prevs(to_mark);
 
     return VISITOR_CONTINUE;
   }
@@ -361,6 +369,12 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitDeclRefExpr(DeclRefExpr *expr)
   {
+    /* For C++ we also need to analyze the name specifier.  */
+    if (NestedNameSpecifier *nns = expr->getQualifier()) {
+      TRY_TO(TraverseNestedNameSpecifier(nns));
+    }
+
+    /* Analyze the decl it references to.  */
     return TraverseDecl(expr->getDecl());
   }
 
@@ -429,6 +443,29 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   bool VisitElaboratedType(const ElaboratedType *type)
   {
     return VISITOR_CONTINUE;
+  }
+
+  /* ----------- Other C++ stuff ----------- */
+  bool TraverseNestedNameSpecifier(NestedNameSpecifier *nns)
+  {
+    switch (nns->getKind()) {
+      case NestedNameSpecifier::Namespace:
+        /* Do not traverse to avoid adding unecessary childs.  */
+        TRY_TO(VisitNamespaceDecl(nns->getAsNamespace()));
+        break;
+      case NestedNameSpecifier::NamespaceAlias:
+        TRY_TO(TraverseDecl(nns->getAsNamespaceAlias()));
+        break;
+
+      case NestedNameSpecifier::Super:
+        /* Something regarding MSVC, but lets put this here.  */
+        TRY_TO(TraverseDecl(nns->getAsRecordDecl()));
+        break;
+
+      default:
+        break;
+    }
+    return RecursiveASTVisitor::TraverseNestedNameSpecifier(nns);
   }
 
   private:
