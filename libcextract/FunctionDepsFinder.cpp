@@ -468,6 +468,13 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return RecursiveASTVisitor::TraverseNestedNameSpecifier(nns);
   }
 
+  bool TraverseCXXBaseSpecifier(const CXXBaseSpecifier base)
+  {
+    TRY_TO(TraverseType(base.getType()));
+    return RecursiveASTVisitor::TraverseCXXBaseSpecifier(base);
+  }
+
+
   private:
   /** The resulting closure set.  */
   ClosureSet &Closure;
@@ -488,7 +495,6 @@ FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
       KeepIncludes(ctx->KeepIncludes),
       Visitor(new DeclClosureVisitor(Closure, EnumTable))
 {
-  Run_Analysis(ctx->FuncExtractNames);
 }
 
 FunctionDependencyFinder::~FunctionDependencyFinder(void)
@@ -496,39 +502,25 @@ FunctionDependencyFinder::~FunctionDependencyFinder(void)
   delete Visitor;
 }
 
-void FunctionDependencyFinder::Find_Functions_Required(
+bool FunctionDependencyFinder::Find_Functions_Required(
     std::vector<std::string> const &funcnames)
 {
-  /* Vector to verify if all functions passed were found in the source code. */
-  std::vector<std::string> funcs = funcnames;
+  try {
+    for (const std::string &funcname : funcnames) {
+      /* Get list of Decls matching the `funcname`.  */
+      const DeclContextLookupResult decls = Get_Decl_List_From_Identifier(AST, funcname);
 
-  for (const std::string &funcname : funcnames) {
-    /* Get list of Decls matching the `funcname`.  */
-    const DeclContextLookupResult decls = Get_Decl_List_From_Identifier(AST, funcname);
-
-    /* Iterate on them.  */
-    for (Decl *decl : decls) {
-      Visitor->TraverseDecl(decl);
-
-      /* Erase from the `funcs` vector to check later if it was found.  */
-      std::erase(funcs, funcname);
+      /* Iterate on them.  */
+      for (Decl *decl : decls) {
+        Visitor->TraverseDecl(decl);
+      }
     }
+  } catch (SymbolNotFoundException &e) {
+    DiagsClass::Emit_Error(std::string("Requested symbol not found: ") + e.what());
+    return false;
   }
 
-  if (funcs.size() > 0) {
-    std::string message;
-
-    message += "Some specified functions weren't found in the source code. Aborting.\n"
-               "Functions:";
-    for (const std::string &funcname : funcs) {
-      message += funcname + ", ";
-    }
-
-    message += '\n';
-
-    throw std::runtime_error(message);
-  }
-
+  return true;
 }
 
 void FunctionDependencyFinder::Print(void)
@@ -649,10 +641,11 @@ void FunctionDependencyFinder::Insert_Decls_From_Non_Expanded_Includes(void)
   }
 }
 
-void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions)
+bool FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &functions)
 {
+  bool ret = true;
   /* Step 1: Compute the closure.  */
-  Find_Functions_Required(functions);
+  ret &= Find_Functions_Required(functions);
 
   /* Step 2: Expand the closure to include Decls in non-expanded includes.  */
   if (KeepIncludes) {
@@ -669,4 +662,6 @@ void FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
      is required because of the `enum-5.c` testcase (struct declared inside
      a typedef).  */
   Remove_Redundant_Decls();
+
+  return ret;
 }

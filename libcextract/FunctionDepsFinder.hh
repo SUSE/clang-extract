@@ -77,14 +77,15 @@ class FunctionDependencyFinder
     /** Print the marked nodes as they appear in the AST.  */
     void Print(void);
 
-  protected:
     /** Run the analysis on function `function`*/
-    void Run_Analysis(std::vector<std::string> const &function);
+    bool Run_Analysis(std::vector<std::string> const &function);
+
+  protected:
 
     /** Given a list of functions in `funcnames`, compute the closure of those
         functions.  That means find all Types, functions, and global variables
         that are reachable from those functions.  */
-    void Find_Functions_Required(std::vector<std::string> const &funcnames);
+    bool Find_Functions_Required(std::vector<std::string> const &funcnames);
 
     /** Insert Decls that comes from #include's which are not expanded.  This
         is necessary to make sure we don't remove decls that are used in the

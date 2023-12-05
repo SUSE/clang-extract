@@ -3,10 +3,26 @@
 
 #pragma once
 
+#include <system_error>
 #include <clang/Tooling/Tooling.h>
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Sema/IdentifierResolver.h"
 #include "clang/AST/DeclContextInternals.h"
+
+class SymbolNotFoundException : public std::exception {
+  public:
+  SymbolNotFoundException(std::string name)
+    : Name(name)
+  {}
+
+  virtual const char *what() const noexcept
+  {
+    return Name.c_str();
+  }
+
+  private:
+  std::string Name;
+};
 
 using namespace clang;
 

@@ -281,6 +281,9 @@ class ClosurePass : public Pass
 
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf(ctx);
+      if (fdf.Run_Analysis(ctx->FuncExtractNames) == false) {
+        return false;
+      }
       fdf.Print();
 
       /* Add the temporary string with code to the filesystem.  */
@@ -324,6 +327,9 @@ class ClosurePass : public Pass
 
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf2(ctx);
+      if (fdf2.Run_Analysis(ctx->FuncExtractNames) == false) {
+        return false;
+      }
       fdf2.Print();
 
       /* Add the temporary string with code to the filesystem.  */

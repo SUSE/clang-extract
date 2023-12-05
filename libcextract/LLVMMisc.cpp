@@ -8,13 +8,16 @@ bool Is_Builtin_Decl(const Decl *decl)
 {
   const NamedDecl *ndecl = dyn_cast<const NamedDecl>(decl);
   if (ndecl) {
-    StringRef name = ndecl->getName();
-    if (name.starts_with("__builtin_")) {
-      return true;
-    }
+    /* Avoid triggering an assert in clang.  */
+    if (ndecl->getDeclName().isIdentifier()) {
+      StringRef name = ndecl->getName();
+      if (name.starts_with("__builtin_")) {
+        return true;
+      }
 
-    if (name.starts_with("__compiletime_assert_")) {
-      return true;
+      if (name.starts_with("__compiletime_assert_")) {
+        return true;
+      }
     }
   }
 
@@ -35,6 +38,11 @@ const StoredDeclsList &Get_Stored_Decl_List_From_Identifier(ASTUnit *ast,
 
   DeclarationName dn(&info);
   auto found = map->find(dn);
+  if (found == map->end()) {
+    /* Well, throw to whoever called me.  */
+    throw SymbolNotFoundException(info.getName().str());
+  }
+
   const StoredDeclsList &x = found->second;
   return x;
 }
