@@ -514,6 +514,10 @@ void RecursivePrint::Print_Decl(Decl *decl)
      that can be unused in the program.  Hence we need to handle it
      carefully to remove what we don't need.  */
   if (NamespaceDecl *namespacedecl = dynamic_cast<NamespaceDecl*>(decl)) {
+    if (namespacedecl->isInline()) {
+       (*PrettyPrint::Out)  << "inline ";
+    }
+
     (*PrettyPrint::Out) <<"namespace " << namespacedecl->getName() << " {\n  ";
 
     /* Iterate on each macro.  */

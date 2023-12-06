@@ -24,27 +24,6 @@ bool ClosureSet::Add_Decl_And_Prevs(Decl *decl)
       inserted = true;
     }
 
-
-    /* getPrevious seems broken.  When trying to add `struct key;` from kernel
-       6.6-rc7 defined in `include/linux/key.h:33`, getPrevious returns
-       `task_struct` which is nonsense: it is not by any means a child of
-       struct key.  Hence we need to open a bug in clang about it (but first
-       check if it was fixed in llvm-17 or llvm-18).  See issue #12.  */
-#if 0
-    ASTContext &ctx = AST->getASTContext();
-    DynTypedNodeList list = ctx.getParents(*decl);
-
-    /* Iterate on the list of parents to find the FunctionTemplateDecl and
-       mark for output.  */
-    for (unsigned i = 0; i < list.size(); i++) {
-      const DynTypedNode n = list[i];
-      Decl *d = (Decl *) n.get<const Decl>();
-      if (d != nullptr) {
-        inserted |= Add_Decl_And_Prevs(d);
-      }
-    }
-#endif
-
     decl = decl->getPreviousDecl();
   }
   return inserted;
@@ -224,6 +203,12 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  bool VisitValueDecl(ValueDecl *decl)
+  {
+    TRY_TO(TraverseType(decl->getType()));
+    return VISITOR_CONTINUE;
+  }
+
   bool VisitRecordDecl(RecordDecl *decl)
   {
     /* If this is a C++ record decl, then analyze it as such.  */
@@ -271,6 +256,21 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  bool VisitTagDecl(TagDecl *decl)
+  {
+    DeclContext *parent = decl->getParent();
+    if (parent && parent->hasValidDeclKind()) {
+      /* Check if parent declaration is a namespace.  If yes, then add it
+         as well BUT DO NOT add its children.  */
+      if (parent->isNamespace()) {
+        NamespaceDecl *nm = cast<NamespaceDecl>(parent);
+        TRY_TO(VisitNamespaceDecl(nm));
+      }
+    }
+
+    return VISITOR_CONTINUE;
+  }
+
   bool VisitEnumConstantDecl(EnumConstantDecl *decl)
   {
     /* Add original EnumDecl it originated.  */
@@ -285,8 +285,14 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   /* Not called automatically by Transverse.  */
   bool VisitTypedefNameDecl(TypedefNameDecl *decl)
   {
+    TRY_TO(TraverseType(decl->getUnderlyingType()));
     Closure.Add_Decl_And_Prevs(decl);
 
+    return VISITOR_CONTINUE;
+  }
+
+  bool VisitRecordType(const RecordType *type)
+  {
     return VISITOR_CONTINUE;
   }
 
@@ -369,6 +375,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitDeclRefExpr(DeclRefExpr *expr)
   {
+    TRY_TO(TraverseDecl(expr->getDecl()));
     /* For C++ we also need to analyze the name specifier.  */
     if (NestedNameSpecifier *nns = expr->getQualifier()) {
       TRY_TO(TraverseNestedNameSpecifier(nns));
