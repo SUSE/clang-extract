@@ -7,11 +7,12 @@
 #include <stdexcept>
 
 InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
-                              const char *symvers_path)
+                              const char *symvers_path, bool is_kernel)
   : ElfObj(nullptr),
     ElfCache(nullptr),
     Ipa(nullptr),
-    Symv(nullptr)
+    Symv(nullptr),
+    Kernel(is_kernel)
 {
   try {
     /* Debuginfo information is not needed for inline analysis.  But is desired
@@ -289,6 +290,15 @@ ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym
     unsigned bind = ElfSymbol::Bind_Of(info);
     switch (bind) {
       case STB_GLOBAL:
+        /*
+         * When creating a livepatch for Linux kernel, we need to externalize
+         * all existing symbols that don't reside on vmlinux. In this case, the
+         * specific symbol was found in the ELF object, so we can safely externalize
+         * it.
+         */
+        if (Kernel) {
+          return ExternalizationType::STRONG;
+        }
         return ExternalizationType::WEAK;
         break;
       case STB_LOCAL:

@@ -45,7 +45,7 @@ class PassManager {
             DscOutputPath(args.Get_Dsc_Output_Path()),
             NamesLog(),
             PassNum(0),
-            IA(DebuginfoPath, IpaclonesPath, SymversPath)
+            IA(DebuginfoPath, IpaclonesPath, SymversPath, args.Is_Kernel())
         {
         }
 

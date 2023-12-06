@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 
   try {
 
-    InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path);
+    InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path, false);
 
     if (Mode == LIST_ALL) {
       std::set<std::string> set = ia.Get_All_Symbols();
