@@ -39,6 +39,46 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 using namespace clang;
 using namespace llvm;
 
+static std::vector<SourceRange>
+Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
+{
+  std::vector<SourceRange> ret = {};
+  StringRef string = PrettyPrint::Get_Source_Text(range);
+
+  /* Tokenize away the function-like macro stuff or expression, we only want
+     the identifier.  */
+  const char *token_vector = " (),;+-*/^|&{}";
+
+  /* Create temporary buff, strtok modifies it.  */
+  unsigned len = string.size();
+  char buf[len + 1];
+  memcpy(buf, string.data(), len);
+  buf[len] = '\0';
+
+  char *tok = strtok(buf, token_vector);
+  while (tok != nullptr) {
+    if (strcmp(tok, id) == 0) {
+      /* Found.  */
+      ptrdiff_t distance = (ptrdiff_t)(tok - buf);
+      assert(distance > 0);
+
+      /* Compute the distance from the original SourceRange of the
+         MacroExpansion.  */
+      int32_t offset = (int32_t) distance;
+      SourceLocation start = range.getBegin().getLocWithOffset(offset);
+      SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
+
+      /* Add to the list of output.  */
+      ret.push_back(SourceRange(start, end));
+    }
+
+    tok = strtok(nullptr, token_vector);
+  }
+
+  return ret;
+}
+
+
 static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
 {
   const SourceManager &sm = ast->getSourceManager();
@@ -84,7 +124,17 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
     ValueDecl *decl = expr->getDecl();
 
-    if (decl->getName() == OldSymbolName) {
+    /* In case we modified the Identifier of the original function, getName()
+       will return the name of the new function but the SourceText will not
+       be updated.  Hence check if the SourceRange has it as well.  */
+    auto vec_of_ranges = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+                                                             OldSymbolName.c_str());
+    StringRef old_name_src_txt = "";
+    if (!vec_of_ranges.empty()) {
+      old_name_src_txt = PrettyPrint::Get_Source_Text(vec_of_ranges[0]);
+    }
+
+    if (decl->getName() == OldSymbolName || old_name_src_txt == OldSymbolName) {
       /* Rewrite the source code.  */
       SourceLocation begin = expr->getBeginLoc();
       SourceLocation end = expr->getEndLoc();
@@ -285,45 +335,6 @@ void SymbolExternalizer::Strongly_Externalize_Symbol(const std::string &to_exter
 void SymbolExternalizer::Weakly_Externalize_Symbol(const std::string &to_externalize)
 {
   _Externalize_Symbol(to_externalize, ExternalizationType::WEAK);
-}
-
-static std::vector<SourceRange>
-Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
-{
-  std::vector<SourceRange> ret = {};
-  StringRef string = PrettyPrint::Get_Source_Text(range);
-
-  /* Tokenize away the function-like macro stuff or expression, we only want
-     the identifier.  */
-  const char *token_vector = " (),;+-*/^|&{}";
-
-  /* Create temporary buff, strtok modifies it.  */
-  unsigned len = string.size();
-  char buf[len + 1];
-  memcpy(buf, string.data(), len);
-  buf[len] = '\0';
-
-  char *tok = strtok(buf, token_vector);
-  while (tok != nullptr) {
-    if (strcmp(tok, id) == 0) {
-      /* Found.  */
-      ptrdiff_t distance = (ptrdiff_t)(tok - buf);
-      assert(distance > 0);
-
-      /* Compute the distance from the original SourceRange of the
-         MacroExpansion.  */
-      int32_t offset = (int32_t) distance;
-      SourceLocation start = range.getBegin().getLocWithOffset(offset);
-      SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
-
-      /* Add to the list of output.  */
-      ret.push_back(SourceRange(start, end));
-    }
-
-    tok = strtok(nullptr, token_vector);
-  }
-
-  return ret;
 }
 
 /** Given a MacroExpansion object, we try to get the location of where the token
