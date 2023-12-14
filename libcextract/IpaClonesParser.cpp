@@ -49,13 +49,15 @@ static const char *Handle_GCC_Symbol_Quirks(char *symbol)
 IpaClones::IpaClones(const char *path)
     : Parser(path)
 {
-  if (Is_Directory(path) == false) {
+  const char *object_path = this->parser_path.c_str();
+
+  if (Is_Directory(object_path) == false) {
     /* Single file.  We can pass it directly to Parse.  */
     Parse(path);
     return;
   }
 
-  Open_Recursive(path);
+  Open_Recursive(object_path);
 }
 
 void IpaClones::Open_Recursive(const char *path)

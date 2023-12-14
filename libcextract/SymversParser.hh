@@ -28,7 +28,7 @@
 class Symbol
 {
   public:
-  Symbol(std::string name, std::string mod)
+  Symbol(const std::string &name, const std::string &mod)
     : name(name),
       mod(mod)
   {
@@ -41,7 +41,17 @@ class Symbol
     return name;
   }
 
+  const std::string &GetName() const
+  {
+    return name;
+  }
+
   std::string GetModule()
+  {
+    return mod;
+  }
+
+  const std::string &GetModule() const
   {
     return mod;
   }
@@ -104,7 +114,7 @@ class Symvers : public Parser
   }
 
   /* Cache the symbols from a module.  */
-  inline void Insert_Symbols_Into_Hash(Symbol &sym)
+  inline void Insert_Symbols_Into_Hash(const Symbol &sym)
   {
     map[sym.GetName()] = sym.GetModule();
   }

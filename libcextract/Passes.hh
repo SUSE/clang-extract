@@ -21,7 +21,7 @@ class PassManager {
     ~PassManager();
 
     /** Run all passes.  */
-    void Run_Passes(ArgvParser &args);
+    int Run_Passes(ArgvParser &args);
 
     /** Context object in which holds the global state of the pass manager.
         It is also used to communicate between the passes.  */

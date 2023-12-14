@@ -20,7 +20,5 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  PassManager().Run_Passes(args);
-
-  return 0;
+  return PassManager().Run_Passes(args);
 }

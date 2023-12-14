@@ -4,6 +4,7 @@
 #include <cxxabi.h>
 #include <stdlib.h>
 #include <cxxabi.h>
+#include <stdexcept>
 
 InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
                               const char *symvers_path)
@@ -12,20 +13,31 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
     Ipa(nullptr),
     Symv(nullptr)
 {
-  /* Debuginfo information is not needed for inline analysis.  But is desired
-     for better precision.  That is why whe declare those objects dynamically.  */
+  try {
+    /* Debuginfo information is not needed for inline analysis.  But is desired
+       for better precision.  That is why whe declare those objects dynamically.  */
+    if (elf_path) {
+      ElfObj = new ElfObject(elf_path);
+      ElfCache = new ElfSymbolCache(*ElfObj);
+    }
 
-  if (elf_path) {
-    ElfObj = new ElfObject(elf_path);
-    ElfCache = new ElfSymbolCache(*ElfObj);
-  }
+    if (ipaclones_path) {
+      Ipa = new IpaClones(ipaclones_path);
+    }
 
-  if (ipaclones_path) {
-    Ipa = new IpaClones(ipaclones_path);
-  }
+    if (symvers_path) {
+      Symv = new Symvers(symvers_path);
+    }
+  } catch (std::runtime_error &e) {
+    /* So what happens if this constructor throws an exception (like file not
+       found) is that the destructor is never called and therefore it generates
+       memory leaks.  But we *can* call the destructor here because it was
+       designed to be safely callable if the object was not properly constructed
+       and hence we call it here.  */
+    this->~InlineAnalysis();
 
-  if (symvers_path) {
-    Symv = new Symvers(symvers_path);
+    /* Throw the error up for someone else to catch.  */
+    throw e;
   }
 }
 

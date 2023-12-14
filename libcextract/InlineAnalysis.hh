@@ -32,7 +32,8 @@ class InlineAnalysis
       available, and ipaclone_path can be a directory full of many ipa-clones
       generated through LTO or not. Symvers can be NULL is we are creating a
       userspace livepatch   */
-  InlineAnalysis(const char *elf_path, const char *ipaclone_path, const char *symvers_path);
+  InlineAnalysis(const char *elf_path, const char *ipaclone_path,
+                 const char *symvers_path);
 
   ~InlineAnalysis(void);
 

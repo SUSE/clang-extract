@@ -21,7 +21,7 @@ using namespace clang;
 class DscFileGenerator
 {
   public:
-  DscFileGenerator(const char *output,
+  DscFileGenerator(const std::string &output,
                    ASTUnit *ast,
                    const std::vector<std::string> &funcs_to_extract,
                    const std::vector<ExternalizerLogEntry> &log,

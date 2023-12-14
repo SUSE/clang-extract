@@ -18,7 +18,7 @@ void Symvers::Parse()
   f.open(parser_path);
 
   if (!f.is_open())
-    throw new std::runtime_error("File not found!");
+    throw std::runtime_error("File not found: " + parser_path);
 
   /* The Module.symvers file contains five fields separated by tabs:
    * https://www.kernel.org/doc/html/latest/kbuild/modules.html#symbols-from-the-kernel-vmlinux-modules

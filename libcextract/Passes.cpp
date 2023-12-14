@@ -520,7 +520,7 @@ PassManager::~PassManager()
   }
 }
 
-void PassManager::Run_Passes(ArgvParser &args)
+int PassManager::Run_Passes(ArgvParser &args)
 {
   /* Build context object to avoid using global variables.  */
   try {
@@ -538,12 +538,14 @@ void PassManager::Run_Passes(ArgvParser &args)
 
         if (pass_success == false) {
           std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
-          return;
+          return -1;
         }
       }
     }
   } catch (std::runtime_error &err) {
     DiagsClass::Emit_Error(err.what());
-    exit(1);
+    return -1;
   }
+
+  return 0;
 }

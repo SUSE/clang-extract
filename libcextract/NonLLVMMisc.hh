@@ -3,6 +3,8 @@
    that do not use any LLVM datastructures, and because not including llvm
    headers compiles faster.  */
 
+#pragma once
+
 #include <stdbool.h>
 #include <string.h>
 #include <string>
