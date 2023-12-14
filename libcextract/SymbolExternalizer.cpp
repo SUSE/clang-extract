@@ -1,5 +1,6 @@
 #include "SymbolExternalizer.hh"
 #include "PrettyPrint.hh"
+#include "Error.hh"
 
 #include <unordered_set>
 #include <iostream>
@@ -38,6 +39,19 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 
 using namespace clang;
 using namespace llvm;
+
+// For debugging purposes.
+#if 0
+extern "C" void Debug_Range(const SourceRange &range)
+{
+  llvm::outs() << PrettyPrint::Get_Source_Text_Raw(range) << '\n';
+}
+
+#define DEBUG_RANGE(x) do { \
+  llvm::outs() << "line " << __LINE__ << "  "; \
+  Debug_Range(x); \
+  } while (0)
+#endif
 
 static std::vector<SourceRange>
 Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
@@ -283,6 +297,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
          interface, so we expand them into a temporary string and them pass
          it to the SourceManager.  */
       std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
+
       if (mfs->addFile(fentry->getName(),
                        0, MemoryBuffer::getMemBufferCopy(modified_str)) == false) {
         llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
@@ -486,12 +501,20 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
             if (with_body == func) {
               /* Damn. This function do not have a prototype, we will have to
                  craft it ourself.  */
+
+              /* FIXME: it seems that this hits some underlying bug in LLVM rewriter.
+                        hence we do nothing in this case for now.  */
+#if 0
               Stmt *body = with_body->getBody();
               SourceRange body_range = Get_Range_For_Rewriter(AST, body);
               RW.ReplaceText(body_range, ";\n");
 
               /* Remove the body from the AST.  */
               with_body->setBody(nullptr);
+#else
+              DiagsClass::Emit_Note("Weak externalization of functions without "
+                                    "a prototype is currently broken", func->getSourceRange());
+#endif
             } else {
               SourceRange decl_range = Get_Range_For_Rewriter(AST, with_body);
               RW.RemoveText(decl_range);
