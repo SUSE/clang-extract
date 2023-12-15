@@ -9,3 +9,6 @@ int f()
 {
   return A + B;
 }
+
+/* { dg-final { scan-tree-dump "#define A \(\*klp_bbb\)" } } */
+/* { dg-final { scan-tree-dump "#define B \(\*klp_bbb\)" } } */

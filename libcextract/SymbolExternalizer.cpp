@@ -5,6 +5,8 @@
 #include <unordered_set>
 #include <iostream>
 
+#include "clang/Rewrite/Core/Rewriter.h"
+
 /****** Begin hack: used to get a pointer to a private member of a class. *****/
 struct ASTUnit_TopLevelDecls
 {
@@ -61,7 +63,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
 
   /* Tokenize away the function-like macro stuff or expression, we only want
      the identifier.  */
-  const char *token_vector = " (),;+-*/^|&{}";
+  const char *token_vector = " (),;+-*/^|&{}[]<>^&|";
 
   /* Create temporary buff, strtok modifies it.  */
   unsigned len = string.size();
@@ -74,7 +76,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
     if (strcmp(tok, id) == 0) {
       /* Found.  */
       ptrdiff_t distance = (ptrdiff_t)(tok - buf);
-      assert(distance > 0);
+      assert(distance >= 0);
 
       /* Compute the distance from the original SourceRange of the
          MacroExpansion.  */
@@ -116,15 +118,171 @@ static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange 
   return new_range;
 }
 
-static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const Decl *decl)
+/* ---- Delta and TextModifications class ------ */
+
+void TextModifications::Sort(void)
 {
-  return Get_Range_For_Rewriter(ast, decl->getSourceRange());
+  auto comparator = [](const Delta& a, const Delta &b) {
+    return a.Priority > b.Priority;
+  };
+
+  /* Sort by descending priority (larger comes first).  */
+  std::sort(DeltaList.begin(), DeltaList.end(), comparator);
 }
 
-static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const Stmt *stmt)
+void TextModifications::Insert(Delta &delta)
 {
-  return Get_Range_For_Rewriter(ast, stmt->getSourceRange());
+  /* Insert into the vector.  */
+  DeltaList.push_back(delta);
 }
+
+void TextModifications::Solve(void)
+{
+  /* Sort so that the highest priorities comes first.  */
+  Sort();
+
+  /* Get how many Text Modifications we desire.  */
+  int n = DeltaList.size();
+
+  /* Given one Text Modification, we must check if there is another text
+     modification that intersects with this one.  If there is, we must
+     remove the one with smaller priority (the one that is later on the
+     vector because we sorted it).
+
+     Clearly there are better ways of doing this other than this n(n-1)/2
+     loop (see IntervalTree), but for the kernel we see around ~100
+     modifications, which is okay at the moment.  */
+  for (int i = 0; i < n; i++) {
+    for (int j = i+1; j < n; j++) {
+      Delta &a = DeltaList[i];
+      Delta &b = DeltaList[j];
+
+      /* Check if we are not comparing the same thing for some reason.  */
+      assert(&a != &b);
+
+      if (Intersects(a, b)) {
+        if (a.Priority > b.Priority) {
+          /* Intersections with different priority: remove the one with least
+             priority.  */
+          DeltaList.erase(DeltaList.begin() + j);
+          n--;
+          j--;
+        } else if (a.Priority == b.Priority) {
+          /* Intersection with the same priority.  Issue an error -- we can't
+             have this.  */
+          DiagsClass::Emit_Error("Rewriter ranges with same priority intersects");
+          DiagsClass::Emit_Note(" This one: (priority " + std::to_string(a.Priority) + ')',
+                                a.ToChange);
+          DiagsClass::Emit_Note("with this: (priority " + std::to_string(b.Priority) + ')',
+                                b.ToChange);
+          throw std::runtime_error("SymbolExternalizer can not continue.");
+        }
+      }
+    }
+  }
+}
+
+void TextModifications::Commit(void)
+{
+  Solve();
+  int n = DeltaList.size();
+
+  for (int i = 0; i < n; i++) {
+    // Commit Change.
+    Delta &a = DeltaList[i];
+    StringRef source_text = Lexer::getSourceText(CharSourceRange::getCharRange(
+                                                 a.ToChange),
+                                                 SM, LO);
+    unsigned len = source_text.size();
+    assert(RW.ReplaceText(a.ToChange.getBegin(), len, a.NewText) == false);
+
+    if (DumpingEnabled) {
+      Dump(i, a);
+    }
+  }
+}
+
+void TextModifications::Dump(unsigned num, const Delta &a)
+{
+
+  clang::SourceManager::fileinfo_iterator it;
+  std::string output_file = "/tmp/Externalizer.dump." + std::to_string(num) + ".c";
+  FILE *file = fopen(output_file.c_str(), "w");
+
+  llvm::outs() << "Generating " + output_file + '\n';
+
+  std::string note = std::to_string(num) + " Changing " +
+                PrettyPrint::Get_Source_Text_Raw(a.ToChange).str() +
+                " to " + a.NewText;
+  note = "/*\n" + note + "*/\n";
+  fputs(note.c_str(), file);
+
+  /* Iterate into all files we may have opened, most probably headers that are
+     #include'd.  */
+  for (it = SM.fileinfo_begin(); it != SM.fileinfo_end(); ++it) {
+    const FileEntry *fentry = it->getFirst();
+
+    /* Our updated file buffer.  */
+    FileID id = SM.translateFile(fentry);
+    const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
+
+    /* If we have modifications, then dump the buffer.  */
+    if (rewritebuf) {
+      /* The RewriteBuffer object contains a sequence of deltas of the original
+         buffer.  Clearly a faster way would be apply those deltas into the
+         target buffer directly, but clang doesn't seems to provide such
+         interface, so we expand them into a temporary string and them pass
+         it to the SourceManager.  */
+      std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
+      fputs(modified_str.c_str(), file);
+      fputs("\n\n/* --------- */\n\n", file);
+    }
+  }
+
+  fclose(file);
+}
+
+bool TextModifications::Is_Before_Or_Equal(const PresumedLoc &a, const PresumedLoc &b)
+{
+  unsigned a_line = a.getLine();
+  unsigned a_col  = a.getColumn();
+  unsigned b_line = b.getLine();
+  unsigned b_col  = b.getColumn();
+
+  unsigned m = std::max(a_col, b_col);
+  unsigned psi_a = m*a_line + a_col;
+  unsigned psi_b = m*b_line + b_col;
+
+  return psi_a <= psi_b;
+}
+
+bool TextModifications::Intersects(const SourceRange &a, const SourceRange &b)
+{
+  PresumedLoc a_begin = SM.getPresumedLoc(a.getBegin());
+  PresumedLoc a_end   = SM.getPresumedLoc(a.getEnd());
+  PresumedLoc b_begin = SM.getPresumedLoc(b.getBegin());
+  PresumedLoc b_end   = SM.getPresumedLoc(b.getEnd());
+
+  assert(a_begin.getFileID() == a_end.getFileID());
+  assert(b_begin.getFileID() == b_end.getFileID());
+
+  if (a_begin.getFileID() != b_begin.getFileID()) {
+    /* Files are distinct, thus we can't easily determine which comes first.  */
+    return false;
+  }
+
+  assert(a_begin.getLine() <= a_end.getLine());
+  assert(b_begin.getLine() <= b_end.getLine());
+
+  return Is_Before_Or_Equal(a_begin, b_end) && Is_Before_Or_Equal(b_begin, a_end);
+}
+
+bool TextModifications::Intersects(const Delta &a, const Delta &b)
+{
+  return Intersects(a.ToChange, b.ToChange);
+}
+
+/* ---- End of Deltas class -------- */
 
 
 bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
@@ -141,7 +299,7 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
     /* In case we modified the Identifier of the original function, getName()
        will return the name of the new function but the SourceText will not
        be updated.  Hence check if the SourceRange has it as well.  */
-    auto vec_of_ranges = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+    auto vec_of_ranges = Get_Range_Of_Identifier_In_SrcRange(expr->getSourceRange(),
                                                              OldSymbolName.c_str());
     StringRef old_name_src_txt = "";
     if (!vec_of_ranges.empty()) {
@@ -171,7 +329,7 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
         }
 
         /* Issue a text modification.  */
-        SE.RW.ReplaceText(range, new_name);
+        SE.Replace_Text(range, new_name, 100);
       } else {
         /* If we did not get the old symbol, it mostly means that the
            references comes from a macro.  */
@@ -204,6 +362,20 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Declarator
     return Update_References_To_Symbol(to_update->getBody());
   }
   return false;
+}
+
+void SymbolExternalizer::Replace_Text(const SourceRange &range, StringRef new_name, int prio)
+{
+  SourceRange rw_range = Get_Range_For_Rewriter(AST, range);
+  TextModifications::Delta delta(rw_range, new_name.str(), prio);
+  TM.Insert(delta);
+}
+
+void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
+{
+  SourceRange rw_range = Get_Range_For_Rewriter(AST, range);
+  TextModifications::Delta delta(rw_range, "", prio);
+  TM.Insert(delta);
 }
 
 void SymbolExternalizer::Externalize_Symbol([[maybe_unused]] DeclaratorDecl *to_externalize)
@@ -274,11 +446,18 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
   bool modified = false;
   bool main_file_inserted = false;
 
-  ofs = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(
-                 new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
-  mfs = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(
-                 new vfs::InMemoryFileSystem);
-  ofs->pushOverlay(mfs);
+  auto new_ofs = IntrusiveRefCntPtr<vfs::OverlayFileSystem>(
+                       new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
+
+  auto new_mfs = IntrusiveRefCntPtr<vfs::InMemoryFileSystem>(
+                        new vfs::InMemoryFileSystem);
+
+  new_ofs->pushOverlay(new_mfs);
+
+  /* Commit the text changes.  */
+  TM.Commit();
+
+  Rewriter &RW = TM.Get_Rewriter();
 
   /* Iterate into all files we may have opened, most probably headers that are
      #include'd.  */
@@ -298,7 +477,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
          it to the SourceManager.  */
       std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
 
-      if (mfs->addFile(fentry->getName(),
+      if (new_mfs->addFile(fentry->getName(),
                        0, MemoryBuffer::getMemBufferCopy(modified_str)) == false) {
         llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
       }
@@ -320,12 +499,15 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
       FileID id = sm.getMainFileID();
       const FileEntry *fentry = sm.getFileEntryForID(id);
       const std::string &main_file_content = Get_Modifications_To_Main_File();
-      if (mfs->addFile(fentry->getName(),
+      if (new_mfs->addFile(fentry->getName(),
                        0,
                        MemoryBuffer::getMemBufferCopy(main_file_content)) == false) {
         llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
       }
   }
+
+  ofs = new_ofs;
+  mfs = new_mfs;
 
   return modified;
 }
@@ -337,6 +519,7 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 
   /* Our updated file buffer for main file.  */
   FileID main_id = sm.getMainFileID();
+  Rewriter &RW = TM.Get_Rewriter();
   RewriteBuffer &main_buf = RW.getEditBuffer(main_id);
 
   return std::string(main_buf.begin(), main_buf.end());
@@ -383,8 +566,7 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
 
         if (!maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, id_info)) {
           if (id_info->getName() == to_look_for) {
-            SourceRange range(tok.getLocation(), tok.getLastLoc());
-            RW.ReplaceText(range, replace_with);
+            Replace_Text(SourceRange(tok.getLocation(), tok.getLastLoc()), replace_with, 10);
           }
         }
       }
@@ -394,7 +576,7 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
       auto ranges = Get_Range_Of_Identifier_In_Macro_Expansion(exp, to_look_for.c_str());
 
       for (SourceRange &tok_range : ranges) {
-        RW.ReplaceText(tok_range, replace_with);
+        Replace_Text(tok_range, replace_with, 10);
       }
     }
   }
@@ -433,7 +615,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           /* If we found the first instance of the function we want to externalize,
              then proceed to create and replace the function declaration node with
              a variable declaration node of proper type.  */
-            std::string new_name = EXTERNALIZED_PREFIX + decl->getName().str();
+          std::string new_name = EXTERNALIZED_PREFIX + decl->getName().str();
           new_decl = Create_Externalized_Var(decl, new_name);
           Log.push_back({.OldName = decl->getName().str(),
                          .NewName = new_name,
@@ -445,13 +627,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           new_decl->print(outstr, AST->getLangOpts());
           outstr << ";\n";
 
-          SourceRange decl_range = Get_Range_For_Rewriter(AST, decl);
-
-          /* Replace if the given source text is actually something.  */
-          if (PrettyPrint::Get_Source_Text(decl_range) != "") {
-            /* Replace text content of old declaration.  */
-            assert(RW.ReplaceText(decl_range, outstr.str()) == false && "Location not RW.");
-          }
+          Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
 
           must_update = true;
           was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
@@ -472,17 +648,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
              this function shall be discarded.  */
 
           /* Get source location of old function declaration.  */
-          SourceLocation decl_start = decl->getSourceRange().getBegin();
-          SourceLocation decl_end = Lexer::getLocForEndOfToken(
-              decl->getSourceRange().getEnd(),
-              0,
-              AST->getSourceManager(),
-              AST->getLangOpts());
-
-          SourceRange decl_range(decl_start, decl_end);
-
-          /* Remove the text.  */
-          RW.RemoveText(decl_range);
+          Remove_Text(decl->getSourceRange(), 1000);
 
           /* Remove node from AST.  */
           topleveldecls->erase(it);
@@ -502,22 +668,16 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
               /* Damn. This function do not have a prototype, we will have to
                  craft it ourself.  */
 
-              /* FIXME: it seems that this hits some underlying bug in LLVM rewriter.
-                        hence we do nothing in this case for now.  */
+              /* FIXME: This reults in unwanted intersections.  */
 #if 0
               Stmt *body = with_body->getBody();
-              SourceRange body_range = Get_Range_For_Rewriter(AST, body);
-              RW.ReplaceText(body_range, ";\n");
+              Replace_Text(body->getSourceRange(), ";\n", 1000);
 
               /* Remove the body from the AST.  */
               with_body->setBody(nullptr);
-#else
-              DiagsClass::Emit_Note("Weak externalization of functions without "
-                                    "a prototype is currently broken", func->getSourceRange());
 #endif
             } else {
-              SourceRange decl_range = Get_Range_For_Rewriter(AST, with_body);
-              RW.RemoveText(decl_range);
+              Remove_Text(with_body->getSourceRange(), 1000);
               topleveldecls->erase(it);
 
               /* We must decrease the iterator because we deleted an element from the
@@ -541,11 +701,12 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
         /* Rename the declaration.  */
         IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
         DeclarationName new_decl_name(new_id);
+
         decl->setDeclName(new_decl_name);
         new_decl = decl;
 
         /* Replace text content of old declaration.  */
-        assert(RW.ReplaceText(id_range, new_name) == false && "Location not RW.");
+        Replace_Text(id_range, new_name, 100);
 
         must_update = true;
         was_function = true;

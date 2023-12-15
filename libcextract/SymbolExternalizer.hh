@@ -15,6 +15,103 @@ struct ExternalizerLogEntry
   ExternalizationType Type;
 };
 
+/** Text Modification class wrapping Clang's Rewriter.
+ *
+ *  Clang has a Rewriter class in order to issue Text Modifications into the
+ *  same Compilation Unit.  The problem is that this class expects that every
+ *  modifications is commutative, that means A + B = B + A.  This is not the
+ *  case when whe are externalizing things, once we may externalize a function
+ *  that in its body contains a reference to another externalized function.
+ *  Hence we have to cleverly find which modifications stays and which should
+ *  be discarded.
+ *
+ *  We do this by setting a priority in each Text Modifications, and if two
+ *  modifications wants to modify the same piece of text, we only let the one
+ *  with highest priority.  With this, we classify the modifications which
+ *  removes content to be the highest priority, and the ones which only changes
+ *  the name of things to be the lowest priority.  Hence at some point we compute
+ *  the insersection of all with all and discards the ones with lower priority.
+ */
+class TextModifications
+{
+  public:
+  /** A delta -- a single text modification.  */
+  struct Delta
+  {
+    Delta(const SourceRange &to_change, const std::string &new_text, int prio)
+      : ToChange(to_change),
+        NewText(new_text),
+        Priority(prio)
+    {
+    }
+
+    /* Which part of the original code should be changed?  */
+    SourceRange ToChange;
+
+    /* With what text?  */
+    std::string NewText;
+
+    /* What is the priority of this change?  */
+    int Priority;
+  };
+
+  /** Constructor for the TextModification class.  */
+  TextModifications(ASTUnit *ast, bool dump = false)
+    : SM(ast->getSourceManager()),
+      LO(ast->getLangOpts()),
+      RW(SM, LO),
+      DumpingEnabled(dump)
+  {}
+
+  /** Get underlying Rewriter class.  */
+  inline Rewriter &Get_Rewriter(void)
+  {
+    return RW;
+  }
+
+  /* Insert a text modification.  */
+  void Insert(Delta &delta);
+
+  /* Solve the modifications according to their priorities and apply to clang's
+     Rewriter class instance.  */
+  void Commit(void);
+
+  /* Dump, for debugging purposes.  */
+  void Dump(unsigned, const Delta &a);
+
+  private:
+
+  /* Solve the modifications according to their priorities.  */
+  void Solve(void);
+
+  /* Sort the DeltaLists (sequence of text modifications) according to their
+     priorities.  */
+  void Sort(void);
+
+  /* Checks if two SourceRanges intersects.  */
+  bool Intersects(const SourceRange &a, const SourceRange &b);
+
+  /* Check if two Deltas (text modifications) intersects.  */
+  bool Intersects(const Delta &a, const Delta &b);
+
+  /* Check which SourceLocation comes first.  */
+  bool Is_Before_Or_Equal(const PresumedLoc &a, const PresumedLoc &b);
+
+  /* Reference to the AST SourceManager.  */
+  SourceManager &SM;
+
+  /* Reference to the AST LangOptions.  */
+  const LangOptions &LO;
+
+  /* The clang's Rewriter class.  */
+  Rewriter RW;
+
+  /* Flag indicating we want to dump our changes.  */
+  bool DumpingEnabled;
+
+  /* The list of Text Modifications we want to do.  */
+  std::vector<Delta> DeltaList;
+};
 
 /** Class encapsulating the Symbol externalizer mechanism.
  *
@@ -38,10 +135,10 @@ struct ExternalizerLogEntry
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia)
+  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
-      RW(ast->getSourceManager(), ast->getLangOpts()),
+      TM(ast, dump),
       IA(ia)
   {
   }
@@ -92,6 +189,7 @@ class SymbolExternalizer
   void Externalize_Symbol(const std::string &to_externalize);
   void Externalize_Symbols(std::vector<std::string> const &to_externalize_array);
 
+  /* WARNING: Modifies the given vector.  */
   void Rename_Symbols(std::vector<std::string> &to_rename_array);
 
   bool _Externalize_Symbol(const std::string &to_externalize, ExternalizationType type);
@@ -118,6 +216,11 @@ class SymbolExternalizer
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 
+  /* Issue a Text Replacement with a given `priority`.  The priority will be
+     used in case that there are two replacements to the same piece of text.  */
+  void Replace_Text(const SourceRange &range, StringRef new_name, int priority);
+  void Remove_Text(const SourceRange &range, int priority);
+
   /** AST in analysis.  */
   ASTUnit *AST;
 
@@ -125,7 +228,7 @@ class SymbolExternalizer
   MacroWalker MW;
 
   /** Clang's Rewriter class used to auxiliate us with changes in the source code.  */
-  Rewriter RW;
+  TextModifications TM;
 
   /** Reference to the InlineAnalysis in the PassManager::Context instance.  */
   InlineAnalysis &IA;
