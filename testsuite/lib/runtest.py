@@ -17,7 +17,7 @@ def parse_args():
     argc = len(sys.argv)
     input_path = None
     output_path = None
-    binaries_path = "../../"
+    binaries_path = "../../build/"
 
 
     skip = False
