@@ -34,7 +34,7 @@ void ArgvParser::Insert_Required_Parameters(void)
     "-Xclang", "-detailed-preprocessing-record",
     "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
     // For some reason libtooling do not pass the clang include folder.  Pass this then.
-    "-I/usr/lib64/clang/" STRINGFY_VALUE(__clang_major__) "/include",
+    "-I/usr/lib64/clang/" STRINGFY_VALUE(CLANG_VERSION_MAJOR) "/include",
     "-Wno-gnu-variable-sized-type-not-at-end",
     "-Wno-unused-function" // May happen when trying to extract a static function.
   };
