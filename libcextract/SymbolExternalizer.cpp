@@ -63,7 +63,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
 
   /* Tokenize away the function-like macro stuff or expression, we only want
      the identifier.  */
-  const char *token_vector = " (),;+-*/^|&{}[]<>^&|";
+  const char *token_vector = " (),;+-*/^|&{}[]<>^&|\r\n\t";
 
   /* Create temporary buff, strtok modifies it.  */
   unsigned len = string.size();
@@ -94,6 +94,11 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
   return ret;
 }
 
+static std::vector<SourceRange>
+Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const StringRef id)
+{
+  return Get_Range_Of_Identifier_In_SrcRange(range, id.str().c_str());
+}
 
 static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
 {
@@ -687,7 +692,11 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
         }
       } else if (type == ExternalizationType::RENAME) {
         /* Get SourceRange where the function identifier is.  */
-        SourceRange id_range = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(), decl->getName().str().c_str())[0];
+        auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+                                                       decl->getName());
+        assert(ids.size() > 0 && "Decl name do not match required identifier?");
+
+        SourceRange id_range = ids[0];
         std::string new_name = RENAME_PREFIX + decl->getName().str();
         if (first) {
           /* Only register the first decl rename of the same variable.  */

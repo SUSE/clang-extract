@@ -2,6 +2,12 @@
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
 
+#include <clang/Basic/Version.h>
+
+#ifndef CLANG_VERSION_MAJOR
+# error "Unable to find clang version"
+#endif
+
 ArgvParser::ArgvParser(int argc, char **argv)
   : ArgsToClang(),
     FunctionsToExtract(),

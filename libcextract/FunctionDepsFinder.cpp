@@ -188,16 +188,21 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
        look into it.  */
     if (FunctionTemplateSpecializationInfo *ftsi =
                 decl->getTemplateSpecializationInfo()) {
-      if (VisitFunctionTemplateDecl(ftsi->getTemplate()) == VISITOR_STOP) {
-        return VISITOR_STOP;
-      }
+      TRY_TO(VisitFunctionTemplateDecl(ftsi->getTemplate()));
     }
 
     /* Mark function for output.  */
-    FunctionDecl *to_mark = decl->isStatic() ? decl->getDefinition() : decl;
-    if (to_mark == nullptr) {
-      to_mark = decl; //FIXME: Declared static function in closure without a body?
+    FunctionDecl *to_mark = decl;
+    if (decl->isStatic()) {
+      FunctionDecl *definition = decl->getDefinition();
+      /* FIXME: Declared static function in closure without a body?  */
+      if (definition != nullptr) {
+        to_mark = definition;
+        /* Make sure we parse the function version with a body.  */
+        TRY_TO(TraverseDecl(to_mark));
+      }
     }
+
     Closure.Add_Decl_And_Prevs(to_mark);
 
     return VISITOR_CONTINUE;
@@ -213,9 +218,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   {
     /* If this is a C++ record decl, then analyze it as such.  */
     if (CXXRecordDecl *cxxdecl = dyn_cast<CXXRecordDecl>(decl)) {
-      if (VisitCXXRecordDecl(cxxdecl) == VISITOR_STOP) {
-        return VISITOR_STOP;
-      }
+      TRY_TO(VisitCXXRecordDecl(cxxdecl));
     }
 
     if (TypedefNameDecl *typedecl = decl->getTypedefNameForAnonDecl()) {
@@ -334,9 +337,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     /* In case this is a ClassTemplateSpecialDecl, then analyze it as such.  */
     if (ClassTemplateSpecializationDecl *ctsd =
         dyn_cast<ClassTemplateSpecializationDecl>(decl)) {
-        if (VisitClassTemplateSpecializationDecl(ctsd) == VISITOR_STOP) {
-          return VISITOR_STOP;
-        }
+      TRY_TO(VisitClassTemplateSpecializationDecl(ctsd));
     }
 
     Closure.Add_Decl_And_Prevs(decl);
@@ -363,9 +364,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       V<A> u;
       This call will add the A to the closure.
     */
-    if (TraverseTemplateArguments(decl->getTemplateArgs().asArray()) == VISITOR_STOP) {
-      return VISITOR_STOP;
-    }
+    TRY_TO(TraverseTemplateArguments(decl->getTemplateArgs().asArray()));
 
     /* This call will add the V to the closure.  */
     return VisitClassTemplateDecl(decl->getSpecializedTemplate());
@@ -405,10 +404,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
         const FieldDecl *field = component.getField();
 
         RecordDecl *record = (RecordDecl *)field->getParent();
-        bool ret = TraverseDecl(record);
-        if (ret == VISITOR_STOP) {
-          return VISITOR_STOP;
-        }
+        TRY_TO(TraverseDecl(record));
       }
     }
 
@@ -418,17 +414,13 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   /* -------- Types ----------------- */
   bool VisitTagType(const TagType *type)
   {
-    if (TraverseDecl(type->getDecl()) == VISITOR_STOP) {
-      return VISITOR_STOP;
-    }
+    TRY_TO(TraverseDecl(type->getDecl()));
     return VISITOR_CONTINUE;
   }
 
   bool VisitTypedefType(const TypedefType *type)
   {
-    if (TraverseDecl(type->getDecl()) == VISITOR_STOP) {
-      return VISITOR_STOP;
-    }
+    TRY_TO(TraverseDecl(type->getDecl()));
     return VISITOR_CONTINUE;
   }
 
