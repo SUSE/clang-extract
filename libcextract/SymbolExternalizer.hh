@@ -97,6 +97,9 @@ class TextModifications
   /* Check which SourceLocation comes first.  */
   bool Is_Before_Or_Equal(const PresumedLoc &a, const PresumedLoc &b);
 
+  /* Check if two changes results in the same change.  */
+  bool Is_Same_Change(const Delta &a, const Delta &b);
+
   /* Reference to the AST SourceManager.  */
   SourceManager &SM;
 

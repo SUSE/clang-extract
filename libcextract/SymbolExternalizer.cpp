@@ -161,15 +161,16 @@ void TextModifications::Solve(void)
       assert(&a != &b);
 
       if (Intersects(a, b)) {
-        if (a.Priority > b.Priority) {
-          /* Intersections with different priority: remove the one with least
-             priority.  */
+        if (a.Priority > b.Priority || Is_Same_Change(a, b)) {
+          /* Intersections with different priority or redundant changes: remove
+             the one with least priority.
+
+             FIXME: Why does the externalize issues the same change twice?? */
           DeltaList.erase(DeltaList.begin() + j);
           n--;
           j--;
         } else if (a.Priority == b.Priority) {
-          /* Intersection with the same priority.  Issue an error -- we can't
-             have this.  */
+          /* Intersection with the same priority. Issue an error -- we can't have this.  */
           DiagsClass::Emit_Error("Rewriter ranges with same priority intersects");
           DiagsClass::Emit_Note(" This one: (priority " + std::to_string(a.Priority) + ')',
                                 a.ToChange);
@@ -282,6 +283,11 @@ bool TextModifications::Intersects(const Delta &a, const Delta &b)
   return Intersects(a.ToChange, b.ToChange);
 }
 
+bool TextModifications::Is_Same_Change(const Delta &a, const Delta &b)
+{
+  return a.ToChange == b.ToChange && a.NewText == b.NewText;
+}
+
 /* ---- End of Deltas class -------- */
 
 
@@ -373,14 +379,7 @@ void SymbolExternalizer::Replace_Text(const SourceRange &range, StringRef new_na
 
 void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
 {
-  SourceRange rw_range = Get_Range_For_Rewriter(AST, range);
-  TextModifications::Delta delta(rw_range, "", prio);
-  TM.Insert(delta);
-}
-
-void SymbolExternalizer::Externalize_Symbol([[maybe_unused]] DeclaratorDecl *to_externalize)
-{
-  assert(false && "To be implemented.");
+  Replace_Text(range, "", prio);
 }
 
 VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
