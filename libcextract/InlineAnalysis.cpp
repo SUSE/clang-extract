@@ -279,10 +279,14 @@ static const char *Bind(unsigned link)
 ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym)
 {
   if (Symv) {
-    bool symv_externalize = Symv->Needs_Externalization(sym);
-    if (symv_externalize) {
-      return ExternalizationType::STRONG;
-    }
+    const std::string &sym_mod = Symv->Get_Symbol_Module(sym);
+    /*
+     * If the symbol exists on Symvers we can decide whether the symbol must be
+     * externalized or not, and not rely on ELF.
+     */
+    if (!sym_mod.empty())
+      return (Symv->Needs_Externalization(sym_mod)) ? ExternalizationType::STRONG
+                                                    : ExternalizationType::NONE;
   }
 
   unsigned char info = Get_Symbol_Info(sym);
