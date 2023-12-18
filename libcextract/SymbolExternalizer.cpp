@@ -7,6 +7,14 @@
 
 #include "clang/Rewrite/Core/Rewriter.h"
 
+/* Ban symbols that we are sure to cause problems.  */
+
+/* Although SourceManager has "translateFile" method, it seems unreliable
+   because it may translate to the FileID that do not contain any changed
+   buffer.  Hence we do our own thing here, which is look at our own
+   FileEntry => FileID that we are sure to have modifications.  */
+#pragma GCC poison translateFile
+
 /****** Begin hack: used to get a pointer to a private member of a class. *****/
 struct ASTUnit_TopLevelDecls
 {
@@ -125,6 +133,17 @@ static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange 
 
 /* ---- Delta and TextModifications class ------ */
 
+
+TextModifications::Delta::Delta(const SourceRange &to_change,
+                                const std::string &new_text, int prio)
+      : ToChange(to_change),
+        NewText(new_text),
+        Priority(prio)
+{
+  static int curr_id = 0;
+  ID = curr_id++;
+}
+
 void TextModifications::Sort(void)
 {
   auto comparator = [](const Delta& a, const Delta &b) {
@@ -196,10 +215,29 @@ void TextModifications::Commit(void)
   for (int i = 0; i < n; i++) {
     // Commit Change.
     Delta &a = DeltaList[i];
+
+    /* Register the changed FileID for retrieving the buffer later.  */
+    FileID begin_id = SM.getFileID(a.ToChange.getBegin());
+    FileID end_id   = SM.getFileID(a.ToChange.getEnd());
+
+    /* Ensure that the fileIDs are equal.  */
+    assert(begin_id == end_id);
+
+    /* Insert into the list of FileIDs.  */
+    const FileEntry *fentry = SM.getFileEntryForID(begin_id);
+    /* Insert the FileEntry if we don't have one.  */
+    if (FileEntryMap.find(fentry) == FileEntryMap.end()) {
+      /* Insert it.  */
+      FileEntryMap[fentry] = begin_id;
+    }
+
+    /* Get the text we want to change.  We only do this to know its length.  */
     StringRef source_text = Lexer::getSourceText(CharSourceRange::getCharRange(
                                                  a.ToChange),
                                                  SM, LO);
     unsigned len = source_text.size();
+
+    /* ReplaceText(SourceRange, StringRef) version is unreliable in llvm-16.  */
     assert(RW.ReplaceText(a.ToChange.getBegin(), len, a.NewText) == false);
 
     if (DumpingEnabled) {
@@ -210,8 +248,6 @@ void TextModifications::Commit(void)
 
 void TextModifications::Dump(unsigned num, const Delta &a)
 {
-
-  clang::SourceManager::fileinfo_iterator it;
   std::string output_file = "/tmp/Externalizer.dump." + std::to_string(num) + ".c";
   FILE *file = fopen(output_file.c_str(), "w");
 
@@ -223,13 +259,14 @@ void TextModifications::Dump(unsigned num, const Delta &a)
   note = "/*\n" + note + "*/\n";
   fputs(note.c_str(), file);
 
-  /* Iterate into all files we may have opened, most probably headers that are
-     #include'd.  */
-  for (it = SM.fileinfo_begin(); it != SM.fileinfo_end(); ++it) {
-    const FileEntry *fentry = it->getFirst();
+  /* Iterate into all files we changed.  */
+  for (auto it = FileEntryMap.begin(); it != FileEntryMap.end(); ++it) {
+    /*
+    const FileEntry *fentry = it->first;
+    */
+    FileID id = it->second;
 
     /* Our updated file buffer.  */
-    FileID id = SM.translateFile(fentry);
     const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
 
     /* If we have modifications, then dump the buffer.  */
@@ -446,7 +483,6 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
                           std::vector<std::string> &includes_to_expand)
 {
   SourceManager &sm = AST->getSourceManager();
-  clang::SourceManager::fileinfo_iterator it;
   bool modified = false;
   bool main_file_inserted = false;
 
@@ -462,14 +498,19 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
   TM.Commit();
 
   Rewriter &RW = TM.Get_Rewriter();
+  auto FileEntryMap = TM.Get_FileEntry_Map();
 
   /* Iterate into all files we may have opened, most probably headers that are
      #include'd.  */
-  for (it = sm.fileinfo_begin(); it != sm.fileinfo_end(); ++it) {
-    const FileEntry *fentry = it->getFirst();
 
-    /* Our updated file buffer.  */
-    FileID id = sm.translateFile(fentry);
+  for (auto it = FileEntryMap.begin(); it != FileEntryMap.end(); ++it) {
+    /* Although SourceManager has "translateFile" method, it seems unreliable
+       because it may translate to the FileID that do not contain any changed
+       buffer.  Hence we do our own thing here, which is look at our own
+       FileEntry => FileID that we are sure to have modifications.  */
+    const FileEntry *fentry = it->first;
+    FileID id = it->second;
+
     const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
 
     /* If we have modifications, then update the buffer.  */

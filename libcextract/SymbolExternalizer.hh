@@ -38,12 +38,7 @@ class TextModifications
   /** A delta -- a single text modification.  */
   struct Delta
   {
-    Delta(const SourceRange &to_change, const std::string &new_text, int prio)
-      : ToChange(to_change),
-        NewText(new_text),
-        Priority(prio)
-    {
-    }
+    Delta(const SourceRange &to_change, const std::string &new_text, int prio);
 
     /* Which part of the original code should be changed?  */
     SourceRange ToChange;
@@ -53,6 +48,9 @@ class TextModifications
 
     /* What is the priority of this change?  */
     int Priority;
+
+    /* ID.  */
+    int ID;
   };
 
   /** Constructor for the TextModification class.  */
@@ -75,6 +73,12 @@ class TextModifications
   /* Solve the modifications according to their priorities and apply to clang's
      Rewriter class instance.  */
   void Commit(void);
+
+  /* Get FileEntry map.  */
+  inline const std::unordered_map<const FileEntry *, FileID> &Get_FileEntry_Map(void)
+  {
+    return FileEntryMap;
+  }
 
   /* Dump, for debugging purposes.  */
   void Dump(unsigned, const Delta &a);
@@ -114,6 +118,10 @@ class TextModifications
 
   /* The list of Text Modifications we want to do.  */
   std::vector<Delta> DeltaList;
+
+  /* Our own mapping from FileEntry to FileID to get the modifications to the
+     files.  */
+  std::unordered_map<const FileEntry *, FileID> FileEntryMap;
 };
 
 /** Class encapsulating the Symbol externalizer mechanism.
