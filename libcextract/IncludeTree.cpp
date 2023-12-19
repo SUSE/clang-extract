@@ -23,9 +23,11 @@ static bool In_Set(std::unordered_set<std::string> &set, const std::string &str,
 /* ----- IncludeTree ------ */
 IncludeTree::IncludeTree(Preprocessor &pp,
                          SourceManager &sm,
+                         IncludeExpansionPolicy::Policy p,
                          std::vector<std::string> const &must_expand)
   : PP(pp),
-    SM(sm)
+    SM(sm),
+    IEP(IncludeExpansionPolicy::Get_Expansion_Policy_Unique(p))
 {
   Build_Header_Tree(must_expand);
   Fix_Output_Attrs(Root);
@@ -498,7 +500,13 @@ bool IncludeNode::Is_Reachable_From_Main(void)
                                         nullptr,
                                         nullptr,
                                         nullptr);
+
   if (ref.has_value()) {
+    const FileEntry &entry = (*ref).getFileEntry();
+    if (Tree.IEP->Must_Expand(entry.tryGetRealPathName(), entry.getName())) {
+      /* Lie telling it is unreachable, which would force an expansion.  */
+      return false;
+    }
     /* File is reachable.  */
     return true;
   } else {

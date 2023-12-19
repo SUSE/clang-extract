@@ -95,6 +95,11 @@ class ArgvParser
     return RenameSymbols;
   }
 
+  inline const char *Get_Include_Expansion_Policy(void)
+  {
+    return IncExpansionPolicy;
+  }
+
   const char *Get_Input_File(void);
 
   private:
@@ -119,4 +124,6 @@ class ArgvParser
   const char *SymversPath;
 
   const char *DescOutputPath;
+
+  const char *IncExpansionPolicy;
 };

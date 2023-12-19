@@ -8,9 +8,12 @@
 
 #pragma once
 
+#include "ExpansionPolicy.hh"
+
 #include <clang/Tooling/Tooling.h>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 using namespace clang;
 
@@ -165,10 +168,13 @@ class IncludeTree
 
   /** Create the include tree from the Preprocessor history.  */
   IncludeTree(Preprocessor &pp, SourceManager &sm,
+              IncludeExpansionPolicy::Policy p = IncludeExpansionPolicy::Policy::NOTHING,
               std::vector<std::string> const &must_expand = {});
 
-  IncludeTree(ASTUnit *ast, std::vector<std::string> const &must_expand = {})
-    : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), must_expand)
+  IncludeTree(ASTUnit *ast,
+              IncludeExpansionPolicy::Policy p = IncludeExpansionPolicy::Policy::NOTHING,
+              std::vector<std::string> const &must_expand = {})
+    : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), p, must_expand)
   {
   }
 
@@ -214,6 +220,9 @@ class IncludeTree
 
   /** Reference to the SourceManager.  */
   SourceManager &SM;
+
+  /** The Include Expansion Policy when expanding includes.  */
+  std::unique_ptr<IncludeExpansionPolicy> IEP;
 };
 
 typedef IncludeTree::IncludeNode IncludeNode;

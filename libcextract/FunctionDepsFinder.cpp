@@ -490,7 +490,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
     : AST(ctx->AST.get()),
       EnumTable(AST),
-      IT(AST, ctx->HeadersToExpand),
+      IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand),
       KeepIncludes(ctx->KeepIncludes),
       Visitor(new DeclClosureVisitor(Closure, EnumTable))
 {

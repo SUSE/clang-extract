@@ -22,7 +22,8 @@ ArgvParser::ArgvParser(int argc, char **argv)
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
-    DescOutputPath(nullptr)
+    DescOutputPath(nullptr),
+    IncExpansionPolicy(nullptr)
 {
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
@@ -119,7 +120,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (!strcmp("-DCE_KEEP_INCLUDES", str)) {
     WithIncludes = true;
-
+    return true;
+  }
+  if (prefix("-DCE_KEEP_INCLUDES=", str)) {
+    WithIncludes = true;
+    IncExpansionPolicy = Extract_Single_Arg_C(str);
     return true;
   }
   if (prefix("-DCE_EXPAND_INCLUDES=", str)) {

@@ -3,6 +3,7 @@
 #include "ArgvParser.hh"
 #include "InlineAnalysis.hh"
 #include "SymbolExternalizer.hh"
+#include "ExpansionPolicy.hh"
 #include "clang/Frontend/ASTUnit.h"
 
 using namespace clang;
@@ -43,6 +44,8 @@ class PassManager {
             IpaclonesPath(args.Get_Ipaclones_Path()),
             SymversPath(args.Get_Symvers_Path()),
             DscOutputPath(args.Get_Dsc_Output_Path()),
+            IncExpansionPolicy(IncludeExpansionPolicy::Get_Overriding(
+                               args.Get_Include_Expansion_Policy(), Kernel)),
             NamesLog(),
             PassNum(0),
             IA(DebuginfoPath, IpaclonesPath, SymversPath, args.Is_Kernel())
@@ -100,6 +103,9 @@ class PassManager {
 
         /* Path to libpulp .dsc file for output.  */
         const char *DscOutputPath;
+
+        /* Policy used to expand includes.  */
+        IncludeExpansionPolicy::Policy IncExpansionPolicy;
 
         /** Log of changed names.  */
         std::vector<ExternalizerLogEntry> NamesLog;
