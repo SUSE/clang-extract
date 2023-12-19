@@ -35,12 +35,13 @@ class IncludeTree
     /** Build the IncludeNode from a single InclusionDirective taken from the
         PreprocessingDirective history.  Set if header must be marked to `output`
         or `expanded` when printed.  */
-    IncludeNode(InclusionDirective *include, bool output = true, bool expand = false,
+    IncludeNode(IncludeTree *tree, InclusionDirective *include,
+                bool output = true, bool expand = false,
                 bool is_from_minus_inclue = false);
 
     /** Build an IncludeNode to a null file, which is not #include'd
         anywhere but is the root of everything.  */
-    IncludeNode(void);
+    IncludeNode(IncludeTree *tree);
 
     /* Destructor.  */
     ~IncludeNode(void);
@@ -105,10 +106,19 @@ class IncludeTree
       return HeaderGuard;
     }
 
+    bool Is_Reachable_From_Main(void);
+
     void Mark_For_Expansion(void);
+
+    void Mark_For_Output(void);
 
     /** Check if this node or any of its parents was marked for output.  */
     bool Has_Parent_Marked_For_Output(void);
+
+    inline bool Is_Root(void)
+    {
+      return this == Tree.Root;
+    }
 
     /** Dump, for debugging reasons.  */
     void Dump_Single_Node(void);
@@ -127,6 +137,9 @@ class IncludeTree
 
     /* Set the macro defintion as the HeaderGuard.  */
     void Set_HeaderGuard(MacroDefinitionRecord *guard);
+
+    /** The Tree this node belongs to.  */
+    IncludeTree &Tree;
 
     /** Object from the PreprocessingRecord representing an #include.  */
     InclusionDirective *ID;
@@ -151,7 +164,13 @@ class IncludeTree
   };
 
   /** Create the include tree from the Preprocessor history.  */
-  IncludeTree(Preprocessor &pp, std::vector<std::string> const &must_expand = {});
+  IncludeTree(Preprocessor &pp, SourceManager &sm,
+              std::vector<std::string> const &must_expand = {});
+
+  IncludeTree(ASTUnit *ast, std::vector<std::string> const &must_expand = {})
+    : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), must_expand)
+  {
+  }
 
   /** Default destructor.  */
   ~IncludeTree(void);
@@ -179,6 +198,10 @@ class IncludeTree
   /** Build mapping from header path to IncludeNode.  */
   void Build_Header_Map(void);
 
+  /** Fix the case where the IncludeNode can not be marked to output and needs
+      to be expanded because it is not reachable from the main file.  */
+  void Fix_Output_Attrs(IncludeNode *node);
+
   /** Root of the tree.  */
   IncludeNode *Root;
 
@@ -188,6 +211,9 @@ class IncludeTree
 
   /** Reference to the preprocessor used by compilation.  */
   Preprocessor &PP;
+
+  /** Reference to the SourceManager.  */
+  SourceManager &SM;
 };
 
 typedef IncludeTree::IncludeNode IncludeNode;

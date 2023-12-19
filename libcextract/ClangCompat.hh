@@ -31,7 +31,7 @@ namespace ClangCompat
 #endif
   }
 
-static inline auto
+  static inline auto
   createInvocationFromCommandLine(ArrayRef<const char *> Args, IntrusiveRefCntPtr<DiagnosticsEngine> Diags=IntrusiveRefCntPtr< DiagnosticsEngine >())
   {
 #if CLANG_VERSION_MAJOR >= 15
@@ -50,6 +50,28 @@ static inline auto
     return qtype.isNull() ? nullptr : qtype.getTypePtr();
 #else
     return qtype.getTypePtr();
+#endif
+  }
+
+  static inline auto Get_Main_Directory_Arr(const SourceManager &sm)
+  {
+    FileID main_file = sm.getMainFileID();
+    OptionalFileEntryRef main_fentry = sm.getFileEntryRefForID(main_file);
+    DirectoryEntryRef dir_ref = (*main_fentry).getDir();
+
+#if CLANG_VERSION_MAJOR >= 17
+    std::array<std::pair<OptionalFileEntryRef, DirectoryEntryRef>, 1> A {{
+      { main_fentry, dir_ref },
+    }};
+    return A;
+#else
+    const FileEntry *fentry      = &(*main_fentry).getFileEntry();
+    const DirectoryEntry *dentry = &dir_ref.getDirEntry();
+
+    std::array<std::pair<const FileEntry *, const DirectoryEntry *>, 1> A {{
+      { fentry, dentry },
+    }};
+    return A;
 #endif
   }
 }

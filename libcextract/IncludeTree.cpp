@@ -1,5 +1,6 @@
 #include "IncludeTree.hh"
 #include "PrettyPrint.hh"
+#include "ClangCompat.hh"
 #include "Error.hh"
 
 #include <stack>
@@ -20,10 +21,14 @@ static bool In_Set(std::unordered_set<std::string> &set, const std::string &str,
 }
 
 /* ----- IncludeTree ------ */
-IncludeTree::IncludeTree(Preprocessor &pp, std::vector<std::string> const &must_expand)
-  : PP(pp)
+IncludeTree::IncludeTree(Preprocessor &pp,
+                         SourceManager &sm,
+                         std::vector<std::string> const &must_expand)
+  : PP(pp),
+    SM(sm)
 {
   Build_Header_Tree(must_expand);
+  Fix_Output_Attrs(Root);
   Build_Header_Map();
 }
 
@@ -54,7 +59,7 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
   OptionalFileEntryRef main = SM->getFileEntryRefForID(SM->getMainFileID());
 
   std::stack<IncludeNode *> stack;
-  Root = new IncludeNode();
+  Root = new IncludeNode(this);
 
   PreprocessingRecord *rec = PP.getPreprocessingRecord();
   for (PreprocessedEntity *entity : *rec) {
@@ -106,7 +111,11 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
       bool is_from_minus_include = !already_seen_main;
 
       /* Add child to tree.  */
-      IncludeNode *child = new IncludeNode(id, output, expand, is_from_minus_include);
+      IncludeNode *child = new IncludeNode(this,
+                                           id,
+                                           output,
+                                           expand,
+                                           is_from_minus_include);
       current->Add_Child(child);
       child->Set_Parent(current);
 
@@ -183,6 +192,19 @@ void IncludeTree::Build_Header_Map(void)
   }
 }
 
+void IncludeTree::Fix_Output_Attrs(IncludeNode *node)
+{
+  if (node->ShouldBeOutput) {
+    node->Mark_For_Output();
+  }
+
+  if (node->ShouldBeOutput || node->ShouldBeExpanded) {
+    for (IncludeNode *child : node->Childs) {
+      Fix_Output_Attrs(child);
+    }
+  }
+}
+
 IncludeNode *IncludeTree::Get(const SourceLocation &loc)
 {
   OptionalFileEntryRef fileref = PrettyPrint::Get_FileEntry(loc);
@@ -214,10 +236,12 @@ void IncludeTree::Dump(void)
 
 /* ----- IncludeNode ------ */
 
-IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include,
+IncludeTree::IncludeNode::IncludeNode(IncludeTree *tree,
+                                      InclusionDirective *include,
                                       bool output, bool expand,
                                       bool is_from_minus_include)
-  : ID(include),
+  : Tree(*tree),
+    ID(include),
     File(ID->getFile()),
     HeaderGuard(nullptr),
     ShouldBeOutput(output),
@@ -227,8 +251,9 @@ IncludeTree::IncludeNode::IncludeNode(InclusionDirective *include,
 {
 }
 
-IncludeTree::IncludeNode::IncludeNode(void)
-  : ID(nullptr),
+IncludeTree::IncludeNode::IncludeNode(IncludeTree *tree)
+  : Tree(*tree),
+    ID(nullptr),
     HeaderGuard(nullptr),
     ShouldBeOutput(false),
     ShouldBeExpanded(true),
@@ -425,7 +450,7 @@ void IncludeNode::Mark_For_Expansion(void)
     for (IncludeNode *child : node->Childs) {
       if (child->Should_Be_Expanded() == false && !child->Is_From_Minus_Include()) {
         child->ShouldBeExpanded = false;
-        child->ShouldBeOutput = true;
+        child->Mark_For_Output();
       }
     }
 
@@ -437,6 +462,66 @@ void IncludeNode::Mark_For_Expansion(void)
 
     node = node->Get_Parent();
   } while (node != nullptr);
+}
+
+bool IncludeNode::Is_Reachable_From_Main(void)
+{
+  const Preprocessor &pp = Tree.PP;
+  const SourceManager &sm = Tree.SM;
+
+  if (Is_Root()) {
+    /* Root is always reachable: is the main itself.  */
+    return true;
+  }
+
+  HeaderSearch &incsrch = pp.getHeaderSearchInfo();
+
+  /* Get main file location.  We will check if the include is reachable from
+     the main file.  */
+  FileID main_file = sm.getMainFileID();
+  SourceLocation mainfileloc = sm.getLocForStartOfFile(main_file);
+
+  auto main_dir = ClangCompat::Get_Main_Directory_Arr(sm);
+
+  /* If we mark a file for output, this include must be reachable from the
+     main file, otherwise the generated file won't be able to find certain
+     includes.  */
+  OptionalFileEntryRef ref = incsrch.LookupFile(ID->getFileName(),
+                                        mainfileloc,
+                                        !ID->wasInQuotes(),
+                                        nullptr,
+                                        nullptr,
+                                        main_dir,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr);
+  if (ref.has_value()) {
+    /* File is reachable.  */
+    return true;
+  } else {
+    /* File not reachable.  */
+    return false;
+  }
+}
+
+void IncludeNode::Mark_For_Output(void)
+{
+  if (Is_Root()) {
+    /* Root does not have an InclusionDirective.  */
+    assert(ShouldBeOutput == false && "Root has output true.");
+    return;
+  }
+
+  if (Is_Reachable_From_Main()) {
+    /* File is reachable.  We can safely set this file to output and be done.  */
+    ShouldBeOutput = true;
+  } else {
+    /* File not reachable.  We must expand this.  */
+    Mark_For_Expansion();
+  }
 }
 
 void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
