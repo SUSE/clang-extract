@@ -6,4 +6,4 @@ void pu_f(void)
 {
 }
 
-/* { dg-final { scan-tree-dump "clang-extract: from simple.c" } } */
+/* { dg-final { scan-tree-dump "clang-extract: from .*simple.c" } } */

@@ -4,7 +4,9 @@ import sys
 
 # Import the common test library.
 sys.path.append('../lib/')
+
 import libtest
+import os
 
 is_inline_test = False
 is_lto_test = False
@@ -17,7 +19,7 @@ def parse_args():
     argc = len(sys.argv)
     input_path = None
     output_path = None
-    binaries_path = "../../build/"
+    binaries_path = "./"
 
 
     skip = False
@@ -57,8 +59,8 @@ if __name__ == '__main__':
     # Run test.
     test = libtest.UnitTest(input_path, logfile_path, binaries_path)
     if is_inline_test:
-        test.run_inline_test(is_lto_test)
+        r = test.run_inline_test(is_lto_test)
     else:
-        test.run_test(is_lto_test)
+        r = test.run_test(is_lto_test)
 
-    exit(0)
+    exit(r)

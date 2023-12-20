@@ -2,25 +2,40 @@ project('clang-extract', 'cpp',
   version : '0.1',
   default_options : [
     'cpp_std=c++20',
-    'warning_level=2',
-    'b_sanitizer=address'
+    'warning_level=3'
   ]
 )
 
 add_project_arguments(
   [
     '-Wno-unused-parameter',
-    '-Wuninitialized',
-    '-Wmissing-field-initializers',
-    '-g3'
+    '-Wno-vla-extension'
   ], language: 'cpp'
 )
 
-compiler_name = meson.get_compiler('cpp').get_id()
+# For debug builds, we want every debug info we can get plus addrsan.
+buildtype = get_option('buildtype')
+if buildtype == 'debug' or buildtype == 'debugoptimized'
+  add_project_arguments('-g3', '-fsanitize=address', language : 'cpp')
+  add_project_link_arguments('-fsanitize=address', language : 'cpp')
+endif
+
+# Ensure that we are using clang, and not gcc.
+cpp = meson.get_compiler('cpp')
+compiler_name = cpp.get_id()
 # FIXME: We currently don't support g++, and get_id returns clang for clang++
 assert(compiler_name == 'clang', compiler_name + ' found but only clang is supported')
 
-elf_dep = dependency('libelf')
+########## Dependency: clang libraries ################
+llvm_libdir = dependency('llvm').get_variable(cmake : 'LLVM_LIBRARY_DIR', configtool: 'libdir')
+
+clang_dep = []
+clang_dep += cpp.find_library('clang-cpp', dirs : llvm_libdir)
+clang_dep += cpp.find_library('LLVM', dirs : llvm_libdir)
+############################# #########################
+elf_dep = dependency('libelf') # libelf
+python = import('python').find_installation('python3', modules : ['pexpect', 'psutil'])
+find_program('gcc', version : '>=7.5.0')
 
 subdir('libcextract')
 
@@ -35,8 +50,11 @@ executable('inline', 'Inline.cpp',
 executable('clang-extract', 'Main.cpp',
   include_directories : incdir,
   link_with : libcextract_static,
-  # FIXME: make it work using the dependecy constructor, instead of plain link
-  # args
-  link_args : ['-l:libclang-cpp.so.16', '-l:libLLVM.so.16'],
-  dependencies : elf_dep
+  dependencies : [elf_dep, clang_dep]
 )
+
+#########
+# Tests #
+#########
+
+subdir('testsuite')

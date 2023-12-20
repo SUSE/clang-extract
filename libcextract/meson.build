@@ -16,7 +16,8 @@ libcextract_sources = [
   'PrettyPrint.cpp',
   'SymbolExternalizer.cpp',
   'SymversParser.cpp',
-  'TopLevelASTIterator.cpp'
+  'TopLevelASTIterator.cpp',
+  'ExpansionPolicy.cpp'
 ]
 
 libcextract_static = static_library('cextract', libcextract_sources)

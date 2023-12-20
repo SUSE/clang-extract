@@ -46,6 +46,7 @@ class UnitTest:
         self.log = Log(log_path)
 
         self.test_path = test_path
+        self.test_folder = self.extract_test_folder()
         self.file = open(test_path, "r")
         self.file_content = self.file.read()
         self.lines = self.file_content.split('\n')
@@ -64,13 +65,34 @@ class UnitTest:
 
         self.must_have_regexes, self.must_not_have_regexes, self.error_msgs_regexes, self.warning_msgs_regexes = self.compile_regexes()
 
+    # Get folder where the test is.
+    def extract_test_folder(self):
+        last_slash = self.test_path.rfind('/')
+        return self.test_path[:last_slash]
+
+    # Given a string, expand all tokens we find. Currently only the `$test_dir`
+    # token.
+    def expand_tokens_in_string(self, string):
+        x = string
+        x = x.replace("$test_dir", self.test_folder)
+        return x
+
+    # Given a list of strings, expand all tokens we find. Currently only the `$test_dir`
+    # token.
+    def expand_tokens_in_list(self, l):
+        new_list = []
+        for s in l:
+            new_list.append(self.expand_tokens_in_string(s))
+
+        return new_list
+
     # Extract options passed through dg-options.
     def extract_options(self):
         p = re.compile('{ *dg-options "(.*)" *}')
         matches = re.search(p, self.file_content)
         if matches is not None:
             matches = matches.group(1)
-            return matches.split()
+            return self.expand_tokens_in_list(matches.split())
 
         self.log.print("WARNING: No dg-options given")
         return []
@@ -137,7 +159,7 @@ class UnitTest:
         matches = re.search(p, self.file_content)
         if matches is not None:
             matches = matches.group(1)
-            return matches.split()
+            return self.expand_tokens_in_list(matches.split())
 
         return None
 
@@ -180,6 +202,10 @@ class UnitTest:
 
         tool = subprocess.run(command, timeout=10, stderr=subprocess.STDOUT,
                               stdout=subprocess.PIPE)
+
+        if tool.returncode != 0:
+            print(tool.stdout.decode())
+            exit(99)
 
         return output
 
