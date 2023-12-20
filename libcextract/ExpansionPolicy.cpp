@@ -6,14 +6,15 @@
 bool KernelExpansionPolicy::Must_Expand(const StringRef &absolute_path,
                                         const StringRef &relative_path)
 {
-  /* Marcos, seu código vai aqui.  Essa classe é instanciada a cada vez que
-     o FunctionDepsFinder é instanciado, ou seja, duas vezes no ClosurePass.
+  std::vector<std::string> include_paths = { "/include/", "/arch/" };
 
-     Portanto guardar coisas na KernelExpansionPolicy será eventualmente
-     descartado.
-     */
+  for (auto &path : include_paths) {
+    if (absolute_path.find(path) != std::string::npos)
+      return false;
+  }
 
-  llvm::outs() << "abs: " << absolute_path << "  rel: " << relative_path << '\n';
+  // The subpath wasn't found, so it's not a public header. In this case we
+  // should expand it.
   return true;
 }
 

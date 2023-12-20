@@ -205,6 +205,9 @@ class SymbolExternalizer
 
   bool _Externalize_Symbol(const std::string &to_externalize, ExternalizationType type);
 
+  /* Drop `static` keyword in decl.  */
+  bool Drop_Static(FunctionDecl *decl);
+
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
       system.  */

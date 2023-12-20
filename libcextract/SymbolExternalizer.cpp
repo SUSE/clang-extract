@@ -131,6 +131,24 @@ static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange 
   return new_range;
 }
 
+bool SymbolExternalizer::Drop_Static(FunctionDecl *decl)
+{
+  if (decl->isStatic()) {
+    auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(), "static");
+    assert(ids.size() > 0 && "static decl without static keyword?");
+
+    SourceRange static_range = ids[0];
+    Remove_Text(static_range, 10);
+
+    /* Update the storage class.  */
+    decl->setStorageClass(StorageClass::SC_None);
+
+    return true;
+  }
+
+  return false;
+}
+
 /* ---- Delta and TextModifications class ------ */
 
 
@@ -745,6 +763,11 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
                          .NewName = new_name,
                          .Type = ExternalizationType::RENAME});
           first = false;
+        }
+
+        /* In the case there is a `static` modifier in function, try to drop it.  */
+        if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
+          Drop_Static(fdecl);
         }
 
         /* Rename the declaration.  */
