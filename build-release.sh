@@ -1,3 +1,3 @@
 #!/bin/sh
 
-CXX=clang++ meson setup build --buildtype=release
+meson setup build --buildtype=release --native-file ce-native.ini
