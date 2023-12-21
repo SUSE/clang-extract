@@ -6,5 +6,4 @@
 **/*.py[cod]
 **/*.dump.*
 **/*.swp
-clang-extract
-inline
+build
