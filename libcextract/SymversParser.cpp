@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <libgen.h>
 
 Symvers::Symvers(const std::string &path)
     : Parser(path)
@@ -47,7 +48,8 @@ void Symvers::Parse()
     std::getline(ss, sym_name, '\t');
     std::getline(ss, sym_mod, '\t');
 
-    Symbol sym(sym_name, sym_mod);
+    // Only get the name of the module, instead of the path to it
+    Symbol sym(sym_name, basename(sym_mod.data()));
     Insert_Symbols_Into_Hash(sym);
   }
 }
