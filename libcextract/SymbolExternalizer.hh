@@ -167,11 +167,11 @@ class SymbolExternalizer
     const std::string &OldSymbolName;
 
     FunctionUpdater(SymbolExternalizer &se, ValueDecl *new_decl,
-                    const std::string &old_decl_name, bool was_function)
+                    const std::string &old_decl_name, bool wrap)
     : SE(se),
       NewSymbolDecl(new_decl),
       OldSymbolName(old_decl_name),
-      WasFunction(was_function)
+      Wrap(wrap)
     {}
 
     /** Sweeps the function and update any reference to the old function, replacing
@@ -183,8 +183,8 @@ class SymbolExternalizer
     /* Decl to update.  */
     DeclaratorDecl *ToUpdate;
 
-    /* Was the original declaration a function?  */
-    bool WasFunction;
+    /* Do we need to wrap the use in (*name)?  */
+    bool Wrap;
 
     bool Update_References_To_Symbol(Stmt *);
   };

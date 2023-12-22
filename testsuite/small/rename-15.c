@@ -17,5 +17,5 @@ int f(void)
   return g(3);
 }
 
-/* { dg-final { scan-tree-dump "return klpe_g\(3\);" } } */
+/* { dg-final { scan-tree-dump "return \(\*klpe_g\)\(3\);" } } */
 /* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(int\);" } } */

@@ -12,4 +12,4 @@ int f(void)
 
 /* { dg-final { scan-tree-dump-not "static int g" } } */
 /* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(\);" } } */
-/* { dg-final { scan-tree-dump "int f\(void\)\n{\n *return klpe_g\(\)" } } */
+/* { dg-final { scan-tree-dump "int f\(void\)\n{\n *return \(\*klpe_g\)\(\)" } } */

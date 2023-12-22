@@ -2,4 +2,4 @@
 #include "rename-5.h"
 
 /* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(\);" } } */
-/* { dg-final { scan-tree-dump "return klpe_f\(\);" } } */
+/* { dg-final { scan-tree-dump "return \(\*klpe_f\)\(\);" } } */

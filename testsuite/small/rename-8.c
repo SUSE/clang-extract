@@ -11,5 +11,5 @@ int f()
 }
 
 /* { dg-final { scan-tree-dump "static int \*klpe_bbb;" } } */
-/* { dg-final { scan-tree-dump "#define A \*\(klpe_bbb\)" } } */
-/* { dg-final { scan-tree-dump "#define B \*\(klpe_bbb\)" } } */
+/* { dg-final { scan-tree-dump "#define A \(\*klpe_bbb\)" } } */
+/* { dg-final { scan-tree-dump "#define B \(\*klpe_bbb\)" } } */

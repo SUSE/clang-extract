@@ -9,4 +9,4 @@ int g()
 }
 
 /* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(\);" } } */
-/* { dg-final { scan-tree-dump "return klpe_f\(\);" } } */
+/* { dg-final { scan-tree-dump "return \(\*klpe_f\)\(\);" } } */

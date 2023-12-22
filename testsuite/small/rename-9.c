@@ -11,4 +11,4 @@ int f()
 }
 
 /* { dg-final { scan-tree-dump "static char \(\*klpe_CRYPTO_strdup\)\(const char \*, const char \*, int\);" } } */
-/* { dg-final { scan-tree-dump "klpe_CRYPTO_strdup\(str," } } */
+/* { dg-final { scan-tree-dump "\(\*klpe_CRYPTO_strdup\)\(str," } } */

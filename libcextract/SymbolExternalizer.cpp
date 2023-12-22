@@ -384,13 +384,9 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
       if (str == OldSymbolName) {
         /* Prepare the text modification.  */
         std::string new_name;
-        if (WasFunction) {
-          /* In case the original declaration was a function, we only need to
-             rewrite the new symbol name.  */
+        if (Wrap) {
           new_name = NewSymbolDecl->getName().str();
         } else {
-          /* In case the original declaration was a varaible, we need to indicate
-             that we are now accessing a pointer variable.  */
           new_name = "(*" + NewSymbolDecl->getName().str() + ")";
         }
 
@@ -652,7 +648,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
   bool first = true;
   ValueDecl *new_decl = nullptr;
   bool must_update = false;
-  bool was_function = false;
+  bool wrap = false;
   bool externalized = false;
 
   /* The TopLevelDecls attribute from the AST is private, but we need to
@@ -668,7 +664,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
        functions in order to find if there is a reference to the function we
        externalized.  */
     if (must_update) {
-      FunctionUpdater(*this, new_decl, to_externalize, was_function)
+      FunctionUpdater(*this, new_decl, to_externalize, wrap)
         .Update_References_To_Symbol(decl);
     }
 
@@ -693,11 +689,10 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
 
           must_update = true;
-          was_function = dynamic_cast<FunctionDecl*>(decl) ? true : false;
+          wrap = false;
 
           /* Update any macros that may reference the symbol.  */
-          std::string replacement = was_function ? new_decl->getName().str() : "*(" + new_decl->getName().str() + ")";
-
+          std::string replacement = "(*" + new_decl->getName().str() + ")";
           Rewrite_Macros(to_externalize, replacement);
 
           /* Slaps the new node into the position of where was the function
@@ -781,7 +776,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
         Replace_Text(id_range, new_name, 100);
 
         must_update = true;
-        was_function = true;
+        wrap = true;
 
         /* Update any macros that may reference the symbol.  */
         Rewrite_Macros(to_externalize, new_name);
