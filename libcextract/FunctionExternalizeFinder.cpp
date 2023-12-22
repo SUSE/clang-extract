@@ -103,7 +103,7 @@ bool FunctionExternalizeFinder::Analyze_Function(FunctionDecl *decl)
     return true;
   } else {
     /* Else check if we need to externalize any of its variables.  */
-    Externalize_Variables(decl);
+    Externalize_DeclRefs(decl);
     return false;
   }
 }
@@ -131,7 +131,7 @@ bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
   }
 }
 
-bool FunctionExternalizeFinder::Externalize_Variables(FunctionDecl *decl)
+bool FunctionExternalizeFinder::Externalize_DeclRefs(FunctionDecl *decl)
 {
   if (!decl)
     return false;
@@ -140,13 +140,13 @@ bool FunctionExternalizeFinder::Externalize_Variables(FunctionDecl *decl)
 
   Stmt *body = decl->getBody();
   if (body) {
-    externalized = Externalize_Variables(body);
+    externalized = Externalize_DeclRefs(body);
   }
 
   return externalized;
 }
 
-bool FunctionExternalizeFinder::Externalize_Variables(Stmt *stmt)
+bool FunctionExternalizeFinder::Externalize_DeclRefs(Stmt *stmt)
 {
   if (!stmt)
     return false;
@@ -155,10 +155,10 @@ bool FunctionExternalizeFinder::Externalize_Variables(Stmt *stmt)
 
   if (DeclRefExpr::classof(stmt)) {
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
-    VarDecl *decl = dynamic_cast<VarDecl *>(expr->getDecl());
+    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(expr->getDecl());
 
     if (Should_Externalize(decl)) {
-      externalized = Mark_For_Externalization(decl->getName().str());
+      externalized = Mark_For_Externalization(decl->getNameAsString());
     }
   }
 
@@ -169,7 +169,7 @@ bool FunctionExternalizeFinder::Externalize_Variables(Stmt *stmt)
       it != it_end; ++it) {
 
     Stmt *child = *it;
-    externalized |= Externalize_Variables(child);
+    externalized |= Externalize_DeclRefs(child);
   }
 
   return externalized;

@@ -30,8 +30,8 @@ class FunctionExternalizeFinder
   bool Analyze_Node(CallGraphNode *);
   bool Analyze_Function(FunctionDecl *);
 
-  bool Externalize_Variables(FunctionDecl *decl);
-  bool Externalize_Variables(Stmt *stmt);
+  bool Externalize_DeclRefs(FunctionDecl *decl);
+  bool Externalize_DeclRefs(Stmt *stmt);
 
   inline bool Must_Not_Externalize(const std::string &name)
   {
