@@ -102,6 +102,9 @@ class ArgvParser
 
   const char *Get_Input_File(void);
 
+  /** Print help usage message.  */
+  void Print_Usage_Message(void);
+
   private:
   bool Handle_Clang_Extract_Arg(const char *str);
   void Insert_Required_Parameters(void);
