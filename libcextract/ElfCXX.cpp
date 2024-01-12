@@ -156,26 +156,13 @@ ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
         break;
 
       case SHT_PROGBITS:
-        /* Search for the module name, if the ELF object is a kernel module. */
-        if (!strncmp(section.Get_Name(), ".modinfo", 8)) {
-          Elf_Data *data = section.Get_Data();
+        /*
+         * Search for the module name, if the ELF object is a kernel module. The
+         * module name starts at offset 24 for 64bit kernels.
+         */
+        if (!strncmp(section.Get_Name(), ".gnu.linkonce.this_module", 25))
+          Mod = std::string((char *)section.Get_Data()->d_buf + 24);
 
-          size_t size = data->d_size;
-          char *cdata = (char *)data->d_buf;
-
-          while (size) {
-            size_t len = strlen(cdata);
-
-            /* Module name found */
-            if (prefix("name=", cdata)) {
-                Mod = std::string(cdata).erase(0, 5);
-                break;
-            }
-
-            cdata += len + 1;
-            size -= len + 1;
-          }
-        }
         break;
       default:
         break;
