@@ -43,7 +43,7 @@ namespace ClangCompat
 #endif
   }
 
-  static inline const Type *getTypePtr(const QualType &qtype)
+  static inline const clang::Type *getTypePtr(const QualType &qtype)
   {
 #if CLANG_VERSION_MAJOR >= 17
     /* Starting from clang-17 it crashes if qtype isNull is true.  */
@@ -59,9 +59,16 @@ namespace ClangCompat
     OptionalFileEntryRef main_fentry = sm.getFileEntryRefForID(main_file);
     DirectoryEntryRef dir_ref = (*main_fentry).getDir();
 
-#if CLANG_VERSION_MAJOR >= 17
+#if CLANG_VERSION_MAJOR >= 18
     std::array<std::pair<OptionalFileEntryRef, DirectoryEntryRef>, 1> A {{
       { main_fentry, dir_ref },
+    }};
+    return A;
+#elif CLANG_VERSION_MAJOR == 17
+    const FileEntry *fentry      = &(*main_fentry).getFileEntry();
+
+    std::array<std::pair<const FileEntry *, DirectoryEntryRef>, 1> A {{
+      { fentry, dir_ref },
     }};
     return A;
 #else

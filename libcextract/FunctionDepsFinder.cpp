@@ -565,7 +565,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
     if (TypedefDecl *decl = dynamic_cast<TypedefDecl *>(*it)) {
       SourceRange range = decl->getSourceRange();
 
-      const Type *type = decl->getTypeForDecl();
+      const clang::Type *type = decl->getTypeForDecl();
       if (type) {
         TagDecl *typedecl = type->getAsTagDecl();
 
@@ -611,7 +611,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
     else if (DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it)) {
       SourceRange range = decl->getSourceRange();
 
-      const Type *type = ClangCompat::getTypePtr(decl->getType());
+      const clang::Type *type = ClangCompat::getTypePtr(decl->getType());
       TagDecl *typedecl = type->getAsTagDecl();
       if (typedecl && Closure.Is_Decl_Marked(typedecl)) {
         SourceRange type_range = typedecl->getSourceRange();
