@@ -204,6 +204,11 @@ int main(int argc, char *argv[])
 
     if (Mode == WHERE_IS_INLINED) {
       if (Output == DOT) {
+        if (Output_Path == nullptr) {
+          printf("ERROR: No output path\n");
+          exit(1);
+        }
+
         ia.Get_Graphviz_Of_Inlines(Symbols_To_Analyze, Output_Path);
         printf("Output written to %s\n", Output_Path);
       } else {
@@ -215,6 +220,10 @@ int main(int argc, char *argv[])
     }
     if (Mode == INLINE_CLOSURE) {
       if (Output == DOT) {
+        if (Output_Path == nullptr) {
+          printf("ERROR: No output path\n");
+          exit(1);
+        }
         ia.Get_Graphviz_Of_Inline_Closure(Symbols_To_Analyze, Output_Path);
         printf("Output written to %s\n", Output_Path);
       } else {

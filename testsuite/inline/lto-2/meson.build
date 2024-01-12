@@ -6,4 +6,5 @@ outp_path = meson.current_build_dir() + '/' + file + '.log'
 should_fail = returncode_to_bool[
     run_command('grep', '-nwI', '{ *dg-xfail *}', test_path, check: false).returncode()]
 test(file, runtest, args : [ '-lto-test', '-inline-test', test_path, '-o', outp_path ],
-           should_fail: should_fail)
+           should_fail: should_fail, is_parallel : false) # Race condition while
+           # removing the ipa-clones, so avoid parallel testing for now.
