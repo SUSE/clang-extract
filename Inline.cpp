@@ -144,12 +144,6 @@ static int Check_Input(void)
 
 static void Print_Symbol_Set(InlineAnalysis &ia, std::set<std::string> &set)
 {
-  if (!Symbols_To_Analyze.empty()) {
-    std::erase_if(set, [&](std::string sym) {
-        return std::find(Symbols_To_Analyze.begin(), Symbols_To_Analyze.end(), sym) == Symbols_To_Analyze.end();
-        });
-  }
-
   if (Output == TERMINAL) {
     if (Output_Path== nullptr) {
       ia.Print_Symbol_Set(set);
