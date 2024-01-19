@@ -133,8 +133,12 @@ void ElfSymbolCache::Insert_Symbols_Into_Hash(SymbolTableHash &map, ElfSection &
   size_t n = section.Get_Num_Symbols();
   for (size_t i = 0; i < n; i++) {
     ElfSymbol symbol = section.Get_Symbol(i);
-    std::string symbol_name(symbol.Get_Name());
+    if (symbol.Get_Type() == STT_FILE) {
+      /* Skip the file symbols, we don't need them.  */
+      continue;
+    }
 
+    std::string symbol_name(symbol.Get_Name());
     map[symbol_name] = symbol.Get_Info();
   }
 }

@@ -1,6 +1,5 @@
 /* { dg-compile "-fdump-ipa-clones -O3 -g3"} */
 /* { dg-options "-compute-closure main"} */
-/* { dg-xfail } */
 
 static inline int g(void)
 {
