@@ -1,8 +1,33 @@
+/*
+ *  clang-extract - Extract functions from projects and its dependencies using
+ *                  libclang and LLVM infrastructure.
+ *
+ *  Copyright (C) 2024 SUSE Software Solutions GmbH
+ *
+ *  This file is part of clang-extract.
+ *
+ *  clang-extract is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 3 of the License, or (at your option) any later version.
+ *
+ *  clang-extract is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with clang-extract.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
 /** Header providing compatibility with older versions of clang.
  *
  * Clang API often have minor changes across versions. For this tool to be
  * compatible with multiple versions, we have to provide a minimal interface
  * between them.
+ *
+ * Author: Giuliano Belinassi
  */
 
 #pragma once
@@ -14,7 +39,9 @@
 namespace ClangCompat
 {
 #if CLANG_VERSION_MAJOR >= 16
+/** Some functions changed its signature to expect std::nullopt when no option is given.*/
 # define ClangCompat_None std::nullopt
+/** Clang do not provide getPointer() for tokens anymore.  */
 # define ClangCompat_GetTokenPtr(token) (token).has_value() ? &(token).value() : nullptr
 #else
 # define ClangCompat_None clang::None
@@ -35,6 +62,7 @@ namespace ClangCompat
   createInvocationFromCommandLine(ArrayRef<const char *> Args, IntrusiveRefCntPtr<DiagnosticsEngine> Diags=IntrusiveRefCntPtr< DiagnosticsEngine >())
   {
 #if CLANG_VERSION_MAJOR >= 15
+    /* Provide an implementation of createInvocationFromCommandLine for newer versions of clang.  */
     clang::CreateInvocationOptions CIOpts;
     CIOpts.Diags = Diags;
     return clang::createInvocation(Args, std::move(CIOpts));
@@ -55,6 +83,9 @@ namespace ClangCompat
 
   static inline auto Get_Main_Directory_Arr(const SourceManager &sm)
   {
+    /* This function is used to provide a valid object for the function
+       `LookupFile`, which do not seems to provide a stable interface between
+       versions.  */
     FileID main_file = sm.getMainFileID();
     OptionalFileEntryRef main_fentry = sm.getFileEntryRefForID(main_file);
     DirectoryEntryRef dir_ref = (*main_fentry).getDir();

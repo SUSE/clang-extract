@@ -1,3 +1,18 @@
+//===- SymversParser.cpp - Parse linux Modules.symvers files ----*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Parse linux Modules.symvers files.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Marcos de Paulo Souza  */
+
 #include "SymversParser.hh"
 
 #include <iostream>

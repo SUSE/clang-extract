@@ -1,5 +1,18 @@
-/* MISC functions that is used through the program and use any LLVM
-   datastructure.  */
+//===- LLVMMisc.cpp - Implement misc functions that depends on LLVM *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// MISC functions that is used through the program and use any LLVM
+/// datastructure.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
 
 #include "LLVMMisc.hh"
 
@@ -155,4 +168,3 @@ Decl *Get_Bodyless_Or_Itself(Decl *decl)
   Decl *bodyless = Get_Bodyless_Decl(decl);
   return bodyless ? bodyless : decl;
 }
-

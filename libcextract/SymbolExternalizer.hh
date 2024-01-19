@@ -1,3 +1,18 @@
+//===- SymbolExternalizer.cpp - Externalize or rename symbols ---*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Externalize or rename symbols.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #pragma once
 
 #include "MacroWalker.hh"

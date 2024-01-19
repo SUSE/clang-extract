@@ -1,3 +1,18 @@
+//===- Passes.cpp - Pass manager and pass list for clang-extract -*- C++ *-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Pass manager and pass list for clang-extract.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "Passes.hh"
 
 #include "FunctionDepsFinder.hh"

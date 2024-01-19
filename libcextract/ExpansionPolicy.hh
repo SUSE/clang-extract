@@ -1,3 +1,18 @@
+//===- ExpansionPolicy.hh - Declare header expansion policy ---- *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Implements a Expansion Policy for #include headers.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #pragma once
 
 #include <llvm/ADT/StringRef.h>

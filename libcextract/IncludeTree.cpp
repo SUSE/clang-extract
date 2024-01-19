@@ -1,3 +1,18 @@
+//===- IncludeTree.cpp - Tree of #include'd files -------------- *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Tree of #include'd files.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "IncludeTree.hh"
 #include "PrettyPrint.hh"
 #include "ClangCompat.hh"

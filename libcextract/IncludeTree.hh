@@ -1,3 +1,18 @@
+//===- IncludeTree.hh - Tree of #include'd files --------------- *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Tree of #include'd files.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 /** IncludeTree: Tree of include directives.
  *
  * A C or C++ source file often #include other files for prototypes of

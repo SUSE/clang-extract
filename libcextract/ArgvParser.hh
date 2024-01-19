@@ -1,3 +1,16 @@
+//===- ArgvParser.hh - Parse the command-line options -----------*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Parse the command-line options given to clang-extract.
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <string>
@@ -11,6 +24,7 @@
  * can simply swap the compiler to clang-extract instead of gcc in the
  * makefiles by overwriting the CC variable.
  *
+ * Author: Giuliano Belinassi
  */
 class ArgvParser
 {

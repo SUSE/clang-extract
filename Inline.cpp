@@ -1,3 +1,18 @@
+//===- Inline.cpp - Show inlining decisions and symbol visibility --*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Show inlining decisions and symbol visibility.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "InlineAnalysis.hh"
 #include "NonLLVMMisc.hh"
 #include <stdlib.h>

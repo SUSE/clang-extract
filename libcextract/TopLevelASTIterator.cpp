@@ -1,3 +1,18 @@
+//===- TopLevelASTIterator.cpp - Iterate through toplevel entities *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Iterate through toplevel entities: both macros and decls.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "TopLevelASTIterator.hh"
 
 TopLevelASTIterator::TopLevelASTIterator(ASTUnit *ast, bool skip_macros_in_decls)

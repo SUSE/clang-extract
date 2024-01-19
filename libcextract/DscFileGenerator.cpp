@@ -1,3 +1,18 @@
+//===- DscFileGenerator.cpp - Generate the libpulp .dsc file ----*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Generate the libulp .dsc file for a single userspace livepatch.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "DscFileGenerator.hh"
 #include "PrettyPrint.hh"
 #include "Error.hh"

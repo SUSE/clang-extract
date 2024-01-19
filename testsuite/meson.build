@@ -1,3 +1,18 @@
+##===- meson.build - Rules for building clang-extract *- meson ----------*-===##
+##
+## This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+## See https://llvm.org/LICENSE.txt for license information.
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+##
+##===----------------------------------------------------------------------===##
+##
+### \file
+### Rules and scripts for building libcextract.
+##
+##===----------------------------------------------------------------------===##
+#
+# Author: Giuliano Belinassi
+
 runtest = find_program('lib/runtest.py')
 ordinary_test_dirs = [ 'small/', 'includes/', 'ccp/' ]
 

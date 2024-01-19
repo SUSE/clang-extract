@@ -1,9 +1,25 @@
+//===- ElfCXX.hh- C++ Wrapper for libelf -----------------------*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// A C++ wrapper for libelf.
+//
+//===----------------------------------------------------------------------===//
+
+
 /** ElfCXX: Wrapper class for libelf.
  *
  * Libelf is a library for handling ELF files written in C. It provides a
  * basic API for handling ELF files which IMHO is not straightfoward.
  * Those classes tries to make things easier by collapsing many structures
  * together (e.g. Section, Section Header and Section Data into a single class).
+ *
+ * Author: Giuliano Belinassi, Marcos Paulo de Souza
  */
 
 #pragma once

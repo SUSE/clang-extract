@@ -1,3 +1,16 @@
+//===- DscFileGenerator.hh - Generate the libpulp .dsc file -----*- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Generate the libulp .dsc file for a single userspace livepatch.
+//
+//===----------------------------------------------------------------------===//
+
 /** DscFileGenerator: Generate libpulp .dsc file to be incorporated into livepatch
   *                   object.
   *
@@ -5,6 +18,7 @@
   * (the .so file that is loaded with `ulp trigger`) into the `.ulp` section.
   * This section is merged with the .so file using `ulp packer`.
   *
+  * Author: Giuliano Belinassi
   */
 
 #pragma once

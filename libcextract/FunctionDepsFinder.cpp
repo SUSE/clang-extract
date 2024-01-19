@@ -1,3 +1,18 @@
+//===- ExpansionPolicy.cpp - Construct Closure of Symbols --- *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Implements the closure algorithm for symbols.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include <sstream>
 #include <vector>
 #include "FunctionDepsFinder.hh"

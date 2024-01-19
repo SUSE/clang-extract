@@ -1,3 +1,16 @@
+//===- SymversParser.cpp - Parse linux Modules.symvers files ---*- C++ --*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Parse linux Modules.symvers files.
+//
+//===----------------------------------------------------------------------===//
+
 /** SymversParse
  *
  * The Module.symvers file contains all exported functions from the kernel
@@ -10,6 +23,8 @@
  *
  * If the symbol resides in the vmlinux, we don't need to externalize it, since
  * the symbol will always be there.
+ *
+ * Author: Marcos Paulo de Souza
  */
 
 #pragma once

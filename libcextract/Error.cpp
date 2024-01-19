@@ -1,3 +1,18 @@
+//===- Error.cpp - Implements a simple error pointing mechanism *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Implements a simple error pointing mechanism.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #include "Error.hh"
 #include "PrettyPrint.hh"
 #include "NonLLVMMisc.hh"
@@ -16,6 +31,7 @@ DiagsClass::DiagsClass(void)
     DiagsEngine(llvm::outs(), LangOpts, DOpts.Get_DiagnosticOptions())
 {}
 
+/* Print error giving a piece of source code that caused the error.  */
 void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level, const SourceRange &range)
 {
   SourceManager *sm = PrettyPrint::Get_Source_Manager();
@@ -30,6 +46,7 @@ void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level l
   }
 }
 
+/* Print error without giving a piece of source code that caused the error.  */
 void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level)
 {
   bool colored = Is_Colored();

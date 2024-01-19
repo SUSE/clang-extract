@@ -1,3 +1,18 @@
+//===- PrettyPrint.hh - Print Decls or Preprocessor entities to file *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// Print Decls or Preprocessor entities to file.
+//
+//===----------------------------------------------------------------------===//
+
+/* Author: Giuliano Belinassi  */
+
 #pragma once
 
 #include <unordered_set>
