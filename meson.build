@@ -42,7 +42,7 @@ compiler_name = cpp.get_id()
 assert(compiler_name == 'clang', compiler_name + ' found but only clang is supported')
 
 ########## Dependency: clang libraries ################
-llvm_libdir = dependency('llvm').get_variable(cmake : 'LLVM_LIBRARY_DIR', configtool: 'libdir')
+llvm_libdir = dependency('llvm', version : '>=16').get_variable(cmake : 'LLVM_LIBRARY_DIR', configtool: 'libdir')
 
 clang_dep = []
 clang_dep += cpp.find_library('clang-cpp', dirs : llvm_libdir)
