@@ -329,7 +329,17 @@ class UnitTest:
 
         test_file = os.path.basename(self.test_path)
 
-        return output_folder + "/" + elf_file + "-" + test_file + ".000i.ipa-clones"
+        ipa_file = output_folder + "/" + elf_file + "-" + test_file + ".000i.ipa-clones"
+        # Check if the file exists
+        if os.path.isfile(ipa_file) == True:
+          return ipa_file
+
+        # On older versions of gcc, the name is slightly different.
+        ipa_file = output_folder + "/" +  test_file + ".000i.ipa-clones"
+        if os.path.isfile(ipa_file) == True:
+          return ipa_file
+
+        return None
 
     # Indeed run the test.
     def run_test(self, lto_test=False):
