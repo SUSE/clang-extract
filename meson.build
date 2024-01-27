@@ -64,6 +64,7 @@ executable('inline', 'Inline.cpp',
 
 executable('clang-extract', 'Main.cpp',
   include_directories : incdir,
+  install : true,
   link_with : libcextract_static,
   dependencies : [elf_dep, clang_dep]
 )
