@@ -1,0 +1,45 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        opensuse: [tumbleweed]
+        compiler: [clang]
+        build-type: [debug, release]
+
+#        include:
+#          - build-type: debug
+#          - build-type: release
+
+    container:
+      image: opensuse/${{ matrix.opensuse }}
+      options: --privileged
+
+    steps:
+    - name: dependencies
+      run: zypper -n install libelf-devel
+           llvm16-libclang13 clang16-devel libclang-cpp16
+           clang-tools libLLVM16 llvm16 llvm16-devel meson ninja
+           python311-psutil python311-pexpect python311-subprocess-tee
+           python311-pytest gcc
+    - uses: actions/checkout@v2
+    - name: meson
+      run: meson setup build --buildtype=${{ matrix.build-type }} --native-file ce-native.ini
+    - name: build
+      run: meson compile -C build/ -v
+      id: build
+    - name: test
+      run: meson test -C build/ -v
+      id: check
+    - name: diagnostics
+      if: failure () && steps.check.outcome == 'failure'
+      run: cat build/meson-logs/testlog.log
