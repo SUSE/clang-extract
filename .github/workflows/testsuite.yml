@@ -1,0 +1,52 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        opensuse: [tumbleweed]
+        compiler: [clang]
+        build-type: [NORMAL]
+        include:
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+
+    container:
+      image: opensuse/${{ matrix.opensuse }}
+      options: --privileged
+
+    steps:
+    - name: dependencies
+      run: zypper -n install libelf-devel
+           libclang16 clang16-devel libclang-cpp16
+           clang-tools libLLVM16 llvm16 llvm16-devel meson ninja
+           python311-psutil python311-pexpect python311-subprocess-tee
+           python311-pytest gcc
+    - uses: actions/checkout@v2
+    - name: meson
+      run: meson setup build --buildtype=${{ matrix.build-type }} --native-file ce-native.ini
+    - name: build
+      run: cd build
+    - name: ninja
+      run: ninja
+      id: ninja
+    - name: ninja test
+      run: ninja test
+      id: check
+    - name: diagnostics
+      if: failure () && steps.check.outcome == 'failure'
+      run: cat meson-logs/testlog.log
+    - name: distribution
+      run: ninja dist
