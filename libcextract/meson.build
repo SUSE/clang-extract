@@ -32,7 +32,8 @@ libcextract_sources = [
   'SymbolExternalizer.cpp',
   'SymversParser.cpp',
   'TopLevelASTIterator.cpp',
-  'ExpansionPolicy.cpp'
+  'ExpansionPolicy.cpp',
+  'HeaderGenerate.cpp'
 ]
 
 libcextract_static = static_library('cextract', libcextract_sources)

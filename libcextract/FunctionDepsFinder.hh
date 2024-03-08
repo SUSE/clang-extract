@@ -37,6 +37,12 @@ class ClosureSet
   /** Mark decl as dependencies and all its previous decls versions.  */
   bool Add_Decl_And_Prevs(Decl *decl);
 
+  /** Add a single decl to the set.  */
+  void Add_Single_Decl(Decl *decl)
+  {
+    Dependencies.insert(decl);
+  }
+
   inline std::unordered_set<Decl *> &Get_Set(void)
   {
     return Dependencies;
