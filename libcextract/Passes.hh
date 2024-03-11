@@ -59,6 +59,7 @@ class PassManager {
             IpaclonesPath(args.Get_Ipaclones_Path()),
             SymversPath(args.Get_Symvers_Path()),
             DscOutputPath(args.Get_Dsc_Output_Path()),
+            OutputFunctionPrototypeHeader(args.Get_Output_Path_To_Prototype_Header()),
             IncExpansionPolicy(IncludeExpansionPolicy::Get_Overriding(
                                args.Get_Include_Expansion_Policy(), Kernel)),
             NamesLog(),
@@ -118,6 +119,9 @@ class PassManager {
 
         /* Path to libpulp .dsc file for output.  */
         const char *DscOutputPath;
+
+        /* Output path to a file containing foward declarations of all functions.  */
+        const char *OutputFunctionPrototypeHeader;
 
         /* Policy used to expand includes.  */
         IncludeExpansionPolicy::Policy IncExpansionPolicy;

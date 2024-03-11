@@ -25,6 +25,7 @@
 #include "DscFileGenerator.hh"
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
+#include "HeaderGenerate.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -513,6 +514,39 @@ class GenerateDscPass : public Pass
     }
 };
 
+class HeaderGenerationPass : public Pass
+{
+  public:
+  HeaderGenerationPass()
+  {
+    PassName = "HeaderGenerationPass";
+  }
+
+  virtual bool Gate(PassManager::Context *ctx)
+  {
+    /* Only runs if the user requested the header.  */
+    return ctx->OutputFunctionPrototypeHeader;
+  }
+
+  virtual bool Run_Pass(PassManager::Context *ctx)
+  {
+    std::error_code ec;
+    llvm::raw_fd_ostream out(ctx->OutputFunctionPrototypeHeader, ec);
+    PrettyPrint::Set_Output_Ostream(&out);
+
+    HeaderGeneration HGen(ctx);
+    HGen.Print();
+
+    PrettyPrint::Set_Output_Ostream(nullptr);
+    return true;
+  }
+
+  virtual void Dump_Result(PassManager::Context *ctx)
+  {
+    /* The dump is the generated file itself.  */
+  }
+};
+
 PassManager::PassManager()
 {
   /* Declare the pass list.  Passes will run in this order.  */
@@ -524,6 +558,7 @@ PassManager::PassManager()
     new FunctionExternalizerPass(),
     new GenerateDscPass(),
     new ClosurePass(/*PrintToFile=*/true),
+    new HeaderGenerationPass(),
   };
 }
 

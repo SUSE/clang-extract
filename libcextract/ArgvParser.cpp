@@ -130,6 +130,9 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_SYMVERS_PATH=<arg>  Path to kernel Modules.symvers file.  Only used when\n"
 "                           -D__KERNEL__ is specified.\n"
 "  -DCE_DSC_OUTPUT=<arg>    Libpulp .dsc file output, used for userspace livepatching.\n"
+"  -DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER=<arg>\n"
+"                           Outputs a header file with a foward declaration of all\n"
+"                           functions. This header is not self-compilable.\n"
 "\n";
 
   llvm::outs() << "The following arguments are ignored by clang-extract:\n";
@@ -212,6 +215,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_DSC_OUTPUT=", str)) {
     DescOutputPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (prefix("-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER=", str)) {
+    OutputFunctionPrototypeHeader = Extract_Single_Arg_C(str);
 
     return true;
   }

@@ -114,6 +114,11 @@ class ArgvParser
     return IncExpansionPolicy;
   }
 
+  inline const char *Get_Output_Path_To_Prototype_Header(void)
+  {
+    return OutputFunctionPrototypeHeader;
+  }
+
   const char *Get_Input_File(void);
 
   /** Print help usage message.  */
@@ -143,4 +148,6 @@ class ArgvParser
   const char *DescOutputPath;
 
   const char *IncExpansionPolicy;
+
+  const char *OutputFunctionPrototypeHeader;
 };
