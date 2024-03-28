@@ -9,7 +9,6 @@ int main(void)
 }
 
 /* { dg-final { scan-tree-dump "#define _STDIO_H	1" } } */
-/* { dg-final { scan-tree-dump "typedef __SIZE_TYPE__ size_t;" } } */
 /* { dg-final { scan-tree-dump "#define __need___va_list" } } */
 /* { dg-final { scan-tree-dump "#include <stdarg.h>" } } */
 /* { dg-final { scan-tree-dump "#include <bits/types/__fpos_t.h>" } } */

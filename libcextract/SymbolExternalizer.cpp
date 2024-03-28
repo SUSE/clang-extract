@@ -16,6 +16,7 @@
 #include "SymbolExternalizer.hh"
 #include "PrettyPrint.hh"
 #include "Error.hh"
+#include "ClangCompat.hh"
 
 #include <unordered_set>
 #include <iostream>
@@ -364,7 +365,6 @@ bool TextModifications::Is_Same_Change(const Delta &a, const Delta &b)
 }
 
 /* ---- End of Deltas class -------- */
-
 
 bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
 {
