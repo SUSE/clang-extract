@@ -123,6 +123,16 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
       bool expand = In_Set(must_expand_set, id->getFileName().str(), /*remove=*/true) ||
                     In_Set(must_expand_set, id->getFile()->getName().str(),
                            /*remove=*/true);
+#if CLANG_VERSION_MAJOR >= 18
+      /* Starting from LLVM-18, the behaviour of FileEntry::getName() changed.
+       * Now it returns the full path of the file rather than the relative path
+       * to it, so here we account it for now onwards.
+       */
+      expand |= In_Set(must_expand_set,
+                       id->getFile()->getFileEntry().tryGetRealPathName().str(),
+                       /*remove=*/true);
+#endif
+
       bool output = already_seen_main && current->Should_Be_Expanded()
                                       && !expand;
       bool is_from_minus_include = !already_seen_main;
@@ -355,11 +365,10 @@ void IncludeTree::IncludeNode::Set_FileEntry(OptionalFileEntryRef file)
 
 SourceRange IncludeTree::IncludeNode::Get_File_Range(void)
 {
-  const FileEntry *file = *File;
   SourceManager *SM = PrettyPrint::Get_Source_Manager();
 
   SourceLocation start, end;
-  FileID fid = SM->getOrCreateFileID(file, SrcMgr::CharacteristicKind());
+  FileID fid = SM->getOrCreateFileID(*File, SrcMgr::CharacteristicKind());
   start = SM->getLocForStartOfFile(fid);
   end = SM->getLocForEndOfFile(fid);
 

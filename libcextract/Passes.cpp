@@ -188,7 +188,12 @@ class BuildASTPass : public Pass
   {
     SourceManager &sm = ast->getSourceManager();
 
+#if CLANG_VERSION_MAJOR >= 18
+    FileEntryRef main_file = *sm.getFileEntryRefForID(sm.getMainFileID());
+#else
     const FileEntry *main_file = sm.getFileEntryForID(sm.getMainFileID());
+#endif
+
     StringRef path = sm.getFileManager().getCanonicalName(main_file);
 
     return path;

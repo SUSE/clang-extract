@@ -36,6 +36,14 @@
 #include <clang/Basic/Version.h>
 #include "clang/Frontend/CompilerInstance.h"
 
+/* Starting from LLVM-18, the method FileEntry::getName() got deprecated.
+ * This makes clang warns about the function being deprecated while it is
+ * completely useful as a way to keep compatibility with older versions of
+ * LLVM, hence we acknowledge the warning here and disable it for now.
+ */
+
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace ClangCompat
 {
 #if CLANG_VERSION_MAJOR >= 16
