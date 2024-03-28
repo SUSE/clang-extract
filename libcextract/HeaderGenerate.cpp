@@ -45,17 +45,22 @@ static bool Contains(const std::vector<ExternalizerLogEntry> &v, const std::stri
 bool HeaderGeneration::Run_Analysis(const std::vector<ExternalizerLogEntry> &set)
 {
   ASTUnit::top_level_iterator it;
+  std::unordered_set<std::string> nameset;
+
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
 
     if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
-      if (Contains(set, fdecl->getNameAsString())) {
+      const std::string &fname = fdecl->getNameAsString();
+      /* If the function was already issued, then do not issue it again.  */
+      if (Contains(set, fname) && nameset.find(fname) == nameset.end()) {
         if (fdecl->doesThisDeclarationHaveABody() && fdecl->hasBody()) {
           Stmt *body = fdecl->getBody();
           fdecl->setRangeEnd(body->getBeginLoc().getLocWithOffset(-1));
           fdecl->setBody(nullptr);
         }
         Closure.Add_Single_Decl(fdecl);
+        nameset.insert(fname);
       }
     }
   }
