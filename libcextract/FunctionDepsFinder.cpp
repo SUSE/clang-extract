@@ -627,7 +627,41 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
       SourceRange range = decl->getSourceRange();
 
       const clang::Type *type = ClangCompat::getTypePtr(decl->getType());
-      TagDecl *typedecl = type->getAsTagDecl();
+      /* There are some cases where a variable is declared as follows:
+
+          static const struct mount_opts
+          {
+            int token;
+            int mount_opts;
+            int flags;
+          } ext4_mount_opts[] = {
+            {1, 1, 1}
+          };
+
+        in this case, the `ext4_mount_opts` array is declared together with its
+        type, thus resulting in Clang splitting this into two decls in its AST:
+
+          struct mount_opts
+          {
+            int token;
+            int mount_opts;
+            int flags;
+          };
+
+          static const struct ext4_mount_opts[] = {
+            {1, 1, 1}
+          };
+
+        but since we try to get what the user wrote, it results in two declarations
+        of `struct mount_opts`, thus clang-extract fails because of a redeclaration
+        error. But since `ext4_mount_opts` is an array, geting its type returns
+        an array type, not the struct declaration itself, hence check for this
+        case as well.  */
+      if (type->isArrayType() || type->isPointerType()) {
+        type = type->getBaseElementTypeUnsafe();
+      }
+
+      TagDecl *typedecl = type ? type->getAsTagDecl() : nullptr;
       if (typedecl && Closure.Is_Decl_Marked(typedecl)) {
         SourceRange type_range = typedecl->getSourceRange();
 
