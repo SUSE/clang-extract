@@ -436,7 +436,12 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Declarator
 {
   ToUpdate = to_update;
   if (to_update) {
-    return Update_References_To_Symbol(to_update->getBody());
+    if (VarDecl *vdecl = dyn_cast<VarDecl>(to_update)) {
+      return Update_References_To_Symbol(vdecl->getInit());
+    }
+    if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(to_update)) {
+      return Update_References_To_Symbol(fdecl->getBody());
+    }
   }
   return false;
 }
