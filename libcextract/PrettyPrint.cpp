@@ -81,42 +81,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
     Therefore we must check for the attributes of this declaration and compute
     the furthest location.  */
 
-    SourceLocation furthest = decl_range.getEnd();
-    AttrVec &attrvec = decl->getAttrs();
-    bool has_attr = false;
-
-    for (size_t i = 0; i < attrvec.size(); i++) {
-      SourceLocation loc = attrvec[i]->getRange().getEnd();
-      loc = Lexer::getLocForEndOfToken(loc, 0, *SM, LangOpts);
-
-      if (loc.isValid() && Is_Before(furthest, loc)) {
-        furthest = loc;
-        has_attr = true;
-      }
-    }
-
-    /* Find the last ')'.  On __attribute__((unused)), the previous code reach
-       until __attribute__((unused), ignoring the last parenthesis.  */
-    if (has_attr) {
-
-      tok::TokenKind r_paren(tok::r_paren);
-
-      while (true) {
-        auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
-        Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
-
-        if (tok == nullptr) {
-          break;
-        }
-
-        if (tok->is(r_paren)) {
-          furthest = tok->getLastLoc();
-        } else {
-          break;
-        }
-      }
-    }
-
+    SourceLocation furthest = PrettyPrint::Get_Expanded_Loc(decl);
     decl_range = SourceRange(decl_range.getBegin(), furthest);
     StringRef decl_source = Get_Source_Text(decl_range);
 
@@ -356,8 +321,9 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
     bool has_attr;
 
     for (size_t i = 0; i < attrvec.size(); i++) {
-      SourceLocation loc = attrvec[i]->getRange().getEnd();
-      loc = Lexer::getLocForEndOfToken(loc, 0, *SM, LangOpts);
+      const Attr *attr = attrvec[i];
+      SourceLocation loc = attr->getRange().getEnd();
+      loc = SM->getExpansionLoc(loc);
 
       if (loc.isValid() && Is_Before(furthest, loc)) {
         furthest = loc;
