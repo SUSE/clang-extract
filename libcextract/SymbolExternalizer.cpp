@@ -87,7 +87,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
 
   /* Tokenize away the function-like macro stuff or expression, we only want
      the identifier.  */
-  const char *token_vector = " (),;+-*/^|&{}[]<>^&|\r\n\t";
+  const char *token_vector = " ().,;+-*/^|&{}[]<>^&|\r\n\t";
 
   /* Create temporary buff, strtok modifies it.  */
   unsigned len = string.size();
