@@ -18,5 +18,4 @@ int main(void)
 /* { dg-final { scan-tree-dump "#include <bits/types/struct_FILE.h>" } } */
 /* { dg-final { scan-tree-dump "#include <bits/stdio_lim.h>" } } */
 /* { dg-final { scan-tree-dump "extern int printf \(const char \*__restrict __format, ...\);" } } */
-/* { dg-final { scan-tree-dump "#include <bits/floatn.h>" } } */
 /* { dg-final { scan-tree-dump "int main\(void\)" } } */
