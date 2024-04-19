@@ -164,18 +164,28 @@ class BuildASTPass : public Pass
   virtual void Dump_Result(PassManager::Context *ctx)
   {
     /* If the code is too large, this crashes with an stack overflow.  */
-    return;
-
     clang::ASTUnit::top_level_iterator it;
 
     std::error_code ec;
     llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
+
+    SourceManager &sm = ctx->AST->getSourceManager();
 
     PrettyPrint::Set_Source_Manager(nullptr);
     PrettyPrint::Set_Output_Ostream(&out);
 
     for (it = ctx->AST->top_level_begin(); it != ctx->AST->top_level_end(); ++it) {
       Decl *decl = *it;
+
+      PresumedLoc presumed = sm.getPresumedLoc(decl->getBeginLoc());
+      unsigned line = presumed.getLine();
+      unsigned col = presumed.getColumn();
+      const std::string &filename = sm.getFilename(decl->getBeginLoc()).str();
+
+      std::string comment = "clang-extract: from " + filename + ":" +
+                            std::to_string(line) + ":" + std::to_string(col);
+      PrettyPrint::Print_Comment(comment);
+
       PrettyPrint::Print_Decl(decl);
     }
 

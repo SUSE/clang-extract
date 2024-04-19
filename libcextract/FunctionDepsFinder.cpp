@@ -39,6 +39,14 @@ bool ClosureSet::Add_Decl_And_Prevs(Decl *decl)
       inserted = true;
     }
 
+    if (TypedefDecl *ndecl = dyn_cast<TypedefDecl>(decl)) {
+      llvm::outs() << ndecl->getName() << "\n";
+      PrettyPrint::Debug_Decl(ndecl);
+      if (ndecl->getName() == "mbstate_t") {
+        llvm::outs() << "debug_me\n";
+      }
+    }
+
     decl = decl->getPreviousDecl();
   }
   return inserted;
@@ -172,9 +180,14 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   if ((CALL_EXPR) == VISITOR_STOP)           \
     return VISITOR_STOP
 
+/*
 #define DO_NOT_RUN_IF_ALREADY_ANALYZED(decl) \
   if (Already_Analyzed(decl) == true)        \
     return VISITOR_CONTINUE
+*/
+
+#define DO_NOT_RUN_IF_ALREADY_ANALYZED(decl)
+
 
   /* Special Traversal functions which marks if a Decl was already analyzed.
      This macro generates them.  */
@@ -440,8 +453,22 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   }
 
   /* -------- C++ Types ------------- */
+  bool TraverseTemplateSpecializationType(TemplateSpecializationType *type)
+  {
+    //type->dump();
+    return RecursiveASTVisitor::TraverseTemplateSpecializationType(type);
+  }
+
   bool VisitTemplateSpecializationType(const TemplateSpecializationType *type)
   {
+    //type->dump();
+    for (const TemplateArgument &arg : type->template_arguments()) {
+      llvm::outs() << arg.getKind() << '\n';
+      QualType t = arg.getAsType();
+      //t.dump();
+    }
+
+
     /* For some reason the Traverse do not run on the original template
        C++ Record, only on its specializations.  Hence do it here.  */
     return TraverseDecl(type->getAsCXXRecordDecl());
@@ -456,6 +483,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitElaboratedType(const ElaboratedType *type)
   {
+    //type->dump();
     return VISITOR_CONTINUE;
   }
 
@@ -694,6 +722,12 @@ bool FunctionDependencyFinder::Run_Analysis(std::vector<std::string> const &func
   bool ret = true;
   /* Step 1: Compute the closure.  */
   ret &= Find_Functions_Required(functions);
+
+#if 0
+  for (auto it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    Closure.Add_Single_Decl(*it);
+  }
+#endif
 
   /* Step 2: Expand the closure to include Decls in non-expanded includes.  */
   if (KeepIncludes) {
