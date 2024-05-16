@@ -35,6 +35,7 @@ static const char *UnsupportedGCCArgs[] = {
   "-fconserve-stack",
   "-fdump-ipa-clones",
   "-flive-patching=inline-clone",
+  "-fmin-function-alignment=16",
   "-fno-allow-store-data-races",
   "-fno-var-tracking-assignments",
   "-Wno-alloc-size-larger-than",
