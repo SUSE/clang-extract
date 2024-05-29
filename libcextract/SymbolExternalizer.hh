@@ -182,11 +182,12 @@ class TextModifications
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool dump = false)
+  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt, bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
       TM(ast, dump),
-      IA(ia)
+      IA(ia),
+      Ibt(ibt)
   {
   }
 
@@ -284,4 +285,7 @@ class SymbolExternalizer
 
   /** Log of changed names.  */
   std::vector<ExternalizerLogEntry> Log;
+
+  /** Defines the method that a private symbol will be searched. */
+  bool Ibt;
 };
