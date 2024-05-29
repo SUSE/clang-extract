@@ -53,6 +53,7 @@ class PassManager {
             DumpPasses(args.Should_Dump_Passes()),
             RenameSymbols(args.Should_Rename_Symbols()),
             Kernel(args.Is_Kernel()),
+            Ibt(args.Has_Ibt()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             DebuginfoPath(args.Get_Debuginfo_Path()),
@@ -101,6 +102,9 @@ class PassManager {
 
         /** If the source code comes from Linux Kernel */
         bool Kernel;
+
+        /** If the code was compiled with IBT support */
+        bool Ibt;
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;

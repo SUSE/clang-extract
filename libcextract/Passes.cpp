@@ -437,7 +437,7 @@ class FunctionExternalizerPass : public Pass
     virtual bool Run_Pass(PassManager::Context *ctx)
     {
       /* Issue externalization.  */
-      SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA, ctx->DumpPasses);
+      SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA, ctx->Ibt, ctx->DumpPasses);
       externalizer.Externalize_Symbols(ctx->Externalize);
       if (ctx->RenameSymbols) {
         /* The FuncExtractNames will be modified, as the function will be

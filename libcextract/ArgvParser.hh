@@ -84,6 +84,11 @@ class ArgvParser
     return Kernel;
   }
 
+  inline bool Has_Ibt(void)
+  {
+    return Ibt;
+  }
+
   inline const char *Get_Debuginfo_Path(void)
   {
     return DebuginfoPath;
@@ -140,6 +145,8 @@ class ArgvParser
   bool DumpPasses;
   bool RenameSymbols;
   bool Kernel;
+  /* If the file was compiled with IBT support */
+  bool Ibt;
 
   const char *DebuginfoPath;
   const char *IpaclonesPath;

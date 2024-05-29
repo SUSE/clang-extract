@@ -65,6 +65,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     DumpPasses(false),
     RenameSymbols(false),
     Kernel(false),
+    Ibt(false),
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
@@ -163,6 +164,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
   if (!strncmp("-D__KERNEL__", str, 12)) {
     Kernel = true;
+    return false;
+  }
+
+  if (!strcmp("-D__USE_IBT__", str)) {
+    Ibt = true;
     return false;
   }
 
