@@ -318,7 +318,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
     the furthest location.  */
 
     AttrVec &attrvec = decl->getAttrs();
-    bool has_attr;
+    bool has_attr = false;
 
     for (size_t i = 0; i < attrvec.size(); i++) {
       const Attr *attr = attrvec[i];
@@ -331,23 +331,29 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
       }
     }
 
-    /* Find the last ')'.  On __attribute__((unused)), the previous code reach
-       until __attribute__((unused), ignoring the last parenthesis.  */
+    /* Find the last ';' token, once there are attributes right after the last
+       '}'.  On __attribute__((unused)), the previous code reach until
+       __attribute__((unused), ignoring the last parenthesis. On macros, like
+       __aligned(32), the code would skip (32).  */
     if (has_attr) {
+      tok::TokenKind semicolon(tok::semi);
+      SourceLocation head = furthest;
 
-      tok::TokenKind r_paren(tok::r_paren);
-
+      /* Keep fetching tokens.  */
       while (true) {
-        auto maybe_next_tok = Lexer::findNextToken(furthest, *SM, LangOpts);
+        auto maybe_next_tok = Lexer::findNextToken(head, *SM, LangOpts);
         Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
 
         if (tok == nullptr) {
           break;
         }
 
-        if (tok->is(r_paren)) {
-          furthest = tok->getLastLoc();
-        } else {
+        head = tok->getLastLoc();
+
+        /* Stop when we find the ';' token.  */
+        if (tok->is(semicolon)) {
+          /* Found the ';', now go back a character to *not* include the ';'.  */
+          furthest = head.getLocWithOffset(-1);
           break;
         }
       }
