@@ -519,19 +519,44 @@ FunctionDependencyFinder::~FunctionDependencyFinder(void)
 bool FunctionDependencyFinder::Find_Functions_Required(
     std::vector<std::string> const &funcnames)
 {
-  try {
-    for (const std::string &funcname : funcnames) {
-      /* Get list of Decls matching the `funcname`.  */
-      const DeclContextLookupResult decls = Get_Decl_List_From_Identifier(AST, funcname);
+  /* FIXME: clang has a mechanism (DeclContext::lookup) which is SUPPOSED TO
+     return the list of all Decls that matches the lookup name.  However, this
+     method doesn't work as intented.  In kernel (see github issue #20) it
+     results in the lookup_result set not having the Decl that has the body of
+     the function, which is the most important!
 
-      /* Iterate on them.  */
-      for (Decl *decl : decls) {
-        Visitor->TraverseDecl(decl);
-      }
+     Hence, do our own thing here.  Create a set and sweep the top level decls,
+     analyzing the symbol that matches the name in the set.  */
+
+  std::unordered_set<std::string> setof_names(std::make_move_iterator(funcnames.begin()),
+                                              std::make_move_iterator(funcnames.end()));
+
+  std::unordered_set<std::string> matched_names;
+
+  for (auto it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    NamedDecl *decl = dyn_cast<NamedDecl>(*it);
+
+    if (!decl) {
+      /* Decl does not have a name, thus skip it.  */
+      continue;
     }
-  } catch (SymbolNotFoundException &e) {
-    DiagsClass::Emit_Error(std::string("Requested symbol not found: ") + e.what());
-    return false;
+
+    const std::string &decl_name = decl->getName().str();
+    /* If the symbol name is in the set...   */
+    if (setof_names.find(decl_name) != setof_names.end()) {
+      /* Mark that name as matched.  */
+      matched_names.insert(decl_name);
+      /* Find its dependencies.  */
+      Visitor->TraverseDecl(decl);
+    }
+  }
+
+  /* Find which names did not match any declaration name.  */
+  for (const std::string &funcname : funcnames) {
+    if (matched_names.find(funcname) == matched_names.end()) {
+      DiagsClass::Emit_Error("Requested symbol not found: " + funcname);
+      return false;
+    }
   }
 
   return true;

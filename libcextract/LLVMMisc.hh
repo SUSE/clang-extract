@@ -42,23 +42,6 @@ using namespace clang;
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl);
 
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const IdentifierInfo &info);
-
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const StringRef &name);
-
-/** Get a list of Decls from its Identifier by looking into a table.  */
-const DeclContextLookupResult Get_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const IdentifierInfo &info);
-
-/** Get a list of Decls from its Identifier by looking into a table.  */
-const DeclContextLookupResult Get_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const StringRef &name);
-
-const StoredDeclsList &Get_Stored_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const IdentifierInfo &info);
-
 /** Build CallGraph from AST.
  *
  * The CallGraph is a datastructure in which nodes are functions and edges
