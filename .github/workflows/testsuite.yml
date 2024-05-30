@@ -30,7 +30,7 @@ jobs:
            llvm16-libclang13 clang16-devel libclang-cpp16
            clang-tools libLLVM16 llvm16 llvm16-devel meson ninja
            python311-psutil python311-pexpect python311-subprocess-tee
-           python311-pytest gcc
+           python311-pytest gcc findutils bash
     - uses: actions/checkout@v2
     - name: meson
       run: meson setup build --buildtype=${{ matrix.build-type }} --native-file ce-native.ini
