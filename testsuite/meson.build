@@ -20,8 +20,8 @@ returncode_to_bool = [ true, false ]
 
 foreach test_dir : ordinary_test_dirs
   subdir(test_dir) # Only here for meson to build the directory.
-  grabber = 'find ' + test_dir + ' -name *.c -o -name *.cpp'
-  test_files = run_command('sh', '-c', grabber, check: true).stdout().strip().split('\n')
+  test_files = run_command('find', test_dir, '-name', '*.c', '-o', '-name', '*.cpp',
+                           check: true).stdout().strip().split('\n')
 
   foreach file : test_files
     test_path = meson.current_source_dir() + '/' + file
