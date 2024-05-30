@@ -56,6 +56,9 @@ void DscFileGenerator::Target_ELF(void)
 
 void DscFileGenerator::Global_Functions(void)
 {
+  TranslationUnitDecl *tu = AST->getASTContext().getTranslationUnitDecl();
+  IdentifierTable &idtbl = AST->getPreprocessor().getIdentifierTable();
+
   bool have_renamed_symbols = false;
   for (const ExternalizerLogEntry &entry : ExternalizerLog) {
     if (entry.Type == ExternalizationType::RENAME) {
@@ -67,18 +70,21 @@ void DscFileGenerator::Global_Functions(void)
   if (have_renamed_symbols) {
     for (const ExternalizerLogEntry &entry : ExternalizerLog) {
       if (entry.Type == ExternalizationType::RENAME) {
-        NamedDecl *decl = Get_Decl_From_Identifier(AST, entry.NewName);
-        if (decl == nullptr) {
-          throw std::runtime_error("Unable to find symbol " + entry.NewName
-                                                            + " in the AST");
+
+        DeclContext::lookup_result decls = tu->lookup(
+                                            DeclarationName(&idtbl.get(entry.NewName)));
+        if (decls.empty()) {
+          throw std::runtime_error("Unable to find symbol " + entry.NewName);
         }
         Out << '\n' << entry.OldName << ":" << entry.NewName;
       }
     }
   } else {
     for (const std::string &func_name : FuncsToExtract) {
-      NamedDecl *decl = Get_Decl_From_Identifier(AST, func_name);
-      if (decl == nullptr) {
+      DeclContext::lookup_result decls = tu->lookup(
+                                          DeclarationName(&idtbl.get(func_name)));
+
+      if (decls.empty()) {
         throw std::runtime_error("Unable to find symbol " + func_name + " in the AST");
       }
       Out << '\n' << func_name << ":" << func_name;
@@ -88,10 +94,14 @@ void DscFileGenerator::Global_Functions(void)
 
 void DscFileGenerator::Local_Symbols(void)
 {
+  TranslationUnitDecl *tu = AST->getASTContext().getTranslationUnitDecl();
+  IdentifierTable &idtbl = AST->getPreprocessor().getIdentifierTable();
+
   for (const ExternalizerLogEntry &entry : ExternalizerLog) {
     if (entry.Type == ExternalizationType::STRONG) {
-      NamedDecl *decl = Get_Decl_From_Identifier(AST, entry.NewName);
-      if (decl == nullptr) {
+      DeclContext::lookup_result decls = tu->lookup(
+                                          DeclarationName(&idtbl.get(entry.NewName)));
+      if (decls.empty()) {
         throw std::runtime_error("Unable to find symbol " + entry.NewName + " in the AST");
       }
       Out << "\n#" << entry.OldName << ":" << entry.NewName;

@@ -37,55 +37,6 @@ bool Is_Builtin_Decl(const Decl *decl)
   return false;
 }
 
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-const StoredDeclsList &Get_Stored_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const IdentifierInfo &info)
-{
-  TranslationUnitDecl *tu = ast->getASTContext().getTranslationUnitDecl();
-  StoredDeclsMap *map = tu->getLookupPtr();
-  if (map == nullptr) {
-    /* We need to build it.  */
-    map = tu->buildLookup();
-  }
-  assert(map && "Lookup map is null.");
-
-  DeclarationName dn(&info);
-  auto found = map->find(dn);
-  if (found == map->end()) {
-    /* Well, throw to whoever called me.  */
-    throw SymbolNotFoundException(info.getName().str());
-  }
-
-  const StoredDeclsList &x = found->second;
-  return x;
-}
-
-NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const IdentifierInfo &info)
-{
-  return Get_Stored_Decl_List_From_Identifier(ast, info).getAsDecl();
-}
-
-/** Get a Decl object from its Identifier by looking into a table (O(1)).  */
-NamedDecl *Get_Decl_From_Identifier(ASTUnit *ast, const StringRef &name)
-{
-  IdentifierTable &IdTbl = ast->getPreprocessor().getIdentifierTable();
-  return Get_Decl_From_Identifier(ast, IdTbl.get(name));
-}
-
-const DeclContextLookupResult Get_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const IdentifierInfo &info)
-{
-  const StoredDeclsList &list = Get_Stored_Decl_List_From_Identifier(ast, info);
-  return list.getLookupResult();
-}
-
-const DeclContextLookupResult Get_Decl_List_From_Identifier(ASTUnit *ast,
-                                                            const StringRef &name)
-{
-  IdentifierTable &IdTbl = ast->getPreprocessor().getIdentifierTable();
-  return Get_Decl_List_From_Identifier(ast, IdTbl.get(name));
-}
-
 /** Build CallGraph from AST.
  *
  * The CallGraph is a datastructure in which nodes are functions and edges
