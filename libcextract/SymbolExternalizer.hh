@@ -192,6 +192,7 @@ class SymbolExternalizer
     /** Sweeps the function and update any reference to the old function, replacing
         it with the externalized variable.  */
     bool Update_References_To_Symbol(DeclaratorDecl *to_update);
+    bool Update_References_To_Symbol(Stmt *);
 
     private:
 
@@ -200,8 +201,6 @@ class SymbolExternalizer
 
     /* Do we need to wrap the use in (*name)?  */
     bool Wrap;
-
-    bool Update_References_To_Symbol(Stmt *);
   };
   friend class FunctionUpdater;
 
