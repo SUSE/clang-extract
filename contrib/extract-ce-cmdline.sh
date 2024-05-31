@@ -75,6 +75,7 @@ parse_program_argv()
 
 generate_script()
 {
+
   # Get the pwd where clang-extract was run.
   local string_pwd=$(sed -nr 's/Executing ce on (.*)/\1/p' $INPUT_FILE)
   local found_ce=0
@@ -94,7 +95,7 @@ generate_script()
         if [ $WITH_GDB -eq 1 ]; then
           echo 'gdb -args ' $line '\' >> $OUTPUT_FILE
         else
-          echo $line '\' >> $OUTPUT_FILE
+          echo $line '\' | sed 's/"/\\"/g'  >> $OUTPUT_FILE
         fi
       fi
     else
@@ -104,7 +105,7 @@ generate_script()
         break
       fi
 
-      echo $line '\' >> $OUTPUT_FILE
+      echo $line '\' | sed 's/"/\\"/g' >> $OUTPUT_FILE
     fi
   done < $INPUT_FILE
 
