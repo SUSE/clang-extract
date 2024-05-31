@@ -57,10 +57,19 @@ if __name__ == '__main__':
         exit(1)
 
     # Run test.
+    r = 0
     test = libtest.UnitTest(input_path, logfile_path, binaries_path)
     if is_inline_test:
         r = test.run_inline_test(is_lto_test)
     else:
         r = test.run_test(is_lto_test)
+
+    # Call the destructor to close the log file.
+    del test
+    # Report the content of the files
+    if r != 0:
+        log = open(logfile_path, "r")
+        print(log.read())
+        log.close()
 
     exit(r)
