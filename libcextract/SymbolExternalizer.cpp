@@ -17,6 +17,7 @@
 #include "PrettyPrint.hh"
 #include "Error.hh"
 #include "ClangCompat.hh"
+#include "LLVMMisc.hh"
 
 #include <unordered_set>
 #include <iostream>
@@ -61,7 +62,7 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 /****************************** End hack.  ***********************************/
 
 #define EXTERNALIZED_PREFIX "klpe_"
-#define RENAME_PREFIX      "klpp_"
+#define RENAME_PREFIX       "klpp_"
 
 using namespace clang;
 using namespace llvm;
@@ -78,6 +79,69 @@ extern "C" void Debug_Range(const SourceRange &range)
   Debug_Range(x); \
   } while (0)
 #endif
+
+/** Define a Visitor just to update TypeOfType instances:
+ *
+ *  Kernel code sometime does things like this:
+ *
+ *   typeof(symbol_to_externalize) x;
+ *
+ * this bizarre constructs come from macros, which sometimes explodes because
+ * clang-extract is unable to determine which part of it generates the Decl
+ * in question.
+ *
+ * Now we have to update those typeofs, but there is no easy way of parsing Types
+ * to get to the Expr.  But the RecursiveASTVisitor knows how to do it, so we
+ * hack the class in order to setup a call to
+ * FunctionUpdate::Update_References_To_Symbol and update those references.
+ *
+ */
+class TypeUpdaterVisitor : public RecursiveASTVisitor<TypeUpdaterVisitor>
+{
+  public:
+    /* Constructor. Should match the FunctionUpdate constructor so we can
+       instantiate it in the Visitor.  */
+    TypeUpdaterVisitor(SymbolExternalizer &se, ValueDecl *new_decl,
+                       const std::string &old_decl_name, bool wrap)
+    : SE(se),
+      NewSymbolDecl(new_decl),
+      OldSymbolName(old_decl_name),
+      Wrap(wrap)
+    {}
+
+  enum {
+    VISITOR_CONTINUE = true,   // Return this for the AST transversal to continue;
+    VISITOR_STOP     = false,  // Return this for the AST tranversal to stop completely;
+  };
+
+  /* The updator method.  This will be called by the Visitor when traversing the
+     code.  */
+  bool VisitTypeOfExprType(TypeOfExprType *type)
+  {
+    /* Create a instance of our tested-in-battle FunctionUpdater...  */
+    SymbolExternalizer::FunctionUpdater fu(SE, NewSymbolDecl, OldSymbolName, Wrap);
+
+    /* ... and call the method which updates the body of a function. (but that
+       is not a function!  But who cares, and Expr is a special type of Stmt
+       in clang so everything works!  */
+    fu.Update_References_To_Symbol(type->getUnderlyingExpr());
+
+    return VISITOR_CONTINUE;
+  }
+
+  private:
+
+  /** A reference to SymbolExternalizer.  */
+  SymbolExternalizer &SE;
+
+  /** The new variable declaration to replace the to be externalized function.  */
+  ValueDecl *NewSymbolDecl;
+
+  /** Name of the to be replaced function.  */
+  const std::string &OldSymbolName;
+
+  bool Wrap;
+};
 
 static std::vector<SourceRange>
 Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
@@ -460,7 +524,6 @@ void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
 
 VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
 {
-
   /* Hack a new Variable Declaration node in which holds the address of our
      externalized symbol.  We use the information of the old function to
      build it. For example, assume we want to externalize:
@@ -486,14 +549,13 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
 
   /* Create a type that is a pointer to the externalized object's type.  */
   QualType pointer_to = astctx.getPointerType(decl->getType());
-  TypeSourceInfo *tsi = astctx.CreateTypeSourceInfo(pointer_to);
 
   /* Get context of decl.  */
   DeclContext *decl_ctx;
 
   /* Create node.  */
-  if (dynamic_cast<FunctionDecl *>(decl)) {
-    decl_ctx = dynamic_cast<FunctionDecl *>(decl)->getParent();
+  if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
+    decl_ctx = fdecl->getParent();
   } else {
     decl_ctx = decl->getDeclContext();
   }
@@ -503,7 +565,7 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
     decl->getEndLoc(),
     id,
     pointer_to,
-    tsi,
+    nullptr,
     SC_Static
   );
 
@@ -684,6 +746,10 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
        functions in order to find if there is a reference to the function we
        externalized.  */
     if (must_update) {
+      /* Call our hack to update the TypeOfTypes.  */
+      TypeUpdaterVisitor(*this, new_decl, to_externalize, wrap)
+        .TraverseDecl(decl);
+
       FunctionUpdater(*this, new_decl, to_externalize, wrap)
         .Update_References_To_Symbol(decl);
     }
