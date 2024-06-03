@@ -18,6 +18,7 @@
 #include "Error.hh"
 #include "ClangCompat.hh"
 #include "LLVMMisc.hh"
+#include "IntervalTree.hh"
 
 #include <unordered_set>
 #include <iostream>
@@ -66,6 +67,9 @@ static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
 
 using namespace clang;
 using namespace llvm;
+
+/* IntervalTree.  */
+using namespace Intervals;
 
 // For debugging purposes.
 #if 0
@@ -260,6 +264,11 @@ void TextModifications::Insert(Delta &delta)
 
 void TextModifications::Solve(void)
 {
+  /* Interval Tree to compute intersections of changes.  We can't have
+     intersections so if we find those we try to solve them.  */
+  IntervalTree<SourceLocation, const Delta&> interval_tree;
+  std::vector<Delta> new_arr;
+
   /* Sort so that the highest priorities comes first.  */
   Sort();
 
@@ -271,38 +280,32 @@ void TextModifications::Solve(void)
      remove the one with smaller priority (the one that is later on the
      vector because we sorted it).
 
-     Clearly there are better ways of doing this other than this n(n-1)/2
-     loop (see IntervalTree), but for the kernel we see around ~100
-     modifications, which is okay at the moment.  */
+     Use an Interval Tree to reduce the complexity from O(n(n-1)/2) to
+     O(n log n).  */
   for (int i = 0; i < n; i++) {
-    for (int j = i+1; j < n; j++) {
-      Delta &a = DeltaList[i];
-      Delta &b = DeltaList[j];
+    const Delta &a = DeltaList[i];
+    auto overlap = interval_tree.findOverlappingIntervals(a.ToChange);
+    /* Check if we already have this range in the tree.  */
+    if (overlap.size() > 0) {
+      const Delta &b = overlap[0].value;
 
-      /* Check if we are not comparing the same thing for some reason.  */
-      assert(&a != &b);
-
-      if (Intersects(a, b)) {
-        if (a.Priority > b.Priority || Is_Same_Change(a, b)) {
-          /* Intersections with different priority or redundant changes: remove
-             the one with least priority.
-
-             FIXME: Why does the externalize issues the same change twice?? */
-          DeltaList.erase(DeltaList.begin() + j);
-          n--;
-          j--;
-        } else if (a.Priority == b.Priority) {
-          /* Intersection with the same priority. Issue an error -- we can't have this.  */
-          DiagsClass::Emit_Error("Rewriter ranges with same priority intersects");
-          DiagsClass::Emit_Note(" This one: (priority " + std::to_string(a.Priority) + ')',
-                                a.ToChange);
-          DiagsClass::Emit_Note("with this: (priority " + std::to_string(b.Priority) + ')',
-                                b.ToChange);
-          throw std::runtime_error("SymbolExternalizer can not continue.");
-        }
+      if (a.Priority <= b.Priority || a == b) {
+        // Ignore.
+      } else {
+        /* Intersection with the same priority. Issue an error -- we can't have this.  */
+        DiagsClass::Emit_Error("Rewriter ranges with same priority intersects");
+        DiagsClass::Emit_Note(" This one: (priority " + std::to_string(a.Priority) + ')',
+                              a.ToChange);
+        DiagsClass::Emit_Note("with this: (priority " + std::to_string(b.Priority) + ')',
+                              b.ToChange);
+        throw std::runtime_error("SymbolExternalizer can not continue.");
       }
+    } else {
+      interval_tree.insert(Interval<SourceLocation, const Delta&>(a.ToChange, a));
+      new_arr.push_back(a);
     }
   }
+  DeltaList = new_arr;
 }
 
 void TextModifications::Commit(void)
@@ -421,11 +424,6 @@ bool TextModifications::Intersects(const SourceRange &a, const SourceRange &b)
 bool TextModifications::Intersects(const Delta &a, const Delta &b)
 {
   return Intersects(a.ToChange, b.ToChange);
-}
-
-bool TextModifications::Is_Same_Change(const Delta &a, const Delta &b)
-{
-  return a.ToChange == b.ToChange && a.NewText == b.NewText;
 }
 
 /* ---- End of Deltas class -------- */
