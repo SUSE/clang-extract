@@ -55,6 +55,30 @@ class TextModifications
   {
     Delta(const SourceRange &to_change, const std::string &new_text, int prio);
 
+    Delta(void)
+      : ToChange(),
+        NewText(),
+        Priority(0),
+        ID(0)
+    {
+    }
+
+    /* Check if two changes results in the same change.  */
+    static bool Is_Same_Change(const Delta &a, const Delta &b)
+    {
+      return a.ToChange == b.ToChange && a.NewText == b.NewText;
+    }
+
+    bool operator<(const Delta& other) const
+    {
+      return !(Is_Same_Change(*this, other));
+    }
+
+    bool operator==(const Delta &other) const
+    {
+      return Is_Same_Change(*this, other);
+    }
+
     /* Which part of the original code should be changed?  */
     SourceRange ToChange;
 
@@ -115,9 +139,6 @@ class TextModifications
 
   /* Check which SourceLocation comes first.  */
   bool Is_Before_Or_Equal(const PresumedLoc &a, const PresumedLoc &b);
-
-  /* Check if two changes results in the same change.  */
-  bool Is_Same_Change(const Delta &a, const Delta &b);
 
   /* Reference to the AST SourceManager.  */
   SourceManager &SM;
