@@ -172,6 +172,15 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     return false;
   }
 
+  if (prefix("-DKBUILD_MODNAME=", str)) {
+    /* Avoid storing double quotes */
+    PatchObject = Extract_Single_Arg(str);
+    PatchObject.erase(std::remove(PatchObject.begin(), PatchObject.end(), '\"' ),
+                                    PatchObject.end());
+
+    return false;
+  }
+
   if (prefix("-DCE_EXTRACT_FUNCTIONS=", str)) {
     FunctionsToExtract = Extract_Args(str);
 

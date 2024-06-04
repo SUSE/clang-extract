@@ -182,12 +182,13 @@ class TextModifications
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt, bool dump = false)
+  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt, std::string patch_object, bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
       TM(ast, dump),
       IA(ia),
-      Ibt(ibt)
+      Ibt(ibt),
+      PatchObject(patch_object)
   {
   }
 
@@ -288,4 +289,7 @@ class SymbolExternalizer
 
   /** Defines the method that a private symbol will be searched. */
   bool Ibt;
+
+  /* Name of the object that will be patched. */
+  std::string PatchObject;
 };

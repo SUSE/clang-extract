@@ -54,6 +54,7 @@ class PassManager {
             RenameSymbols(args.Should_Rename_Symbols()),
             Kernel(args.Is_Kernel()),
             Ibt(args.Has_Ibt()),
+            PatchObject(args.Get_PatchObject()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             DebuginfoPath(args.Get_Debuginfo_Path()),
@@ -105,6 +106,9 @@ class PassManager {
 
         /** If the code was compiled with IBT support */
         bool Ibt;
+
+        /** Object that will be patched. */
+        std::string PatchObject;
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;
