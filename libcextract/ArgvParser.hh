@@ -89,6 +89,11 @@ class ArgvParser
     return Ibt;
   }
 
+  inline std::string Get_PatchObject(void)
+  {
+      return PatchObject;
+  }
+
   inline const char *Get_Debuginfo_Path(void)
   {
     return DebuginfoPath;
@@ -147,6 +152,7 @@ class ArgvParser
   bool Kernel;
   /* If the file was compiled with IBT support */
   bool Ibt;
+  std::string PatchObject;
 
   const char *DebuginfoPath;
   const char *IpaclonesPath;
