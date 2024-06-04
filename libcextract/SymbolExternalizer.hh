@@ -271,6 +271,7 @@ class SymbolExternalizer
      used in case that there are two replacements to the same piece of text.  */
   void Replace_Text(const SourceRange &range, StringRef new_name, int priority);
   void Remove_Text(const SourceRange &range, int priority);
+  void Insert_Text(const SourceRange &range, StringRef text, int priority);
 
   /** AST in analysis.  */
   ASTUnit *AST;

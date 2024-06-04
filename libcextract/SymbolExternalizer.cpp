@@ -520,6 +520,11 @@ void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
   Replace_Text(range, "", prio);
 }
 
+void SymbolExternalizer::Insert_Text(const SourceRange &range, StringRef text, int prio)
+{
+  Replace_Text(range, text, prio);
+}
+
 VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
 {
   /* Hack a new Variable Declaration node in which holds the address of our
@@ -892,6 +897,14 @@ void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
+  if (Ibt) {
+    SourceManager &sm = AST->getSourceManager();
+    FileID fi = sm.getMainFileID();
+    SourceLocation sl = sm.getLocForStartOfFile(fi);
+    SourceRange sr(sl, sl);
+    Insert_Text(sr, "#include <linux/livepatch.h>", 1000);
+  }
+
   for (const std::string &to_externalize : to_externalize_array) {
     Externalize_Symbol(to_externalize);
   }
