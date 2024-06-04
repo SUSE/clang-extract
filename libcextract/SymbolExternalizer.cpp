@@ -553,6 +553,10 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
   /* Create a type that is a pointer to the externalized object's type.  */
   QualType pointer_to = astctx.getPointerType(decl->getType());
 
+  /* For IBT, create an extern variable with the same type from the original */
+  if (Ibt)
+    pointer_to = decl->getType();
+
   /* Get context of decl.  */
   DeclContext *decl_ctx;
 
@@ -563,13 +567,22 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
     decl_ctx = decl->getDeclContext();
   }
 
+  /*
+   * For normal externalization, create a static variable. When dealing with IBT
+   * restrictions, create an extern variable that will be sorted out later by
+   * the code that is using it, like Linux for example.
+   */
+  StorageClass sc = SC_Static;
+  if (Ibt)
+    sc = SC_Extern;
+
   VarDecl *ret = VarDecl::Create(astctx, decl_ctx,
     decl->getBeginLoc(),
     decl->getEndLoc(),
     id,
     pointer_to,
     nullptr,
-    SC_Static
+    sc
   );
 
   /* return node.  */
@@ -753,7 +766,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
       TypeUpdaterVisitor(*this, new_decl, to_externalize, wrap)
         .TraverseDecl(decl);
 
-      FunctionUpdater(*this, new_decl, to_externalize, wrap)
+      FunctionUpdater(*this, new_decl, to_externalize, wrap || Ibt)
         .Update_References_To_Symbol(decl);
     }
 
@@ -763,9 +776,10 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           /* If we found the first instance of the function we want to externalize,
              then proceed to create and replace the function declaration node with
              a variable declaration node of proper type.  */
-          std::string new_name = EXTERNALIZED_PREFIX + decl->getName().str();
+          std::string old_name = decl->getName().str();
+          std::string new_name = EXTERNALIZED_PREFIX + old_name;
           new_decl = Create_Externalized_Var(decl, new_name);
-          Log.push_back({.OldName = decl->getName().str(),
+          Log.push_back({.OldName = old_name,
                          .NewName = new_name,
                          .Type = ExternalizationType::STRONG});
 
@@ -773,6 +787,10 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           std::string o;
           llvm::raw_string_ostream outstr(o);
           new_decl->print(outstr, AST->getLangOpts());
+          if (Ibt) {
+            outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << PatchObject << ", " <<
+                  IA.Get_Symbol_Module(old_name) << ", " << old_name << ")";
+          }
           outstr << ";\n";
 
           Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
@@ -780,8 +798,15 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           must_update = true;
           wrap = false;
 
-          /* Update any macros that may reference the symbol.  */
           std::string replacement = "(*" + new_decl->getName().str() + ")";
+          /*
+           * IBT uses extern variables, so we need to use the same type from the
+           * private symbol.
+           */
+          if (Ibt)
+            replacement = new_decl->getName().str();
+
+          /* Update any macros that may reference the symbol.  */
           Rewrite_Macros(to_externalize, replacement);
 
           /* Slaps the new node into the position of where was the function
