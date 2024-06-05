@@ -326,6 +326,19 @@ void TextModifications::Commit(void)
 
     /* Insert into the list of FileIDs.  */
     const FileEntry *fentry = SM.getFileEntryForID(begin_id);
+
+    /* There are some cases where the fentry is known to return NULL.  Check if
+       those are the cases we already acknownledged.  */
+    if (fentry == nullptr) {
+      PresumedLoc ploc = SM.getPresumedLoc(a.ToChange.getBegin());
+      if (ploc.getFilename() == StringRef("<command line>")) {
+        /* Locations comming from the command line can be ignored.  */
+        continue;
+      }
+
+      /* Crash with assertion.  */
+      assert(fentry && "FileEntry is NULL on a non-acknowledged case");
+    }
     /* Insert the FileEntry if we don't have one.  */
     if (FileEntryMap.find(fentry) == FileEntryMap.end()) {
       /* Insert it.  */
@@ -927,7 +940,7 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
     FileID fi = sm.getMainFileID();
     SourceLocation sl = sm.getLocForStartOfFile(fi);
     SourceRange sr(sl, sl);
-    Insert_Text(sr, "#include <linux/livepatch.h>", 1000);
+    Insert_Text(sr, "#include <linux/livepatch.h>\n", 1000);
   }
 
   for (const std::string &to_externalize : to_externalize_array) {
