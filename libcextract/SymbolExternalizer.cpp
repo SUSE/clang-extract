@@ -800,9 +800,14 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           std::string o;
           llvm::raw_string_ostream outstr(o);
           new_decl->print(outstr, AST->getLangOpts());
+
           if (Ibt) {
+            std::string sym_mod = IA.Get_Symbol_Module(old_name);
+            if (sym_mod == "")
+              sym_mod = "vmlinux";
+
             outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << PatchObject << ", " <<
-                  IA.Get_Symbol_Module(old_name) << ", " << old_name << ")";
+                   sym_mod << ", " << old_name << ")";
           }
           outstr << ";\n";
 
