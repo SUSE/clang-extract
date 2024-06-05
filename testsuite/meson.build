@@ -14,7 +14,7 @@
 # Author: Giuliano Belinassi
 
 runtest = find_program('lib/runtest.py')
-ordinary_test_dirs = [ 'small/', 'includes/', 'ccp/' ]
+ordinary_test_dirs = [ 'small/', 'includes/', 'ccp/', 'linux' ]
 
 returncode_to_bool = [ true, false ]
 
