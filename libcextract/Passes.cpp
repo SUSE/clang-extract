@@ -460,6 +460,16 @@ class FunctionExternalizerPass : public Pass
                         ClangCompat_None, ctx->OFS);
       PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
 
+      if (ctx->Ibt && ctx->AST) {
+        /* Do a sanity check on IBT macros.  Some kernel branches can't use it,
+           so do a check here for sanity reasons.  */
+        Preprocessor &pp = ctx->AST->getPreprocessor();
+        if (pp.isMacroDefined("KLP_RELOC_SYMBOL") == false) {
+          throw std::runtime_error("KLP_RELOC_SYMBOL not defined, kernel may not "
+                                   "be compatible with IBT.");
+        }
+      }
+
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return !de.hasErrorOccurred();
     }
