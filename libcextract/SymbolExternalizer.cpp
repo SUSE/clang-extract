@@ -308,6 +308,50 @@ void TextModifications::Solve(void)
   DeltaList = new_arr;
 }
 
+bool TextModifications::Insert_Into_FileEntryMap(const SourceLocation &loc)
+{
+  /* Register the changed FileID for retrieving the buffer later.  */
+  FileID begin_id = SM.getFileID(loc);
+
+  /* Insert into the list of FileIDs.  */
+  const FileEntry *fentry = SM.getFileEntryForID(begin_id);
+
+  /* There are some cases where the fentry is known to return NULL.  Check if
+     those are the cases we already acknownledged.  */
+  if (fentry == nullptr) {
+    PresumedLoc ploc = SM.getPresumedLoc(loc);
+    if (ploc.getFilename() == StringRef("<command line>")) {
+      /* Locations comming from the command line can be ignored.  */
+      return false;
+    }
+
+    /* Crash with assertion.  */
+    assert(fentry && "FileEntry is NULL on a non-acknowledged case");
+  }
+
+  /* Insert the FileEntry if we don't have one.  */
+  if (FileEntryMap.find(fentry) == FileEntryMap.end()) {
+    /* Insert it.  */
+    FileEntryMap[fentry] = begin_id;
+    return true;
+  }
+
+  /* Nothing was inserted.  */
+  return false;
+}
+
+bool TextModifications::Insert_Into_FileEntryMap(const SourceRange &range)
+{
+    /* Register the changed FileID for retrieving the buffer later.  */
+    FileID begin_id = SM.getFileID(range.getBegin());
+    FileID end_id   = SM.getFileID(range.getEnd());
+
+    /* Ensure that the fileIDs are equal.  */
+    assert(begin_id == end_id);
+
+    return Insert_Into_FileEntryMap(range.getBegin());
+}
+
 void TextModifications::Commit(void)
 {
   Solve();
@@ -317,33 +361,9 @@ void TextModifications::Commit(void)
     // Commit Change.
     Delta &a = DeltaList[i];
 
-    /* Register the changed FileID for retrieving the buffer later.  */
-    FileID begin_id = SM.getFileID(a.ToChange.getBegin());
-    FileID end_id   = SM.getFileID(a.ToChange.getEnd());
-
-    /* Ensure that the fileIDs are equal.  */
-    assert(begin_id == end_id);
-
-    /* Insert into the list of FileIDs.  */
-    const FileEntry *fentry = SM.getFileEntryForID(begin_id);
-
-    /* There are some cases where the fentry is known to return NULL.  Check if
-       those are the cases we already acknownledged.  */
-    if (fentry == nullptr) {
-      PresumedLoc ploc = SM.getPresumedLoc(a.ToChange.getBegin());
-      if (ploc.getFilename() == StringRef("<command line>")) {
-        /* Locations comming from the command line can be ignored.  */
-        continue;
-      }
-
-      /* Crash with assertion.  */
-      assert(fentry && "FileEntry is NULL on a non-acknowledged case");
-    }
-    /* Insert the FileEntry if we don't have one.  */
-    if (FileEntryMap.find(fentry) == FileEntryMap.end()) {
-      /* Insert it.  */
-      FileEntryMap[fentry] = begin_id;
-    }
+    /* Try to insert into the FileEntryMap for commiting the change to the buffer
+       later.  */
+    Insert_Into_FileEntryMap(a.ToChange);
 
     /* Get the text we want to change.  We only do this to know its length.  */
     StringRef source_text = Lexer::getSourceText(CharSourceRange::getCharRange(
@@ -533,9 +553,10 @@ void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
   Replace_Text(range, "", prio);
 }
 
-void SymbolExternalizer::Insert_Text(const SourceRange &range, StringRef text, int prio)
+void SymbolExternalizer::Insert_Text(const SourceLocation &loc, StringRef text)
 {
-  Replace_Text(range, text, prio);
+  TM.Insert_Into_FileEntryMap(loc);
+  TM.Get_Rewriter().InsertText(loc, text);
 }
 
 VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
@@ -939,8 +960,7 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
     SourceManager &sm = AST->getSourceManager();
     FileID fi = sm.getMainFileID();
     SourceLocation sl = sm.getLocForStartOfFile(fi);
-    SourceRange sr(sl, sl);
-    Insert_Text(sr, "#include <linux/livepatch.h>\n", 1000);
+    Insert_Text(sl, "#include <linux/livepatch.h>\n");
   }
 
   for (const std::string &to_externalize : to_externalize_array) {

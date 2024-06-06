@@ -119,6 +119,10 @@ class TextModifications
     return FileEntryMap;
   }
 
+  /* Insert into the FileEntryMap hash.  */
+  bool Insert_Into_FileEntryMap(const SourceLocation &loc);
+  bool Insert_Into_FileEntryMap(const SourceRange &range);
+
   /* Dump, for debugging purposes.  */
   void Dump(unsigned, const Delta &a);
 
@@ -271,7 +275,7 @@ class SymbolExternalizer
      used in case that there are two replacements to the same piece of text.  */
   void Replace_Text(const SourceRange &range, StringRef new_name, int priority);
   void Remove_Text(const SourceRange &range, int priority);
-  void Insert_Text(const SourceRange &range, StringRef text, int priority);
+  void Insert_Text(const SourceLocation &range, StringRef text);
 
   /** AST in analysis.  */
   ASTUnit *AST;
