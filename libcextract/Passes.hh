@@ -48,6 +48,7 @@ class PassManager {
           : FuncExtractNames(args.Get_Functions_To_Extract()),
             Externalize(args.Get_Symbols_To_Externalize()),
             OutputFile(args.Get_Output_File()),
+            IgnoreClangErrors(args.Get_Ignore_Clang_Errors()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
             KeepIncludes(args.Should_Keep_Includes()),
             DumpPasses(args.Should_Dump_Passes()),
@@ -89,6 +90,9 @@ class PassManager {
 
         /** The final output file name.  */
         std::string &OutputFile;
+
+        /** Should we ignore compilation errors from clang?  */
+        bool IgnoreClangErrors;
 
         /** Is the externalization passes disabled?  */
         bool ExternalizationDisabled;

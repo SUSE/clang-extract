@@ -200,6 +200,7 @@ Clang-extract support many options which controls the output code:
 - `-DCE_SYMVERS_PATH=<arg>`       Path to kernel Modules.symvers file.  Only used when `-D__KERNEL__` is specified.
 - `-DCE_DSC_OUTPUT=<arg>`         Libpulp .dsc file output, used for userspace livepatching.
 - `-DCE_LATE_EXTERNALIZE`         Enable late externalization (declare externalized variables later than the original).  May reduce code output when `-DCE_KEEP_INCLUDES` is enabled.
+- `-DCE_IGNORE_CLANG_ERRORS`      Ignore clang compilation errors in a hope that code is generated even if it won't compile.
 
 For more switches, see
 ```
