@@ -45,6 +45,11 @@ void Print_AST(ASTUnit *ast)
   }
 }
 
+/** Filesystem that will be used in our custom ASTUnit::create, so that way we
+  * don't break clang's API.  See ASTUnitHack.cpp.
+  */
+extern IntrusiveRefCntPtr<llvm::vfs::FileSystem> _Hack_VFS;
+
 static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
 {
   ctx->AST.reset();
@@ -65,6 +70,8 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
     fs = ctx->OFS;
   }
 
+  _Hack_VFS = fs;
+
   /* Built the ASTUnit from the passed command line and set its SourceManager
      to the PrettyPrint class.  */
   DiagnosticOptions *diagopts = new DiagnosticOptions();
@@ -73,17 +80,44 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
   }
 
   Diags = CompilerInstance::createDiagnostics(diagopts);
+
+  if (ctx->IgnoreClangErrors) {
+    Diags->setWarningsAsErrors(false);
+    Diags->setErrorsAsFatal(false);
+    Diags->setIgnoreAllWarnings(true);
+  }
+
   CInvok = ClangCompat::createInvocationFromCommandLine(ctx->ClangArgs, Diags);
 
-  FileManager *FileMgr = new FileManager(FileSystemOptions(), fs);
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
 
-  auto AU = ASTUnit::LoadFromCompilerInvocation(
-      CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 0,
-      TU_Complete, false, false, false);
+
+  /* Hacked function call, see ASTUnitHack.cpp.  */
+  auto AU = ASTUnit::create(CInvok, Diags, CaptureDiagsKind::None, false);
+  std::unique_ptr<ASTUnit> *ErrAST = nullptr;
+
+  ASTUnit::LoadFromCompilerInvocationAction(CInvok, PCHContainerOps,
+                                            Diags, nullptr, AU.get(),
+                                            /*Persistent=*/true,
+                                            /*ResourceFilesPath=*/StringRef(),
+                                            /*OnlyLocalDecls=*/false,
+                                            /*CaptureDiagnostics=*/CaptureDiagsKind::None,
+                                            /*PrecompilePreambleAfterNParses=*/0,
+                                            /*CacheCodeCompletionResults=*/false,
+                                            /*UserFilesAreVolatile=*/false,
+                                            ErrAST);
+
+  _Hack_VFS = nullptr;
 
   if (AU == nullptr) {
-    DiagsClass::Emit_Error("Unable to create ASTUnit object.");
+    if (ctx->IgnoreClangErrors && ErrAST) {
+      PrettyPrint::Set_AST(ErrAST->get());
+      ctx->AST = std::move(*ErrAST);
+
+      return true;
+    }
+
+    throw std::runtime_error("Unable to create ASTUnit object.");
     return false;
   }
 
@@ -336,7 +370,7 @@ class ClosurePass : public Pass
 
       /* If there was an error on building the AST here, don't continue.  */
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
-      if (de.hasErrorOccurred()) {
+      if (ctx->IgnoreClangErrors == false && de.hasErrorOccurred()) {
         return false;
       }
 
@@ -689,7 +723,7 @@ int PassManager::Run_Passes(ArgvParser &args)
           pass->Dump_Result(&ctx);
         }
 
-        if (pass_success == false) {
+        if (ctx.IgnoreClangErrors == false && pass_success == false) {
           std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
           return -1;
         }

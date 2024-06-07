@@ -134,6 +134,11 @@ class ArgvParser
     return AllowLateExternalization;
   }
 
+  inline bool Get_Ignore_Clang_Errors(void)
+  {
+    return IgnoreClangErrors;
+  }
+
   const char *Get_Input_File(void);
 
   /** Print help usage message.  */
@@ -150,6 +155,7 @@ class ArgvParser
   std::vector<std::string> HeadersToExpand;
   std::string OutputFile;
 
+  bool IgnoreClangErrors;
   bool DisableExternalization;
   bool WithIncludes;
   bool DumpPasses;

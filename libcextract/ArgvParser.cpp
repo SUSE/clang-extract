@@ -66,6 +66,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     SymbolsToExternalize(),
     HeadersToExpand(),
     OutputFile(),
+    IgnoreClangErrors(false),
     DisableExternalization(false),
     WithIncludes(false),
     DumpPasses(false),
@@ -177,6 +178,8 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_LATE_EXTERNALIZE    Enable late externalization (declare externalized variables\n"
 "                           later than the original).  May reduce code output when\n"
 "                           -DCE_KEEP_INCLUDES is enabled\n"
+"  -DCE_IGNORE_CLANG_ERRORS Ignore clang compilation errors in a hope that code is\n"
+"                           generated even if it won't compile.\n"
 "\n";
 
   llvm::outs() << "The following arguments are ignored by clang-extract:\n";
@@ -288,6 +291,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (!strcmp("-DCE_LATE_EXTERNALIZE", str)) {
     AllowLateExternalization = true;
+
+    return true;
+  }
+  if (!strcmp("-DCE_IGNORE_CLANG_ERRORS", str)) {
+    IgnoreClangErrors = true;
 
     return true;
   }
