@@ -820,6 +820,17 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           /* Create a string with the new variable type and name.  */
           std::string o;
           llvm::raw_string_ostream outstr(o);
+
+          if (Ibt && !EmittedLinuxLivepatch) {
+            outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
+                      "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+                      "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
+                      "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+                      "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
+                      "#endif\n\n";
+            EmittedLinuxLivepatch = true;
+          }
+
           new_decl->print(outstr, AST->getLangOpts());
 
           if (Ibt) {
@@ -961,13 +972,6 @@ void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
-  if (Ibt) {
-    SourceManager &sm = AST->getSourceManager();
-    FileID fi = sm.getMainFileID();
-    SourceLocation sl = sm.getLocForStartOfFile(fi);
-    Insert_Text(sl, "#include <linux/livepatch.h>\n");
-  }
-
   for (const std::string &to_externalize : to_externalize_array) {
     Externalize_Symbol(to_externalize);
   }
