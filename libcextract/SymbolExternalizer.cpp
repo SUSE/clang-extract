@@ -821,14 +821,17 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
           std::string o;
           llvm::raw_string_ostream outstr(o);
 
-          if (Ibt && !EmittedLinuxLivepatch) {
+          /*
+           * It won't be a problem to add the code below multiple times, since
+           * clang-extract will remove ifndefs for already defined macros
+           */
+          if (Ibt) {
             outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
                       "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
                       "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
                       "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
                       "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
                       "#endif\n\n";
-            EmittedLinuxLivepatch = true;
           }
 
           new_decl->print(outstr, AST->getLangOpts());

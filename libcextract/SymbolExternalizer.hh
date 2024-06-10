@@ -192,7 +192,6 @@ class SymbolExternalizer
       TM(ast, dump),
       IA(ia),
       Ibt(ibt),
-      EmittedLinuxLivepatch(false),
       PatchObject(patch_object)
   {
   }
@@ -295,9 +294,6 @@ class SymbolExternalizer
 
   /** Defines the method that a private symbol will be searched. */
   bool Ibt;
-
-  /** Flag if we already emit the #include<linux/livepatch.h>  */
-  bool EmittedLinuxLivepatch;
 
   /* Name of the object that will be patched. */
   std::string PatchObject;
