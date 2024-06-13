@@ -623,6 +623,34 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
             }
           }
         }
+
+        /*
+         * Check if there wasn't any symbol that is being defined in the same
+         * interval and remove it. Otherwise we might clash the types.
+         *
+         * One example of how this can happen is then we have something like
+         *
+         * typedef struct {
+         * ...
+         * } x, y;
+         *
+         * In the process of creating the closure we might reach the following
+         * situation:
+         *
+         * typdef struct {
+         * ...
+         * } x;
+         *
+         * typedef struct {
+         *
+         * } x, y;
+         *
+         * Which then breaks the one-definition-rule. In such cases, remove the
+         * previous declaration in the same code range, since the later will
+         * contain both definitions either way.
+         */
+        if (Decl *range_decl = Closure.insideRangeOfDecl(decl))
+          Closure.Remove_Decl(range_decl);
       }
     }
     /* Handle the case where an enum is declared as:

@@ -43,6 +43,31 @@ class ClosureSet
     Dependencies.insert(decl);
   }
 
+  /*
+   * Check if the same Decl was already added into the closure but for a
+   * different typename.
+   */
+  Decl *insideRangeOfDecl(Decl *decl)
+  {
+    SourceRange range = decl->getSourceRange();
+
+    /* FIXME: optimize this loop */
+    for (auto it = Dependencies.begin(); it != Dependencies.end(); ++it) {
+      if (TypedefDecl *cur_decl = dyn_cast<TypedefDecl>(*it)) {
+        SourceRange cur_range = cur_decl->getSourceRange();
+
+        // Avoid comparing to itself
+        if (cur_range == range)
+          continue;
+
+        if (PrettyPrint::Contains_From_LineCol(range, cur_range))
+          return cur_decl;
+      }
+    }
+
+    return nullptr;
+  }
+
   inline std::unordered_set<Decl *> &Get_Set(void)
   {
     return Dependencies;
