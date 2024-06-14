@@ -513,6 +513,35 @@ bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt
       expr->setDecl(NewSymbolDecl);
       replaced = true;
     }
+  } else if (DeclStmt::classof(stmt)) {
+    /* To handle symbol renames on situations like the sizeof below
+     *
+     * static char x[4];
+     *
+     * void f(void) {
+     *    char y[sizeof(x)];
+     * }
+     */
+    DeclStmt *dstmt = (DeclStmt *) stmt;
+    if (VarDecl *ddecl = dyn_cast<VarDecl>(dstmt->getSingleDecl())) {
+      auto vec_of_ranges = Get_Range_Of_Identifier_In_SrcRange(ddecl->getSourceRange(),
+                                                               OldSymbolName.c_str());
+
+      if (vec_of_ranges.size() > 0) {
+        /* Prepare the text modification.  */
+        std::string new_name;
+        if (Wrap) {
+          new_name = NewSymbolDecl->getName().str();
+        } else {
+          new_name = "(*" + NewSymbolDecl->getName().str() + ")";
+        }
+
+        for (auto irange : vec_of_ranges) {
+          /* Issue a text modification.  */
+          SE.Replace_Text(irange, new_name, 100);
+        }
+      }
+    }
   }
 
   /* Repeat the process to child statements.  */
