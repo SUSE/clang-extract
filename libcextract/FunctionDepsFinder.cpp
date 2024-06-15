@@ -623,34 +623,6 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
             }
           }
         }
-
-        /*
-         * Check if there wasn't any symbol that is being defined in the same
-         * interval and remove it. Otherwise we might clash the types.
-         *
-         * One example of how this can happen is then we have something like
-         *
-         * typedef struct {
-         * ...
-         * } x, y;
-         *
-         * In the process of creating the closure we might reach the following
-         * situation:
-         *
-         * typdef struct {
-         * ...
-         * } x;
-         *
-         * typedef struct {
-         *
-         * } x, y;
-         *
-         * Which then breaks the one-definition-rule. In such cases, remove the
-         * previous declaration in the same code range, since the later will
-         * contain both definitions either way.
-         */
-        if (Decl *range_decl = Closure.insideRangeOfDecl(decl))
-          Closure.Remove_Decl(range_decl);
       }
     }
     /* Handle the case where an enum is declared as:
@@ -723,6 +695,59 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void) {
           Closure.Remove_Decl(typedecl);
         }
       }
+    }
+  }
+
+  // FIXME: use interval tree
+  ASTUnit::top_level_iterator it;
+  TypedefDecl *prev = nullptr;
+  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+    if (TypedefDecl *decl = dyn_cast<TypedefDecl>(*it)) {
+      if (!Closure.Is_Decl_Marked(decl))
+        continue;
+
+      // Set prev and exit, since we don't have anything to compare agains't
+      if (!prev) {
+        prev = decl;
+        continue;
+      }
+
+      /*
+       * Check if there wasn't any symbol that is being defined in the same
+       * interval and remove it. Otherwise we might clash the types.
+       *
+       * One example of how this can happen is then we have something like
+       *
+       * typedef struct {
+       * ...
+       * } x, y;
+       *
+       * In the process of creating the closure we might reach the following
+       * situation:
+       *
+       * typdef struct {
+       * ...
+       * } x;
+       *
+       * typedef struct {
+       *
+       * } x, y;
+       *
+       * Which then breaks the one-definition-rule. In such cases, remove the
+       * previous declaration in the same code range, since the later will
+       * contain both definitions either way.
+       */
+      if (PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
+                                              prev->getSourceRange())) {
+        /*
+         * If the prev and the current decl have the same start LoC, but
+         * different ending, remove the prev from the closure and set the
+         * new prev.
+         */
+        Closure.Remove_Decl(prev);
+      }
+
+      prev = decl;
     }
   }
 }
