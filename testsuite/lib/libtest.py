@@ -361,7 +361,7 @@ class UnitTest:
         if self.skip_silently:
             return 0
 
-        inline = self.binaries_path + 'inline'
+        inline = self.binaries_path + 'ce-inline'
         ce_output_path = '/tmp/' + next(tempfile._get_candidate_names()) + '.txt'
 
         elf = self.gcc_compile()
