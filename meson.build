@@ -56,8 +56,9 @@ subdir('libcextract')
 
 incdir = include_directories('libcextract')
 
-executable('inline', 'Inline.cpp',
+executable('ce-inline', 'Inline.cpp',
   include_directories : incdir,
+  install : true,
   link_with : libcextract_static,
   dependencies : elf_dep
 )
