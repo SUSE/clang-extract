@@ -8,10 +8,10 @@ A tool to extract code content from source files using the clang and LLVM infras
 
 clang-extract requires clang, LLVM, libelf, python3-pexpect, python3-psuti,
 meson and ninja in order to build.
-On OpenSUSE, you can install them by running:
+On openSUSE, you can install them by running:
 ```
 $ sudo zypper install clang16 clang16-devel libclang-cpp16 \
-       clang-tools libLLVM16 llvm16 llvm16-devel meson ninja \
+       clang-tools libLLVM16 llvm16 llvm16-devel libelf-devel meson ninja \
        python311-psutil python311-pexpect python311-subprocess-tee python311-pytest
 ```
 Older versions of clang and LLVM may also work, but is untested. We currently support
