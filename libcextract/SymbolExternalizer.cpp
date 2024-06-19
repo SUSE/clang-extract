@@ -813,7 +813,7 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
        externalized.  */
     if (must_update) {
       /* Call our hack to update the TypeOfTypes.  */
-      TypeUpdaterVisitor(*this, new_decl, to_externalize, wrap)
+      TypeUpdaterVisitor(*this, new_decl, to_externalize, wrap || Ibt)
         .TraverseDecl(decl);
 
       FunctionUpdater(*this, new_decl, to_externalize, wrap || Ibt)
