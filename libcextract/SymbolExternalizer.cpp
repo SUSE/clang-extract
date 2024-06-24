@@ -810,151 +810,152 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
         .Update_References_To_Symbol(decl);
     }
 
-    if (decl && decl->getName() == to_externalize) {
-      if (type == ExternalizationType::STRONG) {
-        if (first) {
-          /* If we found the first instance of the function we want to externalize,
-             then proceed to create and replace the function declaration node with
-             a variable declaration node of proper type.  */
-          std::string old_name = decl->getName().str();
-          std::string new_name = EXTERNALIZED_PREFIX + old_name;
-          new_decl = Create_Externalized_Var(decl, new_name);
-          Log.push_back({.OldName = old_name,
-                         .NewName = new_name,
-                         .Type = ExternalizationType::STRONG});
+    if (!decl || decl->getName() != to_externalize)
+      continue;
 
-          /* Create a string with the new variable type and name.  */
-          std::string o;
-          llvm::raw_string_ostream outstr(o);
+    if (type == ExternalizationType::STRONG) {
+      if (first) {
+        /* If we found the first instance of the function we want to externalize,
+           then proceed to create and replace the function declaration node with
+           a variable declaration node of proper type.  */
+        std::string old_name = decl->getName().str();
+        std::string new_name = EXTERNALIZED_PREFIX + old_name;
+        new_decl = Create_Externalized_Var(decl, new_name);
+        Log.push_back({.OldName = old_name,
+                       .NewName = new_name,
+                       .Type = ExternalizationType::STRONG});
 
-          /*
-           * It won't be a problem to add the code below multiple times, since
-           * clang-extract will remove ifndefs for already defined macros
-           */
-          if (Ibt) {
-            outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
-                      "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
-                      "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
-                      "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
-                      "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
-                      "#endif\n\n";
-          }
+        /* Create a string with the new variable type and name.  */
+        std::string o;
+        llvm::raw_string_ostream outstr(o);
 
-          new_decl->print(outstr, AST->getLangOpts());
-
-          if (Ibt) {
-            std::string sym_mod = IA.Get_Symbol_Module(old_name);
-            if (sym_mod == "")
-              sym_mod = "vmlinux";
-
-            outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << PatchObject << ", " <<
-                   sym_mod << ", " << old_name << ")";
-          }
-          outstr << ";\n";
-
-          Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
-
-          must_update = true;
-          wrap = false;
-
-          std::string replacement = "(*" + new_decl->getName().str() + ")";
-          /*
-           * IBT uses extern variables, so we need to use the same type from the
-           * private symbol.
-           */
-          if (Ibt)
-            replacement = new_decl->getName().str();
-
-          /* Update any macros that may reference the symbol.  */
-          Rewrite_Macros(to_externalize, replacement);
-
-          /* Slaps the new node into the position of where was the function
-             to be externalized.  */
-          *it = new_decl;
-          first = false;
-          externalized = true;
-
-        } else {
-          /* If we externalized this function, then all further delcarations of
-             this function shall be discarded.  */
-
-          /* Get source location of old function declaration.  */
-          Remove_Text(decl->getSourceRange(), 1000);
-
-          /* Remove node from AST.  */
-          topleveldecls->erase(it);
-          /* We must decrease the iterator because we deleted an element from the
-             vector.  */
-          it--;
-        }
-      } else if (type == ExternalizationType::WEAK) {
-        /* Now checks if this is a function or a variable delcaration.  */
-        if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
-          /* In the case it is a function we need to remove its declaration that
-             have a body.  */
-          if (func->hasBody()) {
-            FunctionDecl *with_body = func->getDefinition();
-            externalized = true;
-            if (with_body == func) {
-              /* Damn. This function do not have a prototype, we will have to
-                 craft it ourself.  */
-
-              /* FIXME: This reults in unwanted intersections.  */
-#if 0
-              Stmt *body = with_body->getBody();
-              Replace_Text(body->getSourceRange(), ";\n", 1000);
-
-              /* Remove the body from the AST.  */
-              with_body->setBody(nullptr);
-#endif
-            } else {
-              Remove_Text(with_body->getSourceRange(), 1000);
-              topleveldecls->erase(it);
-
-              /* We must decrease the iterator because we deleted an element from the
-                 vector.  */
-              it--;
-            }
-          }
-        }
-      } else if (type == ExternalizationType::RENAME) {
-        /* Get SourceRange where the function identifier is.  */
-        auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
-                                                       decl->getName());
-        assert(ids.size() > 0 && "Decl name do not match required identifier?");
-
-        SourceRange id_range = ids[0];
-        std::string new_name = RENAME_PREFIX + decl->getName().str();
-        if (first) {
-          /* Only register the first decl rename of the same variable.  */
-          Log.push_back({.OldName = decl->getName().str(),
-                         .NewName = new_name,
-                         .Type = ExternalizationType::RENAME});
-          first = false;
+        /*
+         * It won't be a problem to add the code below multiple times, since
+         * clang-extract will remove ifndefs for already defined macros
+         */
+        if (Ibt) {
+          outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
+                    "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+                    "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
+                    "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+                    "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
+                    "#endif\n\n";
         }
 
-        /* In the case there is a `static` modifier in function, try to drop it.  */
-        if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
-          Drop_Static(fdecl);
+        new_decl->print(outstr, AST->getLangOpts());
+
+        if (Ibt) {
+          std::string sym_mod = IA.Get_Symbol_Module(old_name);
+          if (sym_mod == "")
+            sym_mod = "vmlinux";
+
+          outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << PatchObject << ", " <<
+                 sym_mod << ", " << old_name << ")";
         }
+        outstr << ";\n";
 
-        /* Rename the declaration.  */
-        IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
-        DeclarationName new_decl_name(new_id);
-
-        decl->setDeclName(new_decl_name);
-        new_decl = decl;
-
-        /* Replace text content of old declaration.  */
-        Replace_Text(id_range, new_name, 100);
+        Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
 
         must_update = true;
-        wrap = true;
+        wrap = false;
+
+        std::string replacement = "(*" + new_decl->getName().str() + ")";
+        /*
+         * IBT uses extern variables, so we need to use the same type from the
+         * private symbol.
+         */
+        if (Ibt)
+          replacement = new_decl->getName().str();
 
         /* Update any macros that may reference the symbol.  */
-        Rewrite_Macros(to_externalize, new_name);
+        Rewrite_Macros(to_externalize, replacement);
+
+        /* Slaps the new node into the position of where was the function
+           to be externalized.  */
+        *it = new_decl;
+        first = false;
         externalized = true;
+
+      } else {
+        /* If we externalized this function, then all further delcarations of
+           this function shall be discarded.  */
+
+        /* Get source location of old function declaration.  */
+        Remove_Text(decl->getSourceRange(), 1000);
+
+        /* Remove node from AST.  */
+        topleveldecls->erase(it);
+        /* We must decrease the iterator because we deleted an element from the
+           vector.  */
+        it--;
       }
+    } else if (type == ExternalizationType::WEAK) {
+      /* Now checks if this is a function or a variable delcaration.  */
+      if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
+        /* In the case it is a function we need to remove its declaration that
+           have a body.  */
+        if (func->hasBody()) {
+          FunctionDecl *with_body = func->getDefinition();
+          externalized = true;
+          if (with_body == func) {
+            /* Damn. This function do not have a prototype, we will have to
+               craft it ourself.  */
+
+            /* FIXME: This reults in unwanted intersections.  */
+#if 0
+            Stmt *body = with_body->getBody();
+            Replace_Text(body->getSourceRange(), ";\n", 1000);
+
+            /* Remove the body from the AST.  */
+            with_body->setBody(nullptr);
+#endif
+          } else {
+            Remove_Text(with_body->getSourceRange(), 1000);
+            topleveldecls->erase(it);
+
+            /* We must decrease the iterator because we deleted an element from the
+               vector.  */
+            it--;
+          }
+        }
+      }
+    } else if (type == ExternalizationType::RENAME) {
+      /* Get SourceRange where the function identifier is.  */
+      auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+                                                     decl->getName());
+      assert(ids.size() > 0 && "Decl name do not match required identifier?");
+
+      SourceRange id_range = ids[0];
+      std::string new_name = RENAME_PREFIX + decl->getName().str();
+      if (first) {
+        /* Only register the first decl rename of the same variable.  */
+        Log.push_back({.OldName = decl->getName().str(),
+                       .NewName = new_name,
+                       .Type = ExternalizationType::RENAME});
+        first = false;
+      }
+
+      /* In the case there is a `static` modifier in function, try to drop it.  */
+      if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
+        Drop_Static(fdecl);
+      }
+
+      /* Rename the declaration.  */
+      IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
+      DeclarationName new_decl_name(new_id);
+
+      decl->setDeclName(new_decl_name);
+      new_decl = decl;
+
+      /* Replace text content of old declaration.  */
+      Replace_Text(id_range, new_name, 100);
+
+      must_update = true;
+      wrap = true;
+
+      /* Update any macros that may reference the symbol.  */
+      Rewrite_Macros(to_externalize, new_name);
+      externalized = true;
     }
   }
 
