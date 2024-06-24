@@ -33,135 +33,9 @@
    FileEntry => FileID that we are sure to have modifications.  */
 #pragma GCC poison translateFile
 
-/****** Begin hack: used to get a pointer to a private member of a class. *****/
-struct ASTUnit_TopLevelDecls
-{
-  typedef std::vector<Decl*> ASTUnit::*type;
-  friend type Get(ASTUnit_TopLevelDecls);
-};
-
-template<typename Tag, typename Tag::type M>
-struct Rob {
-  friend typename Tag::type Get(Tag) {
-    return M;
-  }
-};
-
-template struct Rob<ASTUnit_TopLevelDecls, &ASTUnit::TopLevelDecls>;
-
-/** Get pointer to the TopLevelDecls vector in the ASTUnit.
- *
- * The TopLevelDecls attribute from the AST is private, but we need to
- * access that in order to remove nodes from the AST toplevel vector,
- * else we can't remove further declarations of the function we need
- * to externalize.
- */
-static std::vector<Decl *>* Get_Pointer_To_Toplev(ASTUnit *obj)
-{
-  return &(obj->*Get(ASTUnit_TopLevelDecls()));
-}
-/****************************** End hack.  ***********************************/
-
-#define EXTERNALIZED_PREFIX "klpe_"
-#define RENAME_PREFIX       "klpp_"
-
-using namespace clang;
-using namespace llvm;
-
-/* IntervalTree.  */
-using namespace Intervals;
-
-// For debugging purposes.
-#if 0
-extern "C" void Debug_Range(const SourceRange &range)
-{
-  llvm::outs() << PrettyPrint::Get_Source_Text_Raw(range) << '\n';
-}
-
-#define DEBUG_RANGE(x) do { \
-  llvm::outs() << "line " << __LINE__ << "  "; \
-  Debug_Range(x); \
-  } while (0)
-#endif
-
-/** Define a Visitor just to update TypeOfType instances:
- *
- *  Kernel code sometime does things like this:
- *
- *   typeof(symbol_to_externalize) x;
- *
- * this bizarre constructs come from macros, which sometimes explodes because
- * clang-extract is unable to determine which part of it generates the Decl
- * in question.
- *
- * Now we have to update those typeofs, but there is no easy way of parsing Types
- * to get to the Expr.  But the RecursiveASTVisitor knows how to do it, so we
- * hack the class in order to setup a call to
- * FunctionUpdate::Update_References_To_Symbol and update those references.
- *
- */
-class TypeUpdaterVisitor : public RecursiveASTVisitor<TypeUpdaterVisitor>
-{
-  public:
-    /* Constructor. Should match the FunctionUpdate constructor so we can
-       instantiate it in the Visitor.  */
-    TypeUpdaterVisitor(SymbolExternalizer &se, ValueDecl *new_decl,
-                       const std::string &old_decl_name, bool wrap)
-    : SE(se),
-      NewSymbolDecl(new_decl),
-      OldSymbolName(old_decl_name),
-      Wrap(wrap)
-    {}
-
-  enum {
-    VISITOR_CONTINUE = true,   // Return this for the AST transversal to continue;
-    VISITOR_STOP     = false,  // Return this for the AST tranversal to stop completely;
-  };
-
-  /* The updator method.  This will be called by the Visitor when traversing the
-     code.  */
-  bool VisitTypeOfExprType(TypeOfExprType *type)
-  {
-    /* Create a instance of our tested-in-battle FunctionUpdater...  */
-    SymbolExternalizer::FunctionUpdater fu(SE, NewSymbolDecl, OldSymbolName, Wrap);
-
-    /* ... and call the method which updates the body of a function. (but that
-       is not a function!  But who cares, and Expr is a special type of Stmt
-       in clang so everything works!  */
-    fu.Update_References_To_Symbol(type->getUnderlyingExpr());
-
-    return VISITOR_CONTINUE;
-  }
-
-  /* To handle symbol renames on situations like the sizeof below
-   *
-   * static char x[4];
-   *
-   * void f(void) {
-   *    char y[sizeof(x)];
-   * }
-   */
-  bool VisitArrayTypeLoc(const ArrayTypeLoc &type)
-  {
-    SymbolExternalizer::FunctionUpdater fu(SE, NewSymbolDecl, OldSymbolName, Wrap);
-    fu.Update_References_To_Symbol(type.getSizeExpr());
-
-    return VISITOR_CONTINUE;
-  }
-
-  private:
-
-  /** A reference to SymbolExternalizer.  */
-  SymbolExternalizer &SE;
-
-  /** The new variable declaration to replace the to be externalized function.  */
-  ValueDecl *NewSymbolDecl;
-
-  /** Name of the to be replaced function.  */
-  const std::string &OldSymbolName;
-
-  bool Wrap;
-};
+/* Tokenize away the function-like macro stuff or expression, we only want
+   the identifier.  */
+#define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|\r\n\t"
 
 static std::vector<SourceRange>
 Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
@@ -169,17 +43,13 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
   std::vector<SourceRange> ret = {};
   StringRef string = PrettyPrint::Get_Source_Text(range);
 
-  /* Tokenize away the function-like macro stuff or expression, we only want
-     the identifier.  */
-  const char *token_vector = " ().,;+-*/^|&{}[]<>^&|\r\n\t";
-
   /* Create temporary buff, strtok modifies it.  */
   unsigned len = string.size();
   char buf[len + 1];
   memcpy(buf, string.data(), len);
   buf[len] = '\0';
 
-  char *tok = strtok(buf, token_vector);
+  char *tok = strtok(buf, TOKEN_VECTOR);
   while (tok != nullptr) {
     if (strcmp(tok, id) == 0) {
       /* Found.  */
@@ -196,7 +66,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
       ret.push_back(SourceRange(start, end));
     }
 
-    tok = strtok(nullptr, token_vector);
+    tok = strtok(nullptr, TOKEN_VECTOR);
   }
 
   return ret;
@@ -207,6 +77,174 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const StringRef id
 {
   return Get_Range_Of_Identifier_In_SrcRange(range, id.str().c_str());
 }
+
+#define EXTERNALIZED_PREFIX "klpe_"
+#define RENAME_PREFIX       "klpp_"
+
+using namespace clang;
+using namespace llvm;
+
+/* IntervalTree.  */
+using namespace Intervals;
+
+class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
+{
+  public:
+    /* Constructor. Should match the FunctionUpdate constructor so we can
+       instantiate it in the Visitor.  */
+    ExternalizerVisitor(SymbolExternalizer &se)
+    : SE(se)
+    {}
+
+  enum {
+    VISITOR_CONTINUE = true,   // Return this for the AST transversal to continue;
+    VISITOR_STOP     = false,  // Return this for the AST tranversal to stop completely;
+  };
+
+  /* This method will be used by LLVM whenever it finds a symbol declaration,
+   * being a variable or a method/function.
+   */
+  bool VisitDeclaratorDecl(DeclaratorDecl *decl)
+  {
+    /* As we are dealing with variables that should be externalized, we are only
+     * interested in the symbols that are present in the hash. If the symbol
+     * found is not in the hash, just continue to the next symbol.
+     */
+    SymbolUpdateStatus *sym = SE.getSymbolsUpdateStatus(decl->getName());
+    if (sym == nullptr)
+      return VISITOR_CONTINUE;
+
+    ExternalizationType type = sym->ExtType;
+    if (type == ExternalizationType::STRONG) {
+      if (!sym->Done) {
+        std::string sym_name = decl->getName().str();
+
+        /* If we found the first instance of the function we want to externalize,
+           then proceed to create and replace the function declaration node with
+           a variable declaration node of proper type.  */
+        const std::string new_name = EXTERNALIZED_PREFIX + sym_name;
+        sym->NewName = new_name;
+        DeclaratorDecl *new_decl = SE.Create_Externalized_Var(decl, new_name);
+        SE.Log.push_back({.OldName = sym_name,
+                       .NewName = new_name,
+                       .Type = type});
+
+        /* Create a string with the new variable type and name.  */
+        std::string o;
+        llvm::raw_string_ostream outstr(o);
+
+        /*
+         * It won't be a problem to add the code below multiple times, since
+         * clang-extract will remove ifndefs for already defined macros
+         */
+        if (SE.Ibt) {
+          outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
+                    "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+                    "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
+                    "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+                    "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
+                    "#endif\n\n";
+        }
+
+        new_decl->print(outstr);
+
+        if (SE.Ibt) {
+          std::string sym_mod = SE.IA.Get_Symbol_Module(sym_name);
+          if (sym_mod == "")
+            sym_mod = "vmlinux";
+
+          outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << SE.PatchObject << ", " <<
+                 sym_mod << ", " << sym_name << ")";
+        }
+        outstr << ";\n";
+
+        SE.Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
+
+        sym->Done = true;
+        sym->Wrap = !SE.Ibt;
+      } else {
+        /* If we externalized this function, then all further declarations of
+           this function shall be discarded.  */
+
+        /* Get source location of old function declaration.  */
+        SE.Remove_Text(decl->getSourceRange(), 1000);
+      }
+    } else if (type == ExternalizationType::WEAK) {
+      /* Now checks if this is a function or a variable delcaration.  */
+      if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
+        /* In the case it is a function we need to remove its declaration that
+           have a body.  */
+        if (func->hasBody()) {
+          FunctionDecl *with_body = func->getDefinition();
+          if (with_body != func)
+            SE.Remove_Text(with_body->getSourceRange(), 1000);
+        }
+      }
+    } else if (type == ExternalizationType::RENAME) {
+      /* Get SourceRange where the function identifier is.  */
+      auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+                                                     decl->getName());
+      assert(ids.size() > 0 && "Decl name do not match required identifier?");
+
+      SourceRange id_range = ids[0];
+      const std::string new_name = RENAME_PREFIX + decl->getName().str();
+      sym->NewName = new_name;
+      if (!sym->Done) {
+        /* Only register the first decl rename of the same variable.  */
+        SE.Log.push_back({.OldName = decl->getName().str(),
+                       .NewName = new_name,
+                       .Type = type});
+        sym->Done = true;
+      }
+
+      /* In the case there is a `static` modifier in function, try to drop it.  */
+      if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
+        SE.Drop_Static(fdecl);
+      }
+
+      /* Replace text content of old declaration.  */
+      SE.Replace_Text(id_range, new_name, 100);
+
+      sym->Wrap = false;
+    }
+
+    return VISITOR_CONTINUE;
+  }
+
+  /* This visitor will be called by LLVM whenever a symbol is being referenced, being it a
+   * variable or a function call. We are only interested in the symbols that are
+   * present in the SymbolsMap. Once found, it updates the code to the new symbol externalized
+   * name of the symbol. */
+  bool VisitDeclRefExpr(DeclRefExpr *expr)
+  {
+    SourceLocation begin = expr->getBeginLoc();
+    SourceLocation end = expr->getEndLoc();
+    SourceRange range(begin, end);
+    const StringRef &sym_name = PrettyPrint::Get_Source_Text(range);
+    SymbolUpdateStatus *sym = SE.getSymbolsUpdateStatus(sym_name);
+
+    /*
+     * Only execute the code in the visitor if we have already externalized the
+     * symbol
+     */
+    if (sym == nullptr || !sym->Done)
+      return VISITOR_CONTINUE;
+
+    ValueDecl *decl = expr->getDecl();
+
+    if (decl->getName() == sym_name) {
+      /* Issue a text modification.  */
+      SE.Replace_Text(range, sym->getUseName(), 100);
+    }
+
+    return VISITOR_CONTINUE;
+  }
+
+  private:
+
+  /** A reference to SymbolExternalizer.  */
+  SymbolExternalizer &SE;
+};
 
 static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
 {
@@ -477,86 +515,6 @@ bool TextModifications::Intersects(const Delta &a, const Delta &b)
 
 /* ---- End of Deltas class -------- */
 
-bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(Stmt *stmt)
-{
-  if (!stmt)
-    return false;
-
-  bool replaced = false;
-
-  if (DeclRefExpr::classof(stmt)) {
-    DeclRefExpr *expr = (DeclRefExpr *) stmt;
-    ValueDecl *decl = expr->getDecl();
-
-    /* In case we modified the Identifier of the original function, getName()
-       will return the name of the new function but the SourceText will not
-       be updated.  Hence check if the SourceRange has it as well.  */
-    auto vec_of_ranges = Get_Range_Of_Identifier_In_SrcRange(expr->getSourceRange(),
-                                                             OldSymbolName.c_str());
-    StringRef old_name_src_txt = "";
-    if (!vec_of_ranges.empty()) {
-      old_name_src_txt = PrettyPrint::Get_Source_Text(vec_of_ranges[0]);
-    }
-
-    if (decl->getName() == OldSymbolName || old_name_src_txt == OldSymbolName) {
-      /* Rewrite the source code.  */
-      SourceLocation begin = expr->getBeginLoc();
-      SourceLocation end = expr->getEndLoc();
-
-      SourceRange range(begin, end);
-      StringRef str = PrettyPrint::Get_Source_Text(range);
-
-      /* Ensure that we indeed got the old symbol.  */
-      if (str == OldSymbolName) {
-        /* Prepare the text modification.  */
-        std::string new_name;
-        if (Wrap) {
-          new_name = NewSymbolDecl->getName().str();
-        } else {
-          new_name = "(*" + NewSymbolDecl->getName().str() + ")";
-        }
-
-        /* Issue a text modification.  */
-        SE.Replace_Text(range, new_name, 100);
-      } else {
-        /* If we did not get the old symbol, it mostly means that the
-           references comes from a macro.  */
-
-        //std::cout << "WARNING: Unable to find location of symbol name: " << OldSymbolName << '\n';
-      }
-
-      /* Replace reference with the rewiten name.  */
-      expr->setDecl(NewSymbolDecl);
-      replaced = true;
-    }
-  }
-
-  /* Repeat the process to child statements.  */
-  clang::Stmt::child_iterator it, it_end;
-  for (it = stmt->child_begin(), it_end = stmt->child_end();
-      it != it_end; ++it) {
-
-    Stmt *child = *it;
-    replaced |= Update_References_To_Symbol(child);
-  }
-
-  return replaced;
-}
-
-bool SymbolExternalizer::FunctionUpdater::Update_References_To_Symbol(DeclaratorDecl *to_update)
-{
-  ToUpdate = to_update;
-  if (to_update) {
-    if (VarDecl *vdecl = dyn_cast<VarDecl>(to_update)) {
-      return Update_References_To_Symbol(vdecl->getInit());
-    }
-    if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(to_update)) {
-      return Update_References_To_Symbol(fdecl->getBody());
-    }
-  }
-  return false;
-}
-
 void SymbolExternalizer::Replace_Text(const SourceRange &range, StringRef new_name, int prio)
 {
   SourceRange rw_range = Get_Range_For_Rewriter(AST, range);
@@ -737,13 +695,45 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 
     TODO: clang may provide a way of doing this with a tokenizer, so maybe this
     code can become cleaner with it.  */
-static std::vector<SourceRange>
-Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp, const char *id)
+std::vector<std::pair<std::string, SourceRange>>
+SymbolExternalizer::Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp)
 {
-  return Get_Range_Of_Identifier_In_SrcRange(exp->getSourceRange(), id);
+  std::vector< std::pair < std::string, SourceRange> > ret;
+  SourceRange range = exp->getSourceRange();
+
+  StringRef string = PrettyPrint::Get_Source_Text(range);
+
+  /* Create temporary buff, strtok modifies it.  */
+  unsigned len = string.size();
+  char buf[len + 1];
+  memcpy(buf, string.data(), len);
+  buf[len] = '\0';
+
+  char *tok = strtok(buf, TOKEN_VECTOR);
+  while (tok != nullptr) {
+    SymbolUpdateStatus *sym = getSymbolsUpdateStatus(StringRef(tok));
+    if (sym) {
+      /* Found.  */
+      ptrdiff_t distance = (ptrdiff_t)(tok - buf);
+      assert(distance >= 0);
+
+      /* Compute the distance from the original SourceRange of the
+         MacroExpansion.  */
+      int32_t offset = (int32_t) distance;
+      SourceLocation start = range.getBegin().getLocWithOffset(offset);
+      SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
+
+      /* Add to the list of output.  */
+      ret.push_back(std::make_pair(std::string(tok), SourceRange(start, end)));
+    }
+
+    tok = strtok(nullptr, TOKEN_VECTOR);
+  }
+
+  return ret;
 }
 
-void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with)
+void SymbolExternalizer::Rewrite_Macros(void)
 {
   PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
 
@@ -762,204 +752,23 @@ void SymbolExternalizer::Rewrite_Macros(std::string const &to_look_for, std::str
         MacroInfo *maybe_macro = MW.Get_Macro_Info(id_info, def->getLocation());
 
         if (!maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, id_info)) {
-          if (id_info->getName() == to_look_for) {
-            Replace_Text(SourceRange(tok.getLocation(), tok.getLastLoc()), replace_with, 10);
-          }
+          SymbolUpdateStatus *sym = getSymbolsUpdateStatus(id_info->getName());
+          if (sym)
+            Replace_Text(SourceRange(tok.getLocation(), tok.getLastLoc()), sym->getUseName(), 10);
         }
       }
     } else if (MacroExpansion *exp = dyn_cast<MacroExpansion>(entity)) {
       /* We must look for references to externalized variables in funcion-like
           macro expansions on the program's toplevel.  */
-      auto ranges = Get_Range_Of_Identifier_In_Macro_Expansion(exp, to_look_for.c_str());
+      auto ranges = Get_Range_Of_Identifier_In_Macro_Expansion(exp);
 
-      for (SourceRange &tok_range : ranges) {
-        Replace_Text(tok_range, replace_with, 10);
+      for (auto &tok_range : ranges) {
+        // At this point, tok_range will contain a valid symbol
+        SymbolUpdateStatus *sym = getSymbolsUpdateStatus(tok_range.first);
+        Replace_Text(tok_range.second, sym->getUseName(), 10);
       }
     }
   }
-}
-
-bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
-                                             ExternalizationType type)
-{
-  ASTUnit::top_level_iterator it;
-  bool first = true;
-  ValueDecl *new_decl = nullptr;
-  bool must_update = false;
-  bool wrap = false;
-  bool externalized = false;
-
-  /* The TopLevelDecls attribute from the AST is private, but we need to
-     access that in order to remove nodes from the AST toplevel vector,
-     else we can't remove further declarations of the function we need
-     to externalize.  */
-  std::vector<Decl *> *topleveldecls = Get_Pointer_To_Toplev(AST);
-
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
-    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it);
-
-    /* If we externalized some function, then we must start analyzing for further
-       functions in order to find if there is a reference to the function we
-       externalized.  */
-    if (must_update) {
-      /* Call our hack to update the TypeOfTypes.  */
-      TypeUpdaterVisitor(*this, new_decl, to_externalize, wrap || Ibt)
-        .TraverseDecl(decl);
-
-      FunctionUpdater(*this, new_decl, to_externalize, wrap || Ibt)
-        .Update_References_To_Symbol(decl);
-    }
-
-    if (!decl || decl->getName() != to_externalize)
-      continue;
-
-    if (type == ExternalizationType::STRONG) {
-      if (first) {
-        /* If we found the first instance of the function we want to externalize,
-           then proceed to create and replace the function declaration node with
-           a variable declaration node of proper type.  */
-        std::string old_name = decl->getName().str();
-        std::string new_name = EXTERNALIZED_PREFIX + old_name;
-        new_decl = Create_Externalized_Var(decl, new_name);
-        Log.push_back({.OldName = old_name,
-                       .NewName = new_name,
-                       .Type = ExternalizationType::STRONG});
-
-        /* Create a string with the new variable type and name.  */
-        std::string o;
-        llvm::raw_string_ostream outstr(o);
-
-        /*
-         * It won't be a problem to add the code below multiple times, since
-         * clang-extract will remove ifndefs for already defined macros
-         */
-        if (Ibt) {
-          outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
-                    "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
-                    "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
-                    "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
-                    "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
-                    "#endif\n\n";
-        }
-
-        new_decl->print(outstr, AST->getLangOpts());
-
-        if (Ibt) {
-          std::string sym_mod = IA.Get_Symbol_Module(old_name);
-          if (sym_mod == "")
-            sym_mod = "vmlinux";
-
-          outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << PatchObject << ", " <<
-                 sym_mod << ", " << old_name << ")";
-        }
-        outstr << ";\n";
-
-        Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
-
-        must_update = true;
-        wrap = false;
-
-        std::string replacement = "(*" + new_decl->getName().str() + ")";
-        /*
-         * IBT uses extern variables, so we need to use the same type from the
-         * private symbol.
-         */
-        if (Ibt)
-          replacement = new_decl->getName().str();
-
-        /* Update any macros that may reference the symbol.  */
-        Rewrite_Macros(to_externalize, replacement);
-
-        /* Slaps the new node into the position of where was the function
-           to be externalized.  */
-        *it = new_decl;
-        first = false;
-        externalized = true;
-
-      } else {
-        /* If we externalized this function, then all further delcarations of
-           this function shall be discarded.  */
-
-        /* Get source location of old function declaration.  */
-        Remove_Text(decl->getSourceRange(), 1000);
-
-        /* Remove node from AST.  */
-        topleveldecls->erase(it);
-        /* We must decrease the iterator because we deleted an element from the
-           vector.  */
-        it--;
-      }
-    } else if (type == ExternalizationType::WEAK) {
-      /* Now checks if this is a function or a variable delcaration.  */
-      if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
-        /* In the case it is a function we need to remove its declaration that
-           have a body.  */
-        if (func->hasBody()) {
-          FunctionDecl *with_body = func->getDefinition();
-          externalized = true;
-          if (with_body == func) {
-            /* Damn. This function do not have a prototype, we will have to
-               craft it ourself.  */
-
-            /* FIXME: This reults in unwanted intersections.  */
-#if 0
-            Stmt *body = with_body->getBody();
-            Replace_Text(body->getSourceRange(), ";\n", 1000);
-
-            /* Remove the body from the AST.  */
-            with_body->setBody(nullptr);
-#endif
-          } else {
-            Remove_Text(with_body->getSourceRange(), 1000);
-            topleveldecls->erase(it);
-
-            /* We must decrease the iterator because we deleted an element from the
-               vector.  */
-            it--;
-          }
-        }
-      }
-    } else if (type == ExternalizationType::RENAME) {
-      /* Get SourceRange where the function identifier is.  */
-      auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
-                                                     decl->getName());
-      assert(ids.size() > 0 && "Decl name do not match required identifier?");
-
-      SourceRange id_range = ids[0];
-      std::string new_name = RENAME_PREFIX + decl->getName().str();
-      if (first) {
-        /* Only register the first decl rename of the same variable.  */
-        Log.push_back({.OldName = decl->getName().str(),
-                       .NewName = new_name,
-                       .Type = ExternalizationType::RENAME});
-        first = false;
-      }
-
-      /* In the case there is a `static` modifier in function, try to drop it.  */
-      if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
-        Drop_Static(fdecl);
-      }
-
-      /* Rename the declaration.  */
-      IdentifierInfo *new_id = AST->getPreprocessor().getIdentifierInfo(new_name);
-      DeclarationName new_decl_name(new_id);
-
-      decl->setDeclName(new_decl_name);
-      new_decl = decl;
-
-      /* Replace text content of old declaration.  */
-      Replace_Text(id_range, new_name, 100);
-
-      must_update = true;
-      wrap = true;
-
-      /* Update any macros that may reference the symbol.  */
-      Rewrite_Macros(to_externalize, new_name);
-      externalized = true;
-    }
-  }
-
-  return externalized;
 }
 
 enum ExternalizationType SymbolExternalizer::Get_Symbol_Ext_Type(const std::string &to_externalize)
@@ -979,19 +788,32 @@ enum ExternalizationType SymbolExternalizer::Get_Symbol_Ext_Type(const std::stri
   return ExternalizationType::STRONG;
 }
 
-void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
+SymbolUpdateStatus *SymbolExternalizer::getSymbolsUpdateStatus(const StringRef &sym)
 {
-  for (const std::string &to_externalize : to_externalize_array) {
-    _Externalize_Symbol(to_externalize, Get_Symbol_Ext_Type(to_externalize));
-  }
+  auto ret = SymbolsMap.find(sym);
+  if (ret == SymbolsMap.end())
+    return nullptr;
+
+  return &ret->second;
 }
 
-void SymbolExternalizer::Rename_Symbols(std::vector<std::string> &to_rename_array)
+void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array,
+                                              std::vector<std::string> &to_rename_array)
 {
-  for (std::string &to_externalize : to_rename_array) {
-    if (_Externalize_Symbol(to_externalize, ExternalizationType::RENAME)) {
-      /* Update the function names for the ClosurePass.  */
-      to_externalize = RENAME_PREFIX + to_externalize;
-    }
+  for (const std::string &to_externalize : to_externalize_array) {
+    SymbolsMap.insert({to_externalize, SymbolUpdateStatus(Get_Symbol_Ext_Type(to_externalize))});
   }
+
+  for (std::string &to_externalize : to_rename_array) {
+    SymbolsMap.insert({to_externalize, SymbolUpdateStatus(ExternalizationType::RENAME)});
+    to_externalize = RENAME_PREFIX + to_externalize;
+  }
+
+  /* Start traversing the AST to find all references to the symbols that we want
+   * to externalize or rename. */
+  ExternalizerVisitor(*this).TraverseDecl(AST->getASTContext().getTranslationUnitDecl());
+
+  /* Search for all macros and macro expansions and rewrite them using the new
+   * names for the externalized variables. */
+  Rewrite_Macros();
 }

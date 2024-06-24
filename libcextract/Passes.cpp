@@ -438,12 +438,12 @@ class FunctionExternalizerPass : public Pass
     {
       /* Issue externalization.  */
       SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA, ctx->Ibt, ctx->PatchObject, ctx->DumpPasses);
-      externalizer.Externalize_Symbols(ctx->Externalize);
-      if (ctx->RenameSymbols) {
-        /* The FuncExtractNames will be modified, as the function will be
-           renamed.  */
-        externalizer.Rename_Symbols(ctx->FuncExtractNames);
-      }
+      if (ctx->RenameSymbols)
+        /* The FuncExtractNames will be modified, as the function will be renamed.  */
+        externalizer.Externalize_Symbols(ctx->Externalize, ctx->FuncExtractNames);
+      else
+        externalizer.Externalize_Symbols(ctx->Externalize);
+
       externalizer.Commit_Changes_To_Source(ctx->OFS, ctx->MFS, ctx->HeadersToExpand);
 
       /* Store the changed names.  */

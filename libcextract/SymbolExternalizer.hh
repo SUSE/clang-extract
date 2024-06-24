@@ -20,6 +20,7 @@
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Rewrite/Core/Rewriter.h>
+#include "llvm/ADT/StringMap.h"
 
 using namespace clang;
 
@@ -28,6 +29,48 @@ struct ExternalizerLogEntry
   std::string OldName;
   std::string NewName;
   ExternalizationType Type;
+};
+
+/* Contains the context of an externalized symbol. It's necessary when the
+ * symbol is being handled in different visitors to know why/if it was already
+ * externalized. */
+struct SymbolUpdateStatus
+{
+
+  SymbolUpdateStatus(std::string new_name, ExternalizationType ext, bool done, bool wrap) :
+    NewName(new_name),
+    ExtType(ext),
+    Done(done),
+    Wrap(wrap)
+  {
+  }
+
+  SymbolUpdateStatus(ExternalizationType ext) :
+    NewName(""),
+    ExtType(ext),
+    Done(false),
+    Wrap(false)
+  {
+  }
+
+  /* The name that was used when the symbol was externalized. */
+  std::string NewName;
+
+  /* The type of the externalization: STRONG, WEAK of RENAME. */
+  ExternalizationType ExtType;
+
+  /* Set when the symbol was externalized. */
+  bool Done;
+
+  /* Set when the symbol usage should be dereferenced when used. */
+  bool Wrap;
+
+  /* Get the correct name used when the code was transformed */
+  std::string getUseName(void)
+  {
+      return Wrap ? "(*" + NewName + ")"
+                  : NewName;
+  }
 };
 
 /** Text Modification class wrapping Clang's Rewriter.
@@ -192,57 +235,33 @@ class SymbolExternalizer
       TM(ast, dump),
       IA(ia),
       Ibt(ibt),
-      PatchObject(patch_object)
+      PatchObject(patch_object),
+      SymbolsMap({})
   {
   }
 
-  class FunctionUpdater
-  {
-    public:
-    /** A reference to SymbolExternalizer.  */
-    SymbolExternalizer &SE;
-
-    /** The new variable declaration to replace the to be externalized function.  */
-    ValueDecl *NewSymbolDecl;
-
-    /** Name of the to be replaced function.  */
-    const std::string &OldSymbolName;
-
-    FunctionUpdater(SymbolExternalizer &se, ValueDecl *new_decl,
-                    const std::string &old_decl_name, bool wrap)
-    : SE(se),
-      NewSymbolDecl(new_decl),
-      OldSymbolName(old_decl_name),
-      Wrap(wrap)
-    {}
-
-    /** Sweeps the function and update any reference to the old function, replacing
-        it with the externalized variable.  */
-    bool Update_References_To_Symbol(DeclaratorDecl *to_update);
-    bool Update_References_To_Symbol(Stmt *);
-
-    private:
-
-    /* Decl to update.  */
-    DeclaratorDecl *ToUpdate;
-
-    /* Do we need to wrap the use in (*name)?  */
-    bool Wrap;
-  };
-  friend class FunctionUpdater;
+  friend class ExternalizerVisitor;
 
   /* Create the externalized var as a AST node ready to be slapped into the
      AST.  */
   VarDecl *Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name);
 
-  /** Externalize a symbol, that means transforming functions into a function
-      pointer, or an global variable into a variable pointer.  */
-  void Externalize_Symbols(std::vector<std::string> const &to_externalize_array);
+  /* Externalize a symbol, that means transforming functions into a function
+     pointer, or an global variable into a variable pointer.
 
-  /* WARNING: Modifies the given vector.  */
-  void Rename_Symbols(std::vector<std::string> &to_rename_array);
+     WARNING: Modifies the to_rename_array vector. */
+  void Externalize_Symbols(std::vector<std::string> const &to_externalize_array,
+                          std::vector<std::string> &to_rename_array);
+  inline void Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
+  {
+    std::vector<std::string> empty = {};
+    Externalize_Symbols(to_externalize_array, empty);
+  }
 
-  bool _Externalize_Symbol(const std::string &to_externalize, ExternalizationType type);
+  std::vector<std::pair<std::string, SourceRange>>
+  Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp);
+
+  SymbolUpdateStatus *getSymbolsUpdateStatus(const StringRef &sym);
 
   /* Drop `static` keyword in decl.  */
   bool Drop_Static(FunctionDecl *decl);
@@ -265,7 +284,7 @@ class SymbolExternalizer
 
   enum ExternalizationType Get_Symbol_Ext_Type(const std::string &to_externalize);
 
-  void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
+  void Rewrite_Macros(void);
 
   /* Issue a Text Replacement with a given `priority`.  The priority will be
      used in case that there are two replacements to the same piece of text.  */
@@ -293,4 +312,7 @@ class SymbolExternalizer
 
   /* Name of the object that will be patched. */
   std::string PatchObject;
+
+  /** Symbols and its externalization type */
+  llvm::StringMap<SymbolUpdateStatus> SymbolsMap;
 };
