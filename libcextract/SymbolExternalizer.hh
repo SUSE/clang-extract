@@ -237,8 +237,6 @@ class SymbolExternalizer
 
   /** Externalize a symbol, that means transforming functions into a function
       pointer, or an global variable into a variable pointer.  */
-  void Externalize_Symbol(DeclaratorDecl *to_externalize);
-  void Externalize_Symbol(const std::string &to_externalize);
   void Externalize_Symbols(std::vector<std::string> const &to_externalize_array);
 
   /* WARNING: Modifies the given vector.  */
@@ -265,9 +263,7 @@ class SymbolExternalizer
 
   private:
 
-  void Strongly_Externalize_Symbol(const std::string &to_externalize);
-  void Weakly_Externalize_Symbol(const std::string &to_externalize);
-  void _Externalize_Symbol(const std::string &to_externalize);
+  enum ExternalizationType Get_Symbol_Ext_Type(const std::string &to_externalize);
 
   void Rewrite_Macros(std::string const &to_look_for, std::string const &replace_with);
 

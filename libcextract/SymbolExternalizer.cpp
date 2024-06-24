@@ -732,16 +732,6 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
   return std::string(main_buf.begin(), main_buf.end());
 }
 
-void SymbolExternalizer::Strongly_Externalize_Symbol(const std::string &to_externalize)
-{
-  _Externalize_Symbol(to_externalize, ExternalizationType::STRONG);
-}
-
-void SymbolExternalizer::Weakly_Externalize_Symbol(const std::string &to_externalize)
-{
-  _Externalize_Symbol(to_externalize, ExternalizationType::WEAK);
-}
-
 /** Given a MacroExpansion object, we try to get the location of where the token
     appears on it.
 
@@ -971,28 +961,27 @@ bool SymbolExternalizer::_Externalize_Symbol(const std::string &to_externalize,
   return externalized;
 }
 
-void SymbolExternalizer::Externalize_Symbol(const std::string &to_externalize)
+enum ExternalizationType SymbolExternalizer::Get_Symbol_Ext_Type(const std::string &to_externalize)
 {
   /* If the symbol is available in the debuginfo and is an EXTERN symbol, we
      do not need to rewrite it, but rather we need to erase any declaration
      with body of it.  */
   if (IA.Can_Decide_Visibility()) {
-    if (IA.Is_Externally_Visible(to_externalize)) {
-      Weakly_Externalize_Symbol(to_externalize);
-    } else {
-      Strongly_Externalize_Symbol(to_externalize);
-    }
-  } else {
-    /* Well, we don't have information so we simply strongly externalize
-       everything.  */
-    Strongly_Externalize_Symbol(to_externalize);
+    if (IA.Is_Externally_Visible(to_externalize))
+      return ExternalizationType::WEAK;
+
+    return ExternalizationType::STRONG;
   }
+
+  /* Well, we don't have information so we simply strongly externalize
+     everything.  */
+  return ExternalizationType::STRONG;
 }
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array)
 {
   for (const std::string &to_externalize : to_externalize_array) {
-    Externalize_Symbol(to_externalize);
+    _Externalize_Symbol(to_externalize, Get_Symbol_Ext_Type(to_externalize));
   }
 }
 
