@@ -37,10 +37,12 @@
    the identifier.  */
 #define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|\r\n\t"
 
-static std::vector<SourceRange>
-Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
+/* Return the ranges for all identifiers on the ids vector */
+template <typename T>
+static std::vector<std::pair<std::string, SourceRange>>
+Get_Range_Of_Identifier(const SourceRange &range, const T &ids)
 {
-  std::vector<SourceRange> ret = {};
+  std::vector< std::pair < std::string, SourceRange> > ret = {};
   StringRef string = PrettyPrint::Get_Source_Text(range);
 
   /* Create temporary buff, strtok modifies it.  */
@@ -51,7 +53,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
 
   char *tok = strtok(buf, TOKEN_VECTOR);
   while (tok != nullptr) {
-    if (strcmp(tok, id) == 0) {
+    if (ids.find(StringRef(tok)) != ids.end()) {
       /* Found.  */
       ptrdiff_t distance = (ptrdiff_t)(tok - buf);
       assert(distance >= 0);
@@ -63,7 +65,7 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
       SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
 
       /* Add to the list of output.  */
-      ret.push_back(SourceRange(start, end));
+      ret.push_back(std::make_pair(std::string(tok), SourceRange(start, end)));
     }
 
     tok = strtok(nullptr, TOKEN_VECTOR);
@@ -72,10 +74,11 @@ Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const char *id)
   return ret;
 }
 
-static std::vector<SourceRange>
-Get_Range_Of_Identifier_In_SrcRange(const SourceRange &range, const StringRef id)
+static std::vector<std::pair<std::string, SourceRange>>
+Get_Range_Of_Identifier(const SourceRange &range, const StringRef &id)
 {
-  return Get_Range_Of_Identifier_In_SrcRange(range, id.str().c_str());
+  std::set<StringRef> ids = { id };
+  return Get_Range_Of_Identifier(range, ids);
 }
 
 #define EXTERNALIZED_PREFIX "klpe_"
@@ -182,11 +185,11 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
       }
     } else if (type == ExternalizationType::RENAME) {
       /* Get SourceRange where the function identifier is.  */
-      auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(),
+      auto ids = Get_Range_Of_Identifier(decl->getSourceRange(),
                                                      decl->getName());
       assert(ids.size() > 0 && "Decl name do not match required identifier?");
 
-      SourceRange id_range = ids[0];
+      SourceRange id_range = ids[0].second;
       const std::string new_name = RENAME_PREFIX + decl->getName().str();
       sym->NewName = new_name;
       if (!sym->Done) {
@@ -272,10 +275,10 @@ static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange 
 bool SymbolExternalizer::Drop_Static(FunctionDecl *decl)
 {
   if (decl->isStatic()) {
-    auto ids = Get_Range_Of_Identifier_In_SrcRange(decl->getSourceRange(), "static");
+    auto ids = Get_Range_Of_Identifier(decl->getSourceRange(), StringRef("static"));
     assert(ids.size() > 0 && "static decl without static keyword?");
 
-    SourceRange static_range = ids[0];
+    SourceRange static_range = ids[0].second;
     Remove_Text(static_range, 10);
 
     /* Update the storage class.  */
@@ -698,39 +701,7 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 std::vector<std::pair<std::string, SourceRange>>
 SymbolExternalizer::Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp)
 {
-  std::vector< std::pair < std::string, SourceRange> > ret;
-  SourceRange range = exp->getSourceRange();
-
-  StringRef string = PrettyPrint::Get_Source_Text(range);
-
-  /* Create temporary buff, strtok modifies it.  */
-  unsigned len = string.size();
-  char buf[len + 1];
-  memcpy(buf, string.data(), len);
-  buf[len] = '\0';
-
-  char *tok = strtok(buf, TOKEN_VECTOR);
-  while (tok != nullptr) {
-    SymbolUpdateStatus *sym = getSymbolsUpdateStatus(StringRef(tok));
-    if (sym) {
-      /* Found.  */
-      ptrdiff_t distance = (ptrdiff_t)(tok - buf);
-      assert(distance >= 0);
-
-      /* Compute the distance from the original SourceRange of the
-         MacroExpansion.  */
-      int32_t offset = (int32_t) distance;
-      SourceLocation start = range.getBegin().getLocWithOffset(offset);
-      SourceLocation end = start.getLocWithOffset(strlen(tok)-1);
-
-      /* Add to the list of output.  */
-      ret.push_back(std::make_pair(std::string(tok), SourceRange(start, end)));
-    }
-
-    tok = strtok(nullptr, TOKEN_VECTOR);
-  }
-
-  return ret;
+  return Get_Range_Of_Identifier(exp->getSourceRange(), SymbolsMap);
 }
 
 void SymbolExternalizer::Rewrite_Macros(void)
