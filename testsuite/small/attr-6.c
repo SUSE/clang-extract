@@ -1,4 +1,5 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
+/* { dg-skip-on-archs "s390x" }*/
 #ifdef __x86_64__
 #define REG "rsp"
 #elif __aarch64__
