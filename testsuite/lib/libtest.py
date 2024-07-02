@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import platform
 import pathlib
 import re
 import signal
@@ -60,6 +61,7 @@ class UnitTest:
         self.skip_silently = self.should_skip_test_silently()
         self.no_debuginfo = self.without_debuginfo()
         self.no_ipa_clones = self.without_ipaclones()
+        self.skip_on_archs = self.should_skip_test_on_archs()
 
         self.binaries_path = binaries_path
 
@@ -168,6 +170,17 @@ class UnitTest:
         matched = re.search(p, self.file_content)
         if matched is not None:
             return True
+
+        return False
+
+    # The architectures should be specified with speaces between them, e.g.
+    # /* { dg-skip-on-archs "x86_64 ppc64le" }*/
+    def should_skip_test_on_archs(self):
+        p = re.compile('{ *dg-skip-on-archs "(.*)" }')
+        matched = re.search(p, self.file_content)
+        if matched is not None:
+            matches = matched.group(1).split(' ')
+            return platform.processor() in matches
 
         return False
 
@@ -345,6 +358,10 @@ class UnitTest:
     def run_test(self, lto_test=False):
         clang_extract = self.binaries_path + 'clang-extract'
         ce_output_path = '/tmp/' + next(tempfile._get_candidate_names()) + '.CE.c'
+
+        if self.skip_on_archs:
+            self.print_result(77)
+            return 77
 
         command = [ clang_extract, '-DCE_OUTPUT_FILE=' + ce_output_path,
                     self.test_path ]
