@@ -12,7 +12,7 @@ On openSUSE, you can install them by running:
 ```
 $ sudo zypper install clang18 clang18-devel libclang-cpp18 \
        clang-tools libLLVM18 llvm18 llvm18-devel libelf-devel meson ninja \
-       python311-psutil python311-pexpect python311-subprocess-tee python311-pytest
+       python311-psutil python311-pexpect python311-pytest
 ```
 It's advised to use LLVM 18 and higher, since it's well tested. But there
 support for LLVM 16 and 17 as well, but you might find issues with it.
