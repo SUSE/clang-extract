@@ -4,6 +4,8 @@
 register unsigned long current_stack_pointer asm("rsp");
 #elif __aarch64__
 register unsigned long current_stack_pointer asm("sp");
+#elif __PPC64__
+register unsigned long current_stack_pointer asm("r1");
 #endif
 
 unsigned long f()
