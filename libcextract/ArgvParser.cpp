@@ -70,7 +70,8 @@ ArgvParser::ArgvParser(int argc, char **argv)
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
     DescOutputPath(nullptr),
-    IncExpansionPolicy(nullptr)
+    IncExpansionPolicy(nullptr),
+    OutputFunctionPrototypeHeader(nullptr)
 {
   for (int i = 0; i < argc; i++) {
     if (!Handle_Clang_Extract_Arg(argv[i])) {
