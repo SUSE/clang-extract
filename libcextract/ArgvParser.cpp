@@ -87,7 +87,11 @@ void ArgvParser::Insert_Required_Parameters(void)
   std::vector<const char *> priv_args = {
     "-Xclang", "-detailed-preprocessing-record",
     // For some reason libtooling do not pass the clang include folder.  Pass this then.
+#ifdef __i386__
+    "-I/usr/lib/clang/" STRINGFY_VALUE(CLANG_VERSION_MAJOR) "/include",
+#else
     "-I/usr/lib64/clang/" STRINGFY_VALUE(CLANG_VERSION_MAJOR) "/include",
+#endif
     "-Wno-gnu-variable-sized-type-not-at-end",
     "-Wno-incompatible-pointer-types-discards-qualifiers", // this can be triggered for older codestreams
     "-Wno-missing-prototypes", // We remove the static keyword from the
