@@ -80,14 +80,14 @@ class PrettyPrint
 
   static bool Contains(const SourceRange &a, const SourceRange &b);
 
-  static inline void Set_Source_Manager(SourceManager *sm)
+  static inline void Set_AST(ASTUnit *ast)
   {
-    SM = sm;
+    AST = ast;
   }
 
   static inline SourceManager *Get_Source_Manager(void)
   {
-    return SM;
+    return &AST->getSourceManager();
   }
 
   static inline LangOptions &Get_Lang_Options(void)
@@ -153,9 +153,10 @@ class PrettyPrint
   /** Policy for printing.  We use the default for now.  */
   static PrintingPolicy PPolicy;
 
-  /** SourceManager built when parsing the AST.  Must be set after constructing
-      the ast by calling Set_Source_Manager.  */
-  static SourceManager *SM;
+  /** ASTUnit object.  Must be set after constructing the ast by
+      calling Set_Source_Manager.  FIXME: This should not be a statc
+      class variable.  Refactor this class entirely.  */
+  static ASTUnit *AST;
 
   friend class RecursivePrint;
 };

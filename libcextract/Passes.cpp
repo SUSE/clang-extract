@@ -86,7 +86,7 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
     return false;
   }
 
-  PrettyPrint::Set_Source_Manager(&AU->getSourceManager());
+  PrettyPrint::Set_AST(AU.get());
   ctx->AST = std::move(AU);
 
   return true;
@@ -171,16 +171,11 @@ class BuildASTPass : public Pass
     std::error_code ec;
     llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
 
-    PrettyPrint::Set_Source_Manager(nullptr);
-    PrettyPrint::Set_Output_Ostream(&out);
-
     for (it = ctx->AST->top_level_begin(); it != ctx->AST->top_level_end(); ++it) {
       Decl *decl = *it;
       PrettyPrint::Print_Decl(decl);
     }
 
-    PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
-    PrettyPrint::Set_Output_Ostream(nullptr);
     out.close();
   }
 
@@ -458,7 +453,7 @@ class FunctionExternalizerPass : public Pass
          and set its new SourceManager to the PrettyPrint class.  */
       ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(),
                         ClangCompat_None, ctx->OFS);
-      PrettyPrint::Set_Source_Manager(&ctx->AST->getSourceManager());
+      PrettyPrint::Set_AST(ctx->AST.get());
 
       if (ctx->Ibt && ctx->AST) {
         /* Do a sanity check on IBT macros.  Some kernel branches can't use it,
