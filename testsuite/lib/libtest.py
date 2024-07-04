@@ -11,10 +11,6 @@ import time
 import tempfile
 import glob
 
-# Third-party libraries
-import pexpect
-import psutil
-
 RESET  = '\033[0m'
 GREEN  = '\033[32m'
 HGREEN = '\033[0;92m'
