@@ -123,15 +123,14 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
       bool expand = In_Set(must_expand_set, id->getFileName().str(), /*remove=*/true) ||
                     In_Set(must_expand_set, id->getFile()->getName().str(),
                            /*remove=*/true);
-#if CLANG_VERSION_MAJOR >= 18
-      /* Starting from LLVM-18, the behaviour of FileEntry::getName() changed.
-       * Now it returns the full path of the file rather than the relative path
-       * to it, so here we account it for now onwards.
+
+      /* Starting from LLVM-18 and in some platforms (s390x), the behaviour of
+       * FileEntry::getName() changed. Now it returns the full path of the file
+       * rather than the relative path to it, so here we account it for now onwards.
        */
       expand |= In_Set(must_expand_set,
                        id->getFile()->getFileEntry().tryGetRealPathName().str(),
                        /*remove=*/true);
-#endif
 
       bool output = already_seen_main && current->Should_Be_Expanded()
                                       && !expand;
