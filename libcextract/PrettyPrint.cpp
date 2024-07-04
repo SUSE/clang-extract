@@ -68,7 +68,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
   /* If a SourceManager was specified and the decl source range seems valid,
      then output based on the original source code.  */
-  if (SM && Is_Range_Valid(decl_range)) {
+  if (Is_Range_Valid(decl_range)) {
 
     /* The range given by getSourceRange ignores attributes. Example :
 
@@ -215,28 +215,26 @@ void PrettyPrint::Print_RawComment(SourceManager &sm, RawComment *comment)
 
 StringRef PrettyPrint::Get_Source_Text(const SourceRange &range)
 {
-    /* Calling this function supposes that a SourceManager was given to this class.  */
-    assert(SM && "A SourceManager wasn't passed to PrettyPrint.");
-
     // NOTE: sm.getSpellingLoc() used in case the range corresponds to a macro/preprocessed source.
     // NOTE2: getSpellingLoc() breaks in the case where a macro was asigned to be expanded to typedef.
+    SourceManager &SM = AST->getSourceManager();
     auto start_loc = range.getBegin();//SM->getSpellingLoc(range.getBegin());
     auto last_token_loc = range.getEnd();//SM->getSpellingLoc(range.getEnd());
-    auto end_loc = clang::Lexer::getLocForEndOfToken(last_token_loc, 0, *SM, LangOpts);
+    auto end_loc = clang::Lexer::getLocForEndOfToken(last_token_loc, 0, SM, LangOpts);
     auto printable_range = clang::SourceRange{start_loc, end_loc};
     return Get_Source_Text_Raw(printable_range);
 }
 
 StringRef PrettyPrint::Get_Source_Text_Raw(const SourceRange &range)
 {
-    return clang::Lexer::getSourceText(CharSourceRange::getCharRange(range), *SM, LangOpts);
+    SourceManager &SM = AST->getSourceManager();
+    return clang::Lexer::getSourceText(CharSourceRange::getCharRange(range), SM, LangOpts);
 }
 
 /** Compare if SourceLocation a is before SourceLocation b in the source code.  */
 bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
 {
-  assert(SM && "No SourceManager were given");
-  BeforeThanCompare<SourceLocation> is_before(*SM);
+  BeforeThanCompare<SourceLocation> is_before(AST->getSourceManager());
 
   assert(a.isValid());
   assert(b.isValid());
@@ -246,15 +244,16 @@ bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
 
 void PrettyPrint::Debug_SourceLoc(const SourceLocation &loc)
 {
-  loc.dump(*SM);
+  loc.dump(AST->getSourceManager());
 }
 
 bool PrettyPrint::Contains_From_LineCol(const SourceRange &a, const SourceRange &b)
 {
-  PresumedLoc a_begin = SM->getPresumedLoc(a.getBegin());
-  PresumedLoc a_end   = SM->getPresumedLoc(a.getEnd());
-  PresumedLoc b_begin = SM->getPresumedLoc(b.getBegin());
-  PresumedLoc b_end   = SM->getPresumedLoc(b.getEnd());
+  SourceManager &SM = AST->getSourceManager();
+  PresumedLoc a_begin = SM.getPresumedLoc(a.getBegin());
+  PresumedLoc a_end   = SM.getPresumedLoc(a.getEnd());
+  PresumedLoc b_begin = SM.getPresumedLoc(b.getBegin());
+  PresumedLoc b_end   = SM.getPresumedLoc(b.getEnd());
 
   assert(a_begin.getFileID() == a_end.getFileID());
   assert(b_begin.getFileID() == b_end.getFileID());
@@ -292,8 +291,7 @@ bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
 /** Compare if SourceLocation a is after SourceLocation b in the source code.  */
 bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
 {
-  assert(SM && "No SourceManager were given");
-  BeforeThanCompare<SourceLocation> is_before(*SM);
+  BeforeThanCompare<SourceLocation> is_before(AST->getSourceManager());
   return is_before(b, a);
 }
 
@@ -304,7 +302,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
 
   /* If a SourceManager was specified and the decl source range seems valid,
      then output based on the original source code.  */
-  if (SM && Is_Range_Valid(decl_range)) {
+  if (Is_Range_Valid(decl_range)) {
 
     /* The range given by getSourceRange ignores attributes. Example :
 
@@ -319,11 +317,12 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
 
     AttrVec &attrvec = decl->getAttrs();
     bool has_attr = false;
+    SourceManager &SM = AST->getSourceManager();
 
     for (size_t i = 0; i < attrvec.size(); i++) {
       const Attr *attr = attrvec[i];
       SourceLocation loc = attr->getRange().getEnd();
-      loc = SM->getExpansionLoc(loc);
+      loc = SM.getExpansionLoc(loc);
 
       if (loc.isValid() && Is_Before(furthest, loc)) {
         furthest = loc;
@@ -341,7 +340,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
 
       /* Keep fetching tokens.  */
       while (true) {
-        auto maybe_next_tok = Lexer::findNextToken(head, *SM, LangOpts);
+        auto maybe_next_tok = Lexer::findNextToken(head, SM, LangOpts);
         Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
 
         if (tok == nullptr) {
@@ -375,19 +374,20 @@ void PrettyPrint::Set_Output_To(const std::string &path)
 
 StringRef PrettyPrint::Get_Filename_From_Loc(const SourceLocation &loc)
 {
-  return SM->getFilename(loc);
+  return AST->getSourceManager().getFilename(loc);
 }
 
 OptionalFileEntryRef PrettyPrint::Get_FileEntry(const SourceLocation &loc)
 {
-  return SM->getFileEntryRefForID(SM->getFileID(loc));
+  SourceManager &SM = AST->getSourceManager();
+  return SM.getFileEntryRefForID(SM.getFileID(loc));
 }
 
 /* See PrettyPrint.hh for what they do.  */
 raw_ostream *PrettyPrint::Out = &llvm::outs();
 LangOptions PrettyPrint::LangOpts;
 PrintingPolicy PrettyPrint::PPolicy(LangOpts);
-SourceManager *PrettyPrint::SM;
+ASTUnit *PrettyPrint::AST;
 
 
 
