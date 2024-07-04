@@ -49,7 +49,6 @@ clang_dep += cpp.find_library('clang-cpp', dirs : llvm_libdir)
 clang_dep += cpp.find_library('LLVM', dirs : llvm_libdir)
 ############################# #########################
 elf_dep = dependency('libelf') # libelf
-python = import('python').find_installation('python3', modules : ['pexpect', 'psutil'])
 find_program('gcc', version : '>=7.5.0')
 
 subdir('libcextract')
