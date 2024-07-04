@@ -62,6 +62,18 @@ bool PrettyPrint::Is_Range_Valid(const SourceRange &range)
   return Is_Before(begin, end) && (begin != end);
 }
 
+bool Has_NoInline_Attr(Decl *decl)
+{
+  const AttrVec &attrs = decl->getAttrs();
+  for (const Attr *attr : attrs) {
+    if (attr->getKind() == attr::NoInline) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void PrettyPrint::Print_Decl_Raw(Decl *decl)
 {
   SourceRange decl_range = decl->getSourceRange();
@@ -122,7 +134,27 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
           decl->print(Out, PPolicy);
         }
       } else {
+        MacroInfo *noinline_info = nullptr;
+        if (Has_NoInline_Attr(decl)) {
+          /* If the code has a `noinline` macro defined, it conflicts with
+             clang's __attribute__((noinline)) attribute dump.  Hence we
+             have to undef it.  */
+          Preprocessor &pp = AST->getPreprocessor();
+          MacroWalker MW(pp);
+
+          /* Get the valid macro at the source location.  */
+          IdentifierInfo *noinline = pp.getIdentifierInfo("noinline");
+          noinline_info = MW.Get_Macro_Info(noinline, decl->getBeginLoc());
+          /* Only print it if the noinline macro is defined at location.  */
+          if (noinline_info) {
+            Out << "#undef noinline\n";
+          }
+        }
         decl->print(Out, LangOpts);
+        if (noinline_info) {
+          /* Redeclare the macro to the previous value.  */
+          PrettyPrint::Print_MacroInfo(noinline_info);
+        }
       }
     } else {
       Out << decl_source;
@@ -192,7 +224,7 @@ void PrettyPrint::Debug_InclusionDirective(InclusionDirective *include)
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
-  llvm::outs() << " info: " << Get_Source_Text(range) << '\n';
+  Out << "#define " << Get_Source_Text(range) << '\n';
 }
 
 void PrettyPrint::Print_Attr(Attr *attr)
