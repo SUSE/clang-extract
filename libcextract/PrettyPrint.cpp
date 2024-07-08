@@ -390,6 +390,19 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
       }
     }
   }
+
+  /* In case this decl is a TypedefNameDecl, we also need to check for the
+     struct definition for extra attributes.  See small/attr-10.c testscase
+     for an example where this happens.  */
+  if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {
+    if (TagDecl *tag = typedecl->getAnonDeclWithTypedefName()) {
+      SourceLocation tag_furthest = PrettyPrint::Get_Expanded_Loc(tag);
+      if (Is_Before(furthest, tag_furthest)) {
+        furthest = tag_furthest;
+      }
+    }
+  }
+
   return furthest;
 }
 
