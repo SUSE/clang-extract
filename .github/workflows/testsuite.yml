@@ -15,10 +15,7 @@ jobs:
         opensuse: [tumbleweed]
         compiler: [clang]
         build-type: [debug, release]
-
-#        include:
-#          - build-type: debug
-#          - build-type: release
+        version: [17, 18]
 
     container:
       image: opensuse/${{ matrix.opensuse }}
@@ -26,10 +23,13 @@ jobs:
 
     steps:
     - name: dependencies
-      run: zypper -n install libelf-devel
-           llvm16-libclang13 clang16-devel libclang-cpp16
-           clang-tools libLLVM16 llvm16 llvm16-devel meson ninja
-           gcc findutils bash
+      run: zypper -n install
+           libclang-cpp${{ matrix.version }}
+           clang${{ matrix.version }}-devel
+           libLLVM${{ matrix.version }}
+           llvm${{ matrix.version }}
+           llvm${{ matrix.version }}-devel
+           meson ninja clang-tools gcc findutils bash libelf-devel
     - uses: actions/checkout@v2
     - name: meson
       run: meson setup build --buildtype=${{ matrix.build-type }} --native-file ce-native.ini
