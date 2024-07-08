@@ -41,6 +41,29 @@ compiler_name = cpp.get_id()
 # FIXME: We currently don't support g++, and get_id returns clang for clang++
 assert(compiler_name == 'clang', compiler_name + ' found but only clang is supported')
 
+# We need gcc at least 7.5.0
+gcc = find_program('gcc', version : '>=7.5.0')
+
+# We also need to get the system GCC installation folder to make sure we are
+# building with the correct headers, otherwise we run the risk of building
+# clang-extract with different headers than libLLVM
+gcc_install_dir = ''
+gcc_output = run_command(gcc.full_path(), '-v', check: true).stderr().strip().split('\n')
+foreach line : gcc_output
+  params = line.split('=')
+  lhs = params.get(0)
+  rhs = params.get(1, '')
+
+  if lhs == 'COLLECT_LTO_WRAPPER'
+    gcc_install_dir = run_command('dirname', rhs, check: true).stdout().strip()
+    break
+  endif
+endforeach
+
+# Check if we got the gcc installation dir and add it to the project arguments.
+assert(gcc_install_dir != '', 'GCC headers dir not found. Check \'gcc -v\'')
+add_project_arguments('--gcc-install-dir=' + gcc_install_dir, language: 'cpp')
+
 ########## Dependency: clang libraries ################
 llvm_libdir = dependency('llvm', version : '>=16').get_variable(cmake : 'LLVM_LIBRARY_DIR', configtool: 'libdir')
 
@@ -49,7 +72,6 @@ clang_dep += cpp.find_library('clang-cpp', dirs : llvm_libdir)
 clang_dep += cpp.find_library('LLVM', dirs : llvm_libdir)
 ############################# #########################
 elf_dep = dependency('libelf') # libelf
-find_program('gcc', version : '>=7.5.0')
 
 subdir('libcextract')
 
