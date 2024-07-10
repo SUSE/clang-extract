@@ -40,6 +40,10 @@ struct SymbolUpdateStatus
   SymbolUpdateStatus(std::string new_name, ExternalizationType ext, bool done, bool wrap) :
     NewName(new_name),
     ExtType(ext),
+    OldDecl(nullptr),
+    NewDecl(nullptr),
+    FirstUse(nullptr),
+    LateInsertLocation(SourceLocation()),
     Done(done),
     Wrap(wrap)
   {
@@ -48,6 +52,10 @@ struct SymbolUpdateStatus
   SymbolUpdateStatus(ExternalizationType ext) :
     NewName(""),
     ExtType(ext),
+    OldDecl(nullptr),
+    NewDecl(nullptr),
+    FirstUse(nullptr),
+    LateInsertLocation(SourceLocation()),
     Done(false),
     Wrap(false)
   {
@@ -59,6 +67,18 @@ struct SymbolUpdateStatus
   /* The type of the externalization: STRONG, WEAK of RENAME. */
   ExternalizationType ExtType;
 
+  /* The old non-externalized declaration.  */
+  DeclaratorDecl *OldDecl;
+
+  /* The new externalized declaration.  */
+  DeclaratorDecl *NewDecl;
+
+  /* The first use of the symbol.  */
+  DeclRefExpr *FirstUse;
+
+  /* The late insertion location.  */
+  SourceLocation LateInsertLocation;
+
   /* Set when the symbol was externalized. */
   bool Done;
 
@@ -66,10 +86,43 @@ struct SymbolUpdateStatus
   bool Wrap;
 
   /* Get the correct name used when the code was transformed */
-  std::string getUseName(void)
+  inline std::string getUseName(void)
   {
       return Wrap ? "(*" + NewName + ")"
                   : NewName;
+  }
+
+  /* Check if this SymbolUpdateStatus was used, e.g. it wasn't a result of an
+     attempt of externalize an symbol which was removed by the ClosurePass.  */
+  inline bool Is_Used(void)
+  {
+    return OldDecl && NewDecl;
+  }
+
+  void Dump(SourceManager &SM)
+  {
+    llvm::outs() << "SymbolUpdateStatus at 0x" << this << '\n';
+    if (OldDecl != nullptr) {
+      SourceLocation loc = OldDecl->getLocation();
+      PresumedLoc ploc = SM.getPresumedLoc(loc);
+      llvm::outs() << "  OldDecl " << OldDecl->getName() << " at " << ploc.getFilename() << ':' << ploc.getLine() << '\n';
+    } else {
+      llvm::outs() << "  OldDecl is NULL\n";
+    }
+    if (FirstUse != nullptr) {
+      SourceLocation loc = FirstUse->getLocation();
+      PresumedLoc ploc = SM.getPresumedLoc(loc);
+      llvm::outs() << "  FirstUse at " << ploc.getFilename() << ':' << ploc.getLine() << ':' << ploc.getColumn() << '\n';
+    } else {
+      llvm::outs() << "  FirstUse is NULL\n";
+    }
+    if (LateInsertLocation.isValid()) {
+      PresumedLoc ploc = SM.getPresumedLoc(LateInsertLocation);
+      llvm::outs() << "  LateInsertLocation at " << ploc.getFilename() << ':' << ploc.getLine() << ':' << ploc.getColumn() << '\n';
+    } else {
+      llvm::outs() << "  LateInsertLocation is invalid\n";
+    }
+    llvm::outs() << "  ExternalizationType = " << ExtType << '\n';
   }
 };
 
@@ -229,12 +282,15 @@ class TextModifications
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt, std::string patch_object, bool dump = false)
+  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt,
+                     bool allow_late_externalize, std::string patch_object,
+                     bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
       TM(ast, dump),
       IA(ia),
       Ibt(ibt),
+      AllowLateExternalization(allow_late_externalize),
       PatchObject(patch_object),
       SymbolsMap({})
   {
@@ -280,10 +336,23 @@ class SymbolExternalizer
     return Log;
   }
 
+  /** Dump the SymbolsMap structure into stdout for debugging purposes.  */
+  void Dump_SymbolsMap(void);
+
   private:
 
+  /** Get the ExternalizationType from a string.  */
   enum ExternalizationType Get_Symbol_Ext_Type(const std::string &to_externalize);
 
+  /** Compute the late insert locations when -DCE_LATE_EXTERNALIZE is passed by
+      the user.  It will attempt to find a SourceLocation before the first use
+      of the variable that is valid, so we can put our externalized symbol there.  */
+  void Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array);
+
+  /** Do the late externalize logic.  */
+  void Late_Externalize(void);
+
+  /** Rewrite the macros which tokens matches the symbols we want to externalize.  */
   void Rewrite_Macros(void);
 
   /* Issue a Text Replacement with a given `priority`.  The priority will be
@@ -309,6 +378,9 @@ class SymbolExternalizer
 
   /** Defines the method that a private symbol will be searched. */
   bool Ibt;
+
+  /* True if we can write the externalized decl later than the original symbol.  */
+  bool AllowLateExternalization;
 
   /* Name of the object that will be patched. */
   std::string PatchObject;

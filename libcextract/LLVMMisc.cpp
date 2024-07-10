@@ -119,3 +119,42 @@ Decl *Get_Bodyless_Or_Itself(Decl *decl)
   Decl *bodyless = Get_Bodyless_Decl(decl);
   return bodyless ? bodyless : decl;
 }
+
+/* Get the TopLevel Decl that contains the location loc.  */
+Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc)
+{
+  SourceManager &SM = ast->getSourceManager();
+  /* We don't have a way of accessing the TopLevel vector directly, hence we
+     do this.  */
+  char *p = (char *) &(*ast->top_level_begin());
+  char *q = (char *) &(*ast->top_level_end());
+
+  int n = (((ptrdiff_t)(q - p))/sizeof(Decl *));
+
+  Decl **array = (Decl **)p;
+
+  /* Do binary search.  */
+  int low = 0;
+  int high = n-1;
+  while (low <= high) {
+    int mid = low + (high - low)/2;
+
+    Decl *decl = array[mid];
+    /* Get rid of some weird macro locations.  We want the location where
+       it was expanded.  */
+    SourceRange decl_range(SM.getExpansionLoc(decl->getBeginLoc()),
+                           SM.getExpansionLoc(decl->getEndLoc()));
+
+    if (decl_range.fullyContains(loc)) {
+      return decl;
+    }
+
+    if (SM.isBeforeInTranslationUnit(decl_range.getBegin(), loc)) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return nullptr;
+}

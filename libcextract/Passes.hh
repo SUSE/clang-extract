@@ -54,6 +54,7 @@ class PassManager {
             RenameSymbols(args.Should_Rename_Symbols()),
             Kernel(args.Is_Kernel()),
             Ibt(args.Has_Ibt()),
+            AllowLateExternalizations(args.Get_Allow_Late_Externalization()),
             PatchObject(args.Get_PatchObject()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
@@ -106,6 +107,9 @@ class PassManager {
 
         /** If the code was compiled with IBT support */
         bool Ibt;
+
+        /** If we can late externalize variables.  */
+        bool AllowLateExternalizations;
 
         /** Object that will be patched. */
         std::string PatchObject;

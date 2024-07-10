@@ -74,3 +74,6 @@ Decl         *Get_Bodyless_Decl(Decl *decl);
 FunctionDecl *Get_Bodyless_Or_Itself(FunctionDecl *decl);
 TagDecl      *Get_Bodyless_Or_Itself(TagDecl *decl);
 Decl         *Get_Bodyless_Or_Itself(Decl *decl);
+
+/* Get the TopLevel Decl that contains the location loc.  */
+Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
