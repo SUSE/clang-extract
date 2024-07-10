@@ -66,6 +66,8 @@ ArgvParser::ArgvParser(int argc, char **argv)
     RenameSymbols(false),
     Kernel(false),
     Ibt(false),
+    AllowLateExternalization(false),
+    PatchObject(""),
     DebuginfoPath(nullptr),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
@@ -147,6 +149,9 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER=<arg>\n"
 "                           Outputs a header file with a foward declaration of all\n"
 "                           functions. This header is not self-compilable.\n"
+"  -DCE_LATE_EXTERNALIZE    Enable late externalization (declare externalized variables\n"
+"                           later than the original).  May reduce code output when\n"
+"                           -DCE_KEEP_INCLUDES is enabled\n"
 "\n";
 
   llvm::outs() << "The following arguments are ignored by clang-extract:\n";
@@ -256,6 +261,12 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
     return true;
   }
+  if (!strcmp("-DCE_LATE_EXTERNALIZE", str)) {
+    AllowLateExternalization = true;
+
+    return true;
+  }
+
   if (!strcmp("--help", str)) {
     Print_Usage_Message();
     exit(0);

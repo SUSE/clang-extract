@@ -123,64 +123,32 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
         std::string sym_name = decl->getName().str();
 
         /* If we found the first instance of the function we want to externalize,
-           then proceed to create and replace the function declaration node with
-           a variable declaration node of proper type.  */
+           then proceed to annotate the Decl so we can later decide what to do with
+           it.  */
         const std::string new_name = EXTERNALIZED_PREFIX + sym_name;
-        sym->NewName = new_name;
         DeclaratorDecl *new_decl = SE.Create_Externalized_Var(decl, new_name);
+        sym->NewName = new_name;
+        sym->OldDecl = decl;
+        sym->NewDecl = new_decl;
         SE.Log.push_back({.OldName = sym_name,
                        .NewName = new_name,
                        .Type = type});
 
-        /* Create a string with the new variable type and name.  */
-        std::string o;
-        llvm::raw_string_ostream outstr(o);
-
-        /*
-         * It won't be a problem to add the code below multiple times, since
-         * clang-extract will remove ifndefs for already defined macros
-         */
-        if (SE.Ibt) {
-          outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
-                    "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
-                    "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
-                    "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
-                    "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
-                    "#endif\n\n";
-        }
-
-        new_decl->print(outstr);
-
-        if (SE.Ibt) {
-          std::string sym_mod = SE.IA.Get_Symbol_Module(sym_name);
-          if (sym_mod == "")
-            sym_mod = "vmlinux";
-
-          outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << SE.PatchObject << ", " <<
-                 sym_mod << ", " << sym_name << ")";
-        }
-        outstr << ";\n";
-
-        SE.Replace_Text(decl->getSourceRange(), outstr.str(), 1000);
 
         sym->Done = true;
         sym->Wrap = !SE.Ibt;
-      } else {
-        /* If we externalized this function, then all further declarations of
-           this function shall be discarded.  */
-
-        /* Get source location of old function declaration.  */
-        SE.Remove_Text(decl->getSourceRange(), 1000);
       }
     } else if (type == ExternalizationType::WEAK) {
       /* Now checks if this is a function or a variable delcaration.  */
+      sym->OldDecl = decl;
       if (FunctionDecl *func = dyn_cast<FunctionDecl>(decl)) {
         /* In the case it is a function we need to remove its declaration that
            have a body.  */
         if (func->hasBody()) {
           FunctionDecl *with_body = func->getDefinition();
-          if (with_body != func)
+          if (with_body != func) {
             SE.Remove_Text(with_body->getSourceRange(), 1000);
+          }
         }
       }
     } else if (type == ExternalizationType::RENAME) {
@@ -194,6 +162,7 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
       sym->NewName = new_name;
       if (!sym->Done) {
         /* Only register the first decl rename of the same variable.  */
+        sym->OldDecl = decl;
         SE.Log.push_back({.OldName = decl->getName().str(),
                        .NewName = new_name,
                        .Type = type});
@@ -223,7 +192,10 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
     SourceLocation begin = expr->getBeginLoc();
     SourceLocation end = expr->getEndLoc();
     SourceRange range(begin, end);
-    const StringRef &sym_name = PrettyPrint::Get_Source_Text(range);
+
+    ValueDecl *decl = expr->getDecl();
+
+    const StringRef &sym_name = decl->getName();
     SymbolUpdateStatus *sym = SE.getSymbolsUpdateStatus(sym_name);
 
     /*
@@ -233,9 +205,14 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
     if (sym == nullptr || !sym->Done)
       return VISITOR_CONTINUE;
 
-    ValueDecl *decl = expr->getDecl();
+    /* If this is the first use of the symbol, then remember it.  */
+    if (sym->FirstUse == nullptr) {
+      sym->FirstUse = expr;
+    }
 
-    if (decl->getName() == sym_name) {
+    /* We must be careful to ensure that the reference we got is actually
+       written cleanly, e.g. it doesn't come from a macro expansion.  */
+    if (sym_name == PrettyPrint::Get_Source_Text(range)) {
       /* Issue a text modification.  */
       SE.Replace_Text(range, sym->getUseName(), 100);
     }
@@ -381,6 +358,9 @@ bool TextModifications::Insert_Into_FileEntryMap(const SourceLocation &loc)
       /* Locations comming from the command line can be ignored.  */
       return false;
     }
+
+    /* Case where the loc doesn't have proper fileID is known to fail.  */
+    assert(loc.isFileID() && "Provided SourceLocation does not have valid FileID");
 
     /* Crash with assertion.  */
     assert(fentry && "FileEntry is NULL on a non-acknowledged case");
@@ -532,8 +512,14 @@ void SymbolExternalizer::Remove_Text(const SourceRange &range, int prio)
 
 void SymbolExternalizer::Insert_Text(const SourceLocation &loc, StringRef text)
 {
-  TM.Insert_Into_FileEntryMap(loc);
-  TM.Get_Rewriter().InsertText(loc, text);
+  /* Ensure we got a SourceLocation with FileID.  */
+  SourceLocation floc = loc;
+  if (!floc.isFileID()) {
+    floc = AST->getSourceManager().getExpansionLoc(loc);
+  }
+
+  TM.Insert_Into_FileEntryMap(floc);
+  TM.Get_Rewriter().InsertText(floc, text);
 }
 
 VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const std::string &name)
@@ -768,6 +754,114 @@ SymbolUpdateStatus *SymbolExternalizer::getSymbolsUpdateStatus(const StringRef &
   return &ret->second;
 }
 
+void SymbolExternalizer::Dump_SymbolsMap(void)
+{
+  SourceManager &sm = AST->getSourceManager();
+
+  for (auto it = SymbolsMap.begin(); it != SymbolsMap.end(); ++it) {
+    SymbolUpdateStatus &sym = it->getValue();
+    sym.Dump(sm);
+  }
+}
+
+void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array)
+{
+  SourceManager &SM = AST->getSourceManager();
+
+  /* Insert into an array for the sole purpose of sorting in an ascending
+     SourceLocation order.  */
+  for (auto it = SymbolsMap.begin(); it != SymbolsMap.end(); ++it) {
+    SymbolUpdateStatus &sym = it->getValue();
+    if (sym.Is_Used()) {
+      array.push_back(&sym);
+    }
+  }
+
+  if (!AllowLateExternalization) {
+    /* If we can't late-externalize, then there is no point in building this
+       datastructure.  The LateInsertLocation will turn invalid and it will
+       fallback to the old method.  */
+    return;
+  }
+
+  for (auto array_it = array.begin(); array_it != array.end(); ++array_it) {
+    SymbolUpdateStatus *sym = *array_it;
+    DeclRefExpr *first_use = sym->FirstUse;
+    SourceLocation loc_1stuse = SM.getExpansionLoc(first_use->getLocation());
+
+    Decl *topdecl = Get_Toplevel_Decl_At_Location(AST, loc_1stuse);
+    assert(topdecl && "No Toplevel decl encapsulate given expr?");
+
+    sym->LateInsertLocation = topdecl->getBeginLoc();
+  }
+}
+
+void SymbolExternalizer::Late_Externalize(void)
+{
+  SymbolExternalizer &SE = *this;
+  SourceManager &sm = AST->getSourceManager();
+  std::vector<SymbolUpdateStatus *> array;
+  Compute_SymbolsMap_Late_Insert_Locations(array);
+
+  for (SymbolUpdateStatus *sym : array) {
+    if (sym->NewDecl == nullptr || sym->ExtType != ExternalizationType::STRONG) {
+      /* Doesn't require strong externalization.  */
+      continue;
+    }
+
+    /* Create a string with the new variable type and name.  */
+    std::string o;
+    llvm::raw_string_ostream outstr(o);
+
+    /*
+     * It won't be a problem to add the code below multiple times, since
+     * clang-extract will remove ifndefs for already defined macros
+     */
+    if (SE.Ibt) {
+      outstr << "#ifndef KLP_RELOC_SYMBOL_POS\n"
+                "# define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+                "   asm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
+                "# define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+                "   KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n"
+                "#endif\n\n";
+    }
+
+    sym->NewDecl->print(outstr);
+
+    std::string sym_name = sym->OldDecl->getName().str();
+    if (SE.Ibt) {
+      std::string sym_mod = SE.IA.Get_Symbol_Module(sym_name);
+      if (sym_mod == "")
+        sym_mod = "vmlinux";
+
+      outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << SE.PatchObject << ", " <<
+             sym_mod << ", " << sym_name << ")";
+    }
+    outstr << ";\n";
+
+    /* In case we successfully have a late insertion location, put the new decl
+       there.  */
+    if (sym->LateInsertLocation.isValid()) {
+      SE.Insert_Text(sym->LateInsertLocation, outstr.str());
+
+      /* In case the symbol is in the main file already, we must delete it.  */
+      SourceLocation loc = sm.getExpansionLoc(sym->OldDecl->getBeginLoc());
+      if (sm.getFileID(loc) == sm.getMainFileID()) {
+        SE.Remove_Text(sym->OldDecl->getSourceRange(), 1000);
+      }
+    } else {
+      /* Fallback to the old method of rewriting the declaration.  */
+      SE.Replace_Text(sym->OldDecl->getSourceRange(), outstr.str(), 1000);
+
+      /* Emit a warning for debuging purposes for now.  */
+      if (AllowLateExternalization) {
+        std::string msg = "LateLocation of " + sym->OldDecl->getName().str() + " is invalid\n";
+        DiagsClass::Emit_Warn(msg);
+      }
+    }
+  }
+}
+
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array,
                                               std::vector<std::string> &to_rename_array)
 {
@@ -783,6 +877,7 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
   /* Start traversing the AST to find all references to the symbols that we want
    * to externalize or rename. */
   ExternalizerVisitor(*this).TraverseDecl(AST->getASTContext().getTranslationUnitDecl());
+  Late_Externalize();
 
   /* Search for all macros and macro expansions and rewrite them using the new
    * names for the externalized variables. */

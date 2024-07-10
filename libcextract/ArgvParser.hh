@@ -129,6 +129,11 @@ class ArgvParser
     return OutputFunctionPrototypeHeader;
   }
 
+  inline bool Get_Allow_Late_Externalization(void)
+  {
+    return AllowLateExternalization;
+  }
+
   const char *Get_Input_File(void);
 
   /** Print help usage message.  */
@@ -152,6 +157,10 @@ class ArgvParser
   bool Kernel;
   /* If the file was compiled with IBT support */
   bool Ibt;
+
+  /* If set, then clang-extract may write the externalized decl later than the
+     original code.  */
+  bool AllowLateExternalization;
   std::string PatchObject;
 
   const char *DebuginfoPath;
