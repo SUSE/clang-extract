@@ -82,10 +82,6 @@ class FunctionDependencyFinder
     /** The AST that are being used in our analysis.  */
     ASTUnit* AST;
 
-    /** Object holding information about constant enum symbols and a mapping to
-        they original enum object.  */
-    EnumConstantTable EnumTable;
-
     /* Tree of #includes.  */
     IncludeTree IT;
 

@@ -19,6 +19,7 @@
 #include "ClangCompat.hh"
 #include "LLVMMisc.hh"
 #include "IntervalTree.hh"
+#include "Closure.hh"
 
 #include <unordered_set>
 #include <iostream>
@@ -205,9 +206,20 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
     if (sym == nullptr || !sym->Done)
       return VISITOR_CONTINUE;
 
-    /* If this is the first use of the symbol, then remember it.  */
+    /* Get the first effective use, which means an DeclRefExpr of a decl that
+       will not be removed by the Closure.  */
     if (sym->FirstUse == nullptr) {
-      sym->FirstUse = expr;
+      ClosureSet &closure = SE.ClosureVisitor.Get_Closure();
+      ASTUnit *ast = SE.AST;
+      SourceManager &sm = ast->getSourceManager();
+      SourceLocation loc = sm.getExpansionLoc(expr->getLocation());
+      Decl *topdecl = Get_Toplevel_Decl_At_Location(ast, loc);
+
+      /* If the declaration is reachable from the functions we want to extract,
+         then we mark it as FirstUse.  */
+      if (closure.Is_Decl_Marked(topdecl)) {
+        sym->FirstUse = expr;
+      }
     }
 
     /* We must be careful to ensure that the reference we got is actually
@@ -787,6 +799,12 @@ void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<Sy
   for (auto array_it = array.begin(); array_it != array.end(); ++array_it) {
     SymbolUpdateStatus *sym = *array_it;
     DeclRefExpr *first_use = sym->FirstUse;
+
+    /* In case FirstUse is nullptr, then there is nothing to externalize
+       because it will be removed by the ClosurePass.  */
+    if (first_use == nullptr)
+      continue;
+
     SourceLocation loc_1stuse = SM.getExpansionLoc(first_use->getLocation());
 
     Decl *topdecl = Get_Toplevel_Decl_At_Location(AST, loc_1stuse);

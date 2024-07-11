@@ -132,10 +132,10 @@ class ClosureSet
 class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 {
   public:
-  DeclClosureVisitor(ASTUnit *ast, EnumConstantTable &table)
+  DeclClosureVisitor(ASTUnit *ast)
     : RecursiveASTVisitor(),
       AST(ast),
-      EnumTable(table)
+      EnumTable(ast)
   {
   }
 
@@ -520,7 +520,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
                                  std::unordered_set<std::string> *matched_names = nullptr);
 
   private:
-  
+
   /** The ASTUnit object.  */
   ASTUnit *AST;
 
@@ -533,7 +533,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   /** The table maping EnumConstantDecl to its original EnumDecl, used to find
       out where a certain EnumConstantDecl was defined.  */
-  EnumConstantTable &EnumTable;
+  EnumConstantTable EnumTable;
 
   /** The set of all analyzed Decls.  */
   std::unordered_set<Decl *> AnalyzedDecls;

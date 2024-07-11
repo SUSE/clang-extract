@@ -17,6 +17,7 @@
 
 #include "MacroWalker.hh"
 #include "InlineAnalysis.hh"
+#include "Closure.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Rewrite/Core/Rewriter.h>
@@ -96,7 +97,7 @@ struct SymbolUpdateStatus
      attempt of externalize an symbol which was removed by the ClosurePass.  */
   inline bool Is_Used(void)
   {
-    return OldDecl && NewDecl;
+    return OldDecl && NewDecl && FirstUse;
   }
 
   void Dump(SourceManager &SM)
@@ -284,6 +285,7 @@ class SymbolExternalizer
   public:
   SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt,
                      bool allow_late_externalize, std::string patch_object,
+                     const std::vector<std::string> &functions_to_extract,
                      bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
@@ -292,8 +294,10 @@ class SymbolExternalizer
       Ibt(ibt),
       AllowLateExternalization(allow_late_externalize),
       PatchObject(patch_object),
-      SymbolsMap({})
+      SymbolsMap({}),
+      ClosureVisitor(ast)
   {
+    ClosureVisitor.Compute_Closure_Of_Symbols(functions_to_extract);
   }
 
   friend class ExternalizerVisitor;
@@ -387,4 +391,7 @@ class SymbolExternalizer
 
   /** Symbols and its externalization type */
   llvm::StringMap<SymbolUpdateStatus> SymbolsMap;
+
+  /* ClosureVisitor to compute the closure.  */
+  DeclClosureVisitor ClosureVisitor;
 };
