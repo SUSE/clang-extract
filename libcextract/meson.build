@@ -33,7 +33,8 @@ libcextract_sources = [
   'SymversParser.cpp',
   'TopLevelASTIterator.cpp',
   'ExpansionPolicy.cpp',
-  'HeaderGenerate.cpp'
+  'HeaderGenerate.cpp',
+  'Closure.cpp'
 ]
 
 libcextract_static = static_library('cextract', libcextract_sources)
