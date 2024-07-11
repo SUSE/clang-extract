@@ -24,10 +24,9 @@
 /** FunctionDependencyFinder class methods implementation.  */
 FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
     : AST(ctx->AST.get()),
-      EnumTable(AST),
       IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand),
       KeepIncludes(ctx->KeepIncludes),
-      Visitor(AST, EnumTable)
+      Visitor(AST)
 {
 }
 
