@@ -19,6 +19,7 @@
 #include "MacroWalker.hh"
 #include "IncludeTree.hh"
 #include "PrettyPrint.hh"
+#include "Closure.hh"
 #include "Passes.hh"
 
 #include <clang/Tooling/Tooling.h>
@@ -26,43 +27,6 @@
 #include <unordered_set>
 
 using namespace clang;
-
-class ClosureSet
-{
-  public:
-  /** Check if a given declaration was already marked as dependency.  */
-  inline bool Is_Decl_Marked(Decl *decl)
-  { return Dependencies.find(decl) != Dependencies.end(); }
-
-  /** Mark decl as dependencies and all its previous decls versions.  */
-  bool Add_Decl_And_Prevs(Decl *decl);
-
-  /** Add a single decl to the set.  */
-  void Add_Single_Decl(Decl *decl)
-  {
-    Dependencies.insert(decl);
-  }
-
-  inline std::unordered_set<Decl *> &Get_Set(void)
-  {
-    return Dependencies;
-  }
-
-  inline void Remove_Decl(Decl *decl)
-  {
-    Dependencies.erase(decl);
-  }
-
-  private:
-  /** Datastructure holding all Decls required for the functions. This is
-      then used to mark which Decls we need to output.
-
-      We use a unordered_set because we need quick lookup, so a hash table
-      may be (?) the ideal datastructure for this.  */
-  std::unordered_set<Decl*> Dependencies;
-};
-
-class DeclClosureVisitor;
 
 /** Function Dependency Finder.
  *
@@ -93,7 +57,6 @@ class FunctionDependencyFinder
 {
   public:
     FunctionDependencyFinder(PassManager::Context *);
-    ~FunctionDependencyFinder(void);
 
     /** Print the marked nodes as they appear in the AST.  */
     void Print(void);
@@ -116,13 +79,6 @@ class FunctionDependencyFinder
     /* Remove redundant decls, whose source location is inside another decl.  */
     void Remove_Redundant_Decls();
 
-    /** Datastructure holding all Decls required for the functions. This is
-        then used to mark which Decls we need to output.
-
-        We use a unordered_set because we need quick lookup, so a hash table
-        may be (?) the ideal datastructure for this.  */
-    ClosureSet Closure;
-
     /** The AST that are being used in our analysis.  */
     ASTUnit* AST;
 
@@ -138,5 +94,5 @@ class FunctionDependencyFinder
 
     /* Visitor that sweeps through the AST.  Kept as pointer to avoid declaring
        the DeclClosureVisitor class into this .h to speedup build time.  */
-    DeclClosureVisitor *Visitor;
+    DeclClosureVisitor Visitor;
 };
