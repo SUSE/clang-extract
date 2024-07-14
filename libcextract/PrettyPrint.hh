@@ -72,6 +72,8 @@ class PrettyPrint
 
   static void Print_Comment(const std::string &comment);
 
+  static void Print_Raw(const std::string &string);
+
   static void Print_RawComment(SourceManager &sm, RawComment *comment);
 
   static void Debug_SourceLoc(const SourceLocation &loc);

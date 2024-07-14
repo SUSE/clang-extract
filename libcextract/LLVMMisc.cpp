@@ -15,6 +15,7 @@
 /* Author: Giuliano Belinassi  */
 
 #include "LLVMMisc.hh"
+#include "NonLLVMMisc.hh"
 
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl)
@@ -157,4 +158,50 @@ Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc)
   }
 
   return nullptr;
+}
+
+std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc)
+{
+  PresumedLoc presumed = sm.getPresumedLoc(loc);
+  unsigned line = presumed.getLine();
+  unsigned col = presumed.getColumn();
+  const char *filename = presumed.getFilename();
+
+  std::string comment = "/** clang-extract: from " + std::string(filename) + ":" +
+                       std::to_string(line) + ":" + std::to_string(col) + " */\n";
+  return comment;
+}
+
+/** Get decl clang-extract location comment, or build one if it doesn't exist.  */
+std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl)
+{
+  SourceManager &sm = ctx.getSourceManager();
+  RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
+  if (Have_Location_Comment(sm, comment)) {
+    return comment->getRawText(sm).str();;
+  } else {
+    return Build_CE_Location_Comment(sm, decl->getBeginLoc());
+  }
+}
+
+/** Get the begin location of the Decl before its comment if it have one.  */
+SourceLocation Get_Begin_Loc_Of_Decl_Or_Comment(ASTContext &ctx, Decl *decl)
+{
+  if (RawComment *comment = ctx.getRawCommentForDeclNoCache(decl)) {
+    return comment->getBeginLoc();
+  } else {
+    return decl->getBeginLoc();
+  }
+}
+
+/** Check if Decl have a Location comment.  */
+bool Have_Location_Comment(const SourceManager &sm, RawComment *comment)
+{
+  if (comment) {
+    StringRef text = comment->getRawText(sm);
+    if (prefix("/** clang-extract: from ", text.data())) {
+      return true;
+    }
+  }
+  return false;
 }
