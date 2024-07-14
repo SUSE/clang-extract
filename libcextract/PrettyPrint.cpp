@@ -17,6 +17,7 @@
 #include "ClangCompat.hh"
 #include "TopLevelASTIterator.hh"
 #include "NonLLVMMisc.hh"
+#include "LLVMMisc.hh"
 
 #include <clang/AST/Attr.h>
 
@@ -236,6 +237,11 @@ void PrettyPrint::Print_Attr(Attr *attr)
 void PrettyPrint::Print_Comment(const std::string &comment)
 {
   Out << "/** " << comment << "  */\n";
+}
+
+void PrettyPrint::Print_Raw(const std::string &string)
+{
+  Out << string;
 }
 
 void PrettyPrint::Print_RawComment(SourceManager &sm, RawComment *comment)
@@ -525,17 +531,6 @@ void RecursivePrint::Print_Preprocessed(PreprocessedEntity *prep)
   }
 }
 
-static bool Have_Location_Comment(const SourceManager &sm, RawComment *comment)
-{
-  if (comment) {
-    StringRef text = comment->getRawText(sm);
-    if (prefix("/** clang-extract: from ", text.data())) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void RecursivePrint::Print_Decl(Decl *decl)
 {
   if (!Is_Decl_Marked(decl)) {
@@ -564,14 +559,8 @@ void RecursivePrint::Print_Decl(Decl *decl)
     RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
     if (decl->getBeginLoc().isValid()) {
       if (!Have_Location_Comment(sm, comment)) {
-        PresumedLoc presumed = sm.getPresumedLoc(decl->getBeginLoc());
-        unsigned line = presumed.getLine();
-        unsigned col = presumed.getColumn();
-        const std::string &filename = sm.getFilename(decl->getBeginLoc()).str();
-
-        std::string comment = "clang-extract: from " + filename + ":" +
-                              std::to_string(line) + ":" + std::to_string(col);
-        PrettyPrint::Print_Comment(comment);
+        std::string comment = Build_CE_Location_Comment(sm, decl->getBeginLoc());
+        PrettyPrint::Print_Raw(comment);
       } else {
         /* Just output what it had.  */
         PrettyPrint::Print_RawComment(sm, comment);

@@ -77,3 +77,15 @@ Decl         *Get_Bodyless_Or_Itself(Decl *decl);
 
 /* Get the TopLevel Decl that contains the location loc.  */
 Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
+
+/** Build a clang-extract location comment.  */
+std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc);
+
+/** Get the begin location of the Decl before its comment if it have one.  */
+SourceLocation Get_Begin_Loc_Of_Decl_Or_Comment(ASTContext &ctx, Decl *decl);
+
+/** Get decl clang-extract location comment, or build one if it doesn't exist.  */
+std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl);
+
+/** Check if Decl have a Location comment.  */
+bool Have_Location_Comment(const SourceManager &sm, RawComment *comment);

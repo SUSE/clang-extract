@@ -779,6 +779,7 @@ void SymbolExternalizer::Dump_SymbolsMap(void)
 void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array)
 {
   SourceManager &SM = AST->getSourceManager();
+  ASTContext &ctx = AST->getASTContext();
 
   /* Insert into an array for the sole purpose of sorting in an ascending
      SourceLocation order.  */
@@ -810,7 +811,9 @@ void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<Sy
     Decl *topdecl = Get_Toplevel_Decl_At_Location(AST, loc_1stuse);
     assert(topdecl && "No Toplevel decl encapsulate given expr?");
 
-    sym->LateInsertLocation = topdecl->getBeginLoc();
+    /* Check if the declaration have comments.  In this case we want to insert
+       it before the comment.  */
+    sym->LateInsertLocation = Get_Begin_Loc_Of_Decl_Or_Comment(ctx, topdecl);
   }
 }
 
@@ -818,6 +821,7 @@ void SymbolExternalizer::Late_Externalize(void)
 {
   SymbolExternalizer &SE = *this;
   SourceManager &sm = AST->getSourceManager();
+  ASTContext &astctx = AST->getASTContext();
   std::vector<SymbolUpdateStatus *> array;
   Compute_SymbolsMap_Late_Insert_Locations(array);
 
@@ -844,6 +848,13 @@ void SymbolExternalizer::Late_Externalize(void)
                 "#endif\n\n";
     }
 
+    /*
+     * Get the location of the original decl so we can output the right comment
+     * location when LateExternalization is active.
+     */
+    if (sym->LateInsertLocation.isValid()) {
+      outstr << Get_Or_Build_CE_Location_Comment(astctx, sym->OldDecl);
+    }
     sym->NewDecl->print(outstr);
 
     std::string sym_name = sym->OldDecl->getName().str();
