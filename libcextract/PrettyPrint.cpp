@@ -357,6 +357,15 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
     bool has_attr = false;
     SourceManager &SM = AST->getSourceManager();
 
+    /* Vector type attributes are not encoded in the AttrVec structure, hence
+       we have to check for its existence and expand until we match the ';'
+       token.  See small/attr-11.c testcase.  */
+    if (TypedefDecl *tdecl = dyn_cast<TypedefDecl>(decl)) {
+      if (isa<clang::VectorType>(tdecl->getTypeSourceInfo()->getType().getTypePtr())) {
+        has_attr = true;
+      }
+    }
+
     for (size_t i = 0; i < attrvec.size(); i++) {
       const Attr *attr = attrvec[i];
       SourceLocation loc = attr->getRange().getEnd();
