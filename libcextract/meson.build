@@ -34,7 +34,8 @@ libcextract_sources = [
   'ExpansionPolicy.cpp',
   'HeaderGenerate.cpp',
   'Closure.cpp',
-  'ASTUnitHack.cpp'
+  'ASTUnitHack.cpp',
+  'DependencyGraph.cpp'
 ]
 
 libcextract_static = static_library('cextract', libcextract_sources)

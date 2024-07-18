@@ -15,6 +15,7 @@
 
 #include "Passes.hh"
 
+#include "DependencyGraph.hh"
 #include "FunctionDepsFinder.hh"
 #include "ArgvParser.hh"
 #include "PrettyPrint.hh"
@@ -339,6 +340,8 @@ class ClosurePass : public Pass
       raw_string_ostream code_stream(ctx->CodeOutput);
 
       PrettyPrint::Set_Output_Ostream(&code_stream);
+
+      DependencyGraph DG(ctx->AST.get());
 
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf(ctx);
