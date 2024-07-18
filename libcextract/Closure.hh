@@ -444,6 +444,14 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  bool VisitConvertVectorExpr(const ConvertVectorExpr *expr)
+  {
+    const TypeSourceInfo *tsi = expr->getTypeSourceInfo();
+    TRY_TO(TraverseTypeLoc(tsi->getTypeLoc()));
+
+    return VISITOR_CONTINUE;
+  }
+
   /* -------- Types ----------------- */
   bool VisitTagType(const TagType *type)
   {
