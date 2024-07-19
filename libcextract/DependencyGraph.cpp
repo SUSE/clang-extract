@@ -42,7 +42,7 @@ DependencyEdge *DependencyNode::getBackwardEdgeAdjacentTo(DependencyNode *backwa
   return nullptr;
 }
 
-void DependencyNode::dumpSingleNode(FILE *file)
+void DependencyNode::dumpSingleNode(FILE *file) const
 {
   for (const DependencyEdge *edge : BackwardEdges) {
     std::string back = edge->getBackward()->getName().str();
@@ -59,6 +59,38 @@ void DependencyNode::dumpSingleNode(FILE *file)
     std::string front = edge->getForward()->getName().str();
 
     fprintf(file, "\n\"%s\" -> \"%s\"\n", back.c_str(), front.c_str());
+  }
+}
+
+void DependencyNode::dumpGraphviz(FILE *file, int depth)
+{
+  if (Aux != nullptr) {
+    return;
+  }
+
+  Aux = (void *) 1;
+
+  if (depth == 0) {
+    fprintf(file, "strict digraph {");
+  }
+
+  for (const DependencyEdge *edge : ForwardEdges) {
+    DependencyNode *backward = edge->getBackward();
+    DependencyNode *forward = edge->getForward();
+
+    const std::string &back = backward->getName().str();
+    const std::string &front = forward->getName().str();
+
+    fprintf(file, "\n\"%s (%lx)\" -> \"%s (%lx)\"", back.c_str(), (unsigned long)
+                                                                  edge->getBackward(),
+                                                    front.c_str(), (unsigned long)
+                                                                  edge->getForward());
+
+    forward->dumpGraphviz(file, depth + 1);
+  }
+
+  if (depth == 0) {
+    fprintf(file, "\n}");
   }
 }
 
@@ -140,7 +172,7 @@ void DependencyGraph::Build_Dependency_Graph(void)
   DependencyGraphVisitor visitor(*this, AST);
   visitor.TraverseDecl(AST->getASTContext().getTranslationUnitDecl());
 
-  dumpGraphviz();
+  dumpGraphviz("main");
 
   exit(0);
 }
@@ -231,4 +263,22 @@ void DependencyGraph::dumpGraphviz(FILE *file)
                                                                   edge->getForward());
   }
   fprintf(file, "\n}");
+}
+
+void DependencyGraph::dumpGraphviz(const std::string &name, FILE *file)
+{
+  for (DependencyNode *node : NodePool) {
+    if (node->getName() == name) {
+      node->dumpGraphviz(file);
+      break;
+    }
+  }
+  nullifyAux();
+}
+
+void DependencyGraph::nullifyAux(void)
+{
+  for (DependencyNode *node : NodePool) {
+    node->Aux = nullptr;
+  }
 }

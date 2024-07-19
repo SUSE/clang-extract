@@ -41,13 +41,15 @@ class DependencyGraph
   {
     public:
     DependencyNode(Decl *decl)
-      : AsDecl(decl),
+      : Aux(nullptr),
+        AsDecl(decl),
         Type(NodeType::DECL)
     {
     }
 
     DependencyNode(PreprocessedEntity *entity)
-      : AsPrep(entity),
+      : Aux(nullptr),
+        AsPrep(entity),
         Type(NodeType::PREPROCESSED_ENTITY)
     {
     }
@@ -95,9 +97,12 @@ class DependencyGraph
 
     StringRef getName(void) const;
 
-    void dumpSingleNode(FILE *f = stdout);
+    void dumpSingleNode(FILE *f = stdout) const;
+    void dumpGraphviz(FILE *f = stdout, int depth = 0);
 
     friend class DependencyGraph;
+
+    void *Aux;
 
     protected:
     union
@@ -131,12 +136,12 @@ class DependencyGraph
       return Forward;
     }
 
-    inline const DependencyNode *getBackward(void) const
+    inline DependencyNode *getBackward(void) const
     {
       return Backward;
     }
 
-    inline const DependencyNode *getForward(void) const
+    inline DependencyNode *getForward(void) const
     {
       return Forward;
     }
@@ -165,9 +170,12 @@ class DependencyGraph
   DependencyEdge *createDependencyEdge(DependencyNode *back, DependencyNode *foward);
 
   void dumpGraphviz(FILE *f = stdout);
+  void dumpGraphviz(const std::string &name, FILE *f = stdout);
 
   private:
   void Build_Dependency_Graph(void);
+
+  void nullifyAux(void);
 
   ASTUnit *AST;
 
