@@ -195,18 +195,14 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE
 
   /* Special Traversal functions which marks if a Decl was already analyzed.
-     This macro generates them.  */
-#define DEF_MARKING_TRAVERSE_DECL(DECL)               \
-  bool Traverse##DECL(DECL *decl)                     \
-  {                                                   \
-    DO_NOT_RUN_IF_ALREADY_ANALYZED(decl);             \
-    Mark_As_Analyzed(decl);                           \
-    return RecursiveASTVisitor::Traverse##DECL(decl); \
-  }
-
-  /* Override of TraverseDecl that marks that the given Decl was analyzed.  So
+     Override of TraverseDecl that marks that the given Decl was analyzed.  So
      far it seems we only need this function for now.  */
-  DEF_MARKING_TRAVERSE_DECL(Decl);
+  bool TraverseDecl(Decl *decl)
+  {
+    DO_NOT_RUN_IF_ALREADY_ANALYZED(decl);
+    Mark_As_Analyzed(decl);
+    return RecursiveASTVisitor::TraverseDecl(decl);
+  }
 
   /* -------- C Declarations ----------------- */
 
@@ -266,6 +262,20 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
         typedef struct { int a; } A;  */
       return VisitTypedefNameDecl(typedecl);
     } else {
+      /* In case this references a struct/union defined inside a struct (nested
+         struct), then we also need to analyze the parent struct.  */
+      RecordDecl *parent = dyn_cast<RecordDecl>(decl->getLexicalDeclContext());
+      if (parent) {
+        /* If the parent struct is flagged as not needing a complete definition
+           then we need to set it to true, else the nested struct won't be
+           output as of only a partial definition of the parent struct is
+           output. */
+        parent->setCompleteDefinitionRequired(true);
+
+        /* Analyze parent struct.  */
+        TRY_TO(TraverseDecl(parent));
+      }
+
       Closure.Add_Decl_And_Prevs(Maybe_Partial_Decl(decl));
     }
 
@@ -547,5 +557,4 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   std::unordered_set<Decl *> AnalyzedDecls;
 #undef TRY_TO
 #undef DO_NOT_RUN_IF_ALREADY_ANALYZED
-#undef DEF_MARKING_TRAVERSE_DECL
 };
