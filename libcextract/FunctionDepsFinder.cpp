@@ -95,6 +95,20 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 
       const clang::Type *type = decl->getTypeForDecl();
       if (type) {
+        /* We must be careful with pointers, the user can define things like:
+         *
+         * typedef struct _fakestr {
+         *   struct _fakestr *pNext;
+         *   int type;
+         * } FAKE, *PFAKE;
+         *
+         * which in this case PFAKE is a pointer and we need to deference it
+         * to reach _fakestr.
+         */
+        while (type->isPointerType()) {
+          type = type->getPointeeOrArrayElementType();
+        }
+
         TagDecl *typedecl = type->getAsTagDecl();
 
         if (typedecl && closure.Is_Decl_Marked(typedecl)) {
