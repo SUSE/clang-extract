@@ -167,14 +167,10 @@ class DependencyGraphVisitor : public RecursiveASTVisitor<DependencyGraphVisitor
   std::stack<DependencyNode *> DependencyStack;
 };
 
-void DependencyGraph::Build_Dependency_Graph(void)
+void DependencyGraph::buildDependencyGraph(void)
 {
   DependencyGraphVisitor visitor(*this, AST);
   visitor.TraverseDecl(AST->getASTContext().getTranslationUnitDecl());
-
-  dumpGraphviz("main");
-
-  exit(0);
 }
 
 DependencyGraph::~DependencyGraph(void)
@@ -250,6 +246,23 @@ StringRef DependencyNode::getName(void) const
   }
 }
 
+void DependencyNode::getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec)
+{
+  if (isMarked()) {
+    return;
+  }
+
+  mark();
+
+  for (DependencyEdge *edge : BackwardEdges) {
+    DependencyNode *node = edge->getBackward();
+    if (Decl *decl = node->getAsDecl()) {
+      vec.push_back(decl);
+    }
+    node->getDeclsDependingOnMe(vec);
+  }
+}
+
 void DependencyGraph::dumpGraphviz(FILE *file)
 {
   fprintf(file, "strict digraph {");
@@ -273,12 +286,21 @@ void DependencyGraph::dumpGraphviz(const std::string &name, FILE *file)
       break;
     }
   }
-  nullifyAux();
+  unmarkAllNodes();
 }
 
-void DependencyGraph::nullifyAux(void)
+void DependencyGraph::unmarkAllNodes(void)
 {
   for (DependencyNode *node : NodePool) {
     node->Aux = nullptr;
   }
+}
+
+llvm::SmallVector<Decl *> DependencyGraph::getDeclsDependingOn(DependencyNode *node)
+{
+  llvm::SmallVector<Decl *> ret;
+  node->getDeclsDependingOnMe(ret);
+  unmarkAllNodes();
+
+  return ret;
 }

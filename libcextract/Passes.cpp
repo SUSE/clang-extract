@@ -341,8 +341,6 @@ class ClosurePass : public Pass
 
       PrettyPrint::Set_Output_Ostream(&code_stream);
 
-      DependencyGraph DG(ctx->AST.get());
-
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf(ctx);
       if (fdf.Run_Analysis(ctx->FuncExtractNames) == false) {

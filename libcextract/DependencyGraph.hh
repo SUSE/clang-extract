@@ -18,8 +18,10 @@
 
 #include <clang/Frontend/ASTUnit.h>
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallVector.h>
 #include <vector>
 #include <stdio.h>
+
 
 using namespace clang;
 
@@ -30,7 +32,7 @@ class DependencyGraph
     : AST(ast),
       DeclMap(10000)
   {
-    Build_Dependency_Graph();
+    buildDependencyGraph();
   }
 
   ~DependencyGraph(void);
@@ -92,10 +94,27 @@ class DependencyGraph
       return ForwardEdges;
     }
 
+    inline void mark(void *val = (void *)1)
+    {
+      Aux = val;
+    }
+
+    inline bool isMarked(void)
+    {
+      return Aux != nullptr;
+    }
+
+    inline void unmark(void)
+    {
+      Aux = nullptr;
+    }
+
     DependencyEdge *getForwardEdgeAdjacentTo(DependencyNode *);
     DependencyEdge *getBackwardEdgeAdjacentTo(DependencyNode *);
 
     StringRef getName(void) const;
+
+    void getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec);
 
     void dumpSingleNode(FILE *f = stdout) const;
     void dumpGraphviz(FILE *f = stdout, int depth = 0);
@@ -169,13 +188,15 @@ class DependencyGraph
 
   DependencyEdge *createDependencyEdge(DependencyNode *back, DependencyNode *foward);
 
+  llvm::SmallVector<Decl *> getDeclsDependingOn(DependencyNode *node);
+
   void dumpGraphviz(FILE *f = stdout);
   void dumpGraphviz(const std::string &name, FILE *f = stdout);
 
   private:
-  void Build_Dependency_Graph(void);
+  void buildDependencyGraph(void);
 
-  void nullifyAux(void);
+  void unmarkAllNodes(void);
 
   ASTUnit *AST;
 

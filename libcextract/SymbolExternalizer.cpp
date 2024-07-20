@@ -24,7 +24,8 @@
 #include <unordered_set>
 #include <iostream>
 
-#include "clang/Rewrite/Core/Rewriter.h"
+#include <clang/Rewrite/Core/Rewriter.h>
+#include <DependencyGraph.hh>
 
 /* Ban symbols that we are sure to cause problems.  */
 
@@ -1013,8 +1014,24 @@ void SymbolExternalizer::Late_Externalize(void)
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array,
                                               std::vector<std::string> &to_rename_array)
 {
+  DependencyGraph DG(AST);
+  Preprocessor &pp = AST->getPreprocessor();
+  DeclContext *ctxdecl = AST->getASTContext().getTranslationUnitDecl();
+
   for (const std::string &to_externalize : to_externalize_array) {
     SymbolsMap.insert({to_externalize, SymbolUpdateStatus(Get_Symbol_Ext_Type(to_externalize))});
+    IdentifierInfo *info = pp.getIdentifierInfo(to_externalize);
+    auto result = ctxdecl->lookup(info);
+    for (auto it = result.begin(); it != result.end(); ++it) {
+      Decl *decl = *it;
+      DependencyNode *node = DG.getDependencyNode(decl);
+      SmallVector<Decl *> deps = DG.getDeclsDependingOn(node);
+      for (Decl *d : deps) {
+        if (NamedDecl *ndecl = dyn_cast<NamedDecl>(d)) {
+          llvm::outs() << to_externalize << " : " << ndecl->getName() << " (" << ndecl << ")" << '\n';
+        }
+      }
+    }
   }
 
   for (std::string &to_externalize : to_rename_array) {
