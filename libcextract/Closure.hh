@@ -467,6 +467,13 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  /* --------- Attributes ----------- */
+  bool VisitCleanupAttr(const CleanupAttr *attr)
+  {
+    TRY_TO(TraverseDecl(attr->getFunctionDecl()));
+    return VISITOR_CONTINUE;
+  }
+
   /* -------- Types ----------------- */
   bool VisitTagType(const TagType *type)
   {
