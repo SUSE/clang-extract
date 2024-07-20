@@ -202,9 +202,10 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 
   // FIXME: use interval tree
   ASTUnit::top_level_iterator it;
-  TypedefDecl *prev = nullptr;
+  Decl *prev = nullptr;
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
-    if (TypedefDecl *decl = dyn_cast<TypedefDecl>(*it)) {
+    Decl *decl = *it;
+    if (isa<TypedefDecl>(decl) || isa<VarDecl>(decl)) {
       if (!closure.Is_Decl_Marked(decl))
         continue;
 
