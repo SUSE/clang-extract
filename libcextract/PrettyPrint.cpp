@@ -47,8 +47,32 @@ void PrettyPrint::Print_Decl(Decl *decl)
        because it contains declared constants.  */
   } else {
     /* Structs and prototypes */
+
+    /** Check if we can get a partial declaration of `decl` rather than a full
+        declaration.  */
+    bool full_def_removed = false;
+    if (t && t->isCompleteDefinitionRequired() == false) {
+      /* We don't need the full defintion.  Hide the body for Print_Decl_Raw.  */
+      t->setCompleteDefinition(false);
+
+      /* FIXME: The Print_Decl_Raw class will attempt to write this declaration
+         as the user wrote, that means WITH a body.  To avoid this, we set
+         the StartLocation to equal the End of location, which will trigger
+         the "clang got confused" mechanism in PrettyPrint and force it to
+         be output as a tree dump instead of what the user wrote.  The
+         correct way of doing this would be update the source location to
+         the correct range.  */
+      t->setLocStart(t->getEndLoc());
+
+      full_def_removed = true;
+    }
+
     Print_Decl_Raw(decl);
-    Out << ";\n\n";
+    Out << ';';
+    if (full_def_removed) {
+      Out << "/* Full definition was removed.  */";
+    }
+    Out << "\n\n";
   }
 }
 

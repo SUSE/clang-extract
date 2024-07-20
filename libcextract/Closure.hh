@@ -162,29 +162,6 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     AnalyzedDecls.insert(decl);
   }
 
-  /** Check if we can get a partial declaration of `decl` rather than a full
-      declaration.  */
-  inline TagDecl *Maybe_Partial_Decl(TagDecl *decl)
-  {
-    if (decl->isCompleteDefinitionRequired()) {
-      /* We need the full definition of this struct, enum, or union.  */
-      return decl;
-    } else {
-      /* We don't need the full defintion.  Hide the body for the PrettyPrint
-         class.  */
-      decl->setCompleteDefinition(false);
-      /* FIXME: The PrettyPrint class will attempt to write this declaration
-         as the user wrote, that means WITH a body.  To avoid this, we set
-         the StartLocation to equal the End of location, which will trigger
-         the "clang got confused" mechanism in PrettyPrint and force it to
-         be output as a tree dump instead of what the user wrote.  The
-         correct way of doing this would be update the source location to
-         the correct range.  */
-      decl->setLocStart(decl->getEndLoc());
-      return decl;
-    }
-  }
-
   enum {
     VISITOR_CONTINUE = true,   // Return this for the AST transversal to continue;
     VISITOR_STOP     = false,  // Return this for the AST tranversal to stop completely;
@@ -236,6 +213,15 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       }
     }
 
+    /* Check if the return type of the function is a complete struct
+       definition, which in this case clang seems to ignore.  */
+    const clang::Type *ret_type = to_mark->getReturnType().getTypePtr();
+    if (ret_type->isRecordType()) {
+      if (TagDecl *tag = ret_type->getAsTagDecl()) {
+        tag->setCompleteDefinitionRequired(true);
+      }
+    }
+
     Closure.Add_Decl_And_Prevs(to_mark);
 
     return VISITOR_CONTINUE;
@@ -280,7 +266,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
         TRY_TO(TraverseDecl(parent));
       }
 
-      Closure.Add_Decl_And_Prevs(Maybe_Partial_Decl(decl));
+      Closure.Add_Decl_And_Prevs(decl);
     }
 
     return VISITOR_CONTINUE;
