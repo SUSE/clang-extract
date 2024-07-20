@@ -336,8 +336,9 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   bool VisitVarDecl(VarDecl *decl)
   {
     /* Avoid adding variables that are not global.  */
+    // FIXME: Do we need to analyze every previous decl?
     if (decl->hasGlobalStorage()) {
-      Closure.Add_Decl_And_Prevs(decl);
+      Closure.Add_Single_Decl(decl);
     }
 
     return VISITOR_CONTINUE;
