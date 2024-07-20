@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include "EnumConstTbl.hh"
 #include "MacroWalker.hh"
 #include "IncludeTree.hh"
 #include "PrettyPrint.hh"

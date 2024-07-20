@@ -17,7 +17,6 @@ libcextract_sources = [
   'ArgvParser.cpp',
   'DscFileGenerator.cpp',
   'ElfCXX.cpp',
-  'EnumConstTbl.cpp',
   'Error.cpp',
   'FunctionDepsFinder.cpp',
   'FunctionExternalizeFinder.cpp',

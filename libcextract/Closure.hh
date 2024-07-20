@@ -21,7 +21,6 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <unordered_set>
 
-#include "EnumConstTbl.hh"
 #include "LLVMMisc.hh"
 
 using namespace clang;
@@ -134,8 +133,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   public:
   DeclClosureVisitor(ASTUnit *ast)
     : RecursiveASTVisitor(),
-      AST(ast),
-      EnumTable(ast)
+      AST(ast)
   {
   }
 
@@ -320,7 +318,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   bool VisitEnumConstantDecl(EnumConstantDecl *decl)
   {
     /* Add original EnumDecl it originated.  */
-    EnumDecl *enum_decl = EnumTable.Get(decl);
+    EnumDecl *enum_decl = dyn_cast<EnumDecl>(decl->getLexicalDeclContext());
     if (enum_decl) {
       return TraverseDecl(enum_decl);
     }
@@ -548,10 +546,6 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       We use a unordered_set because we need quick lookup, so a hash table
       may be (?) the ideal datastructure for this.  */
   ClosureSet Closure;
-
-  /** The table maping EnumConstantDecl to its original EnumDecl, used to find
-      out where a certain EnumConstantDecl was defined.  */
-  EnumConstantTable EnumTable;
 
   /** The set of all analyzed Decls.  */
   std::unordered_set<Decl *> AnalyzedDecls;
