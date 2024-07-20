@@ -36,9 +36,15 @@ class ClosureSet
   bool Add_Decl_And_Prevs(Decl *decl);
 
   /** Add a single decl to the set.  */
-  void Add_Single_Decl(Decl *decl)
+  bool Add_Single_Decl(Decl *decl)
   {
+    /* Do not insert builtin decls.  */
+    if (Is_Builtin_Decl(decl)) {
+      return false;
+    }
+
     Dependencies.insert(decl);
+    return true;
   }
 
   inline std::unordered_set<Decl *> &Get_Set(void)
@@ -329,8 +335,9 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   /* Not called automatically by Transverse.  */
   bool VisitTypedefNameDecl(TypedefNameDecl *decl)
   {
+    // FIXME: Do we need to analyze the previous decls?
     TRY_TO(TraverseType(decl->getUnderlyingType()));
-    Closure.Add_Decl_And_Prevs(decl);
+    Closure.Add_Single_Decl(decl);
 
     return VISITOR_CONTINUE;
   }
