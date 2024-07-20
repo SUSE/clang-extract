@@ -233,6 +233,25 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  bool ParentRecordDeclHelper(TagDecl *decl)
+  {
+      /* In case this references a struct/union defined inside a struct (nested
+         struct), then we also need to analyze the parent struct.  */
+      RecordDecl *parent = dyn_cast<RecordDecl>(decl->getLexicalDeclContext());
+      if (parent) {
+        /* If the parent struct is flagged as not needing a complete definition
+           then we need to set it to true, else the nested struct won't be
+           output as of only a partial definition of the parent struct is
+           output. */
+        parent->setCompleteDefinitionRequired(true);
+
+        /* Analyze parent struct.  */
+        TRY_TO(TraverseDecl(parent));
+      }
+
+      return VISITOR_CONTINUE;
+  }
+
   bool VisitRecordDecl(RecordDecl *decl)
   {
     /* If this is a C++ record decl, then analyze it as such.  */
@@ -251,23 +270,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
         typedef struct { int a; } A;  */
       return VisitTypedefNameDecl(typedecl);
-    } else {
-      /* In case this references a struct/union defined inside a struct (nested
-         struct), then we also need to analyze the parent struct.  */
-      RecordDecl *parent = dyn_cast<RecordDecl>(decl->getLexicalDeclContext());
-      if (parent) {
-        /* If the parent struct is flagged as not needing a complete definition
-           then we need to set it to true, else the nested struct won't be
-           output as of only a partial definition of the parent struct is
-           output. */
-        parent->setCompleteDefinitionRequired(true);
-
-        /* Analyze parent struct.  */
-        TRY_TO(TraverseDecl(parent));
-      }
-
-      Closure.Add_Decl_And_Prevs(decl);
     }
+
+    TRY_TO(ParentRecordDeclHelper(decl));
+    Closure.Add_Decl_And_Prevs(decl);
 
     return VISITOR_CONTINUE;
   }
@@ -285,10 +291,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
         typedef enum { CONSTANT = 1 } A;  */
       return VisitTypedefNameDecl(typedecl);
-    } else {
-      Closure.Add_Decl_And_Prevs(decl);
     }
 
+    TRY_TO(ParentRecordDeclHelper(decl));
+    Closure.Add_Decl_And_Prevs(decl);
     return VISITOR_CONTINUE;
   }
 
