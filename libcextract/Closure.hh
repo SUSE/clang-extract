@@ -460,6 +460,20 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     return VISITOR_CONTINUE;
   }
 
+  bool VisitUnaryOperator(const UnaryOperator *expr)
+  {
+    /* Fix cases where a copy of a struct is necessary but
+     * CompleteDefinitionRequired is somehow set to false by clang itself.
+     * see small/record-9.c for an example.
+     */
+    const clang::Type *type = expr->getType().getTypePtr();
+    if (TagDecl *tag = type->getAsTagDecl()) {
+      tag->setCompleteDefinitionRequired(true);
+    }
+
+    return VISITOR_CONTINUE;
+  }
+
   /* --------- Attributes ----------- */
   bool VisitCleanupAttr(const CleanupAttr *attr)
   {
