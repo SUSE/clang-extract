@@ -205,7 +205,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
   Decl *prev = nullptr;
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
-    if (isa<TypedefDecl>(decl) || isa<VarDecl>(decl)) {
+    if (isa<TypedefDecl>(decl) || isa<VarDecl>(decl) || isa<TagDecl>(decl)) {
       if (!closure.Is_Decl_Marked(decl))
         continue;
 
@@ -239,8 +239,14 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
        * Which then breaks the one-definition-rule. In such cases, remove the
        * previous declaration in the same code range, since the later will
        * contain both definitions either way.
+       *
+       * Also be careful to make sure those declarations will be print as
+       * based on the source text and not in AST dump.  In the later case
+       * we don't want to remove it.
        */
-      if (PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
+      if (PrettyPrint::Get_Source_Text(decl->getSourceRange()) != "" &&
+          PrettyPrint::Get_Source_Text(prev->getSourceRange()) != "" &&
+          PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
                                               prev->getSourceRange())) {
         /*
          * If the prev and the current decl have the same start LoC, but
