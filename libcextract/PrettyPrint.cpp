@@ -31,9 +31,9 @@ void PrettyPrint::Print_Decl(Decl *decl)
      with body.  If yes, we can simply print the declaration, but otherwise
      we need to manually insert the end of statement ';' token.  */
 
-  FunctionDecl *f = dynamic_cast<FunctionDecl*>(decl);
-  TagDecl *t = dynamic_cast<TagDecl*>(decl);
-  EnumDecl *e = dynamic_cast<EnumDecl*>(decl);
+  FunctionDecl *f = dyn_cast<FunctionDecl*>(decl);
+  TagDecl *t = dyn_cast<TagDecl*>(decl);
+  EnumDecl *e = dyn_cast<EnumDecl*>(decl);
 
   if (f && f->hasBody() && f->isThisDeclarationADefinition()) {
     Print_Decl_Raw(f);
@@ -549,7 +549,7 @@ void RecursivePrint::Print_Decl(Decl *decl)
   /* Handle namespaces.  Namespace declaration can contain many functions
      that can be unused in the program.  Hence we need to handle it
      carefully to remove what we don't need.  */
-  if (NamespaceDecl *namespacedecl = dynamic_cast<NamespaceDecl*>(decl)) {
+  if (NamespaceDecl *namespacedecl = dyn_cast<NamespaceDecl*>(decl)) {
     if (namespacedecl->isInline()) {
        (*PrettyPrint::Out)  << "inline ";
     }

@@ -90,7 +90,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 
         which is a redeclaration of enum Hand. Hence we have to remove the
         first `enum Hand` from the closure.  See typedef-7.c testcase.  */
-    if (TypedefDecl *decl = dynamic_cast<TypedefDecl *>(*it)) {
+    if (TypedefDecl *decl = dyn_cast<TypedefDecl *>(*it)) {
       SourceRange range = decl->getSourceRange();
 
       const clang::Type *type = decl->getTypeForDecl();
@@ -136,7 +136,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         this will remove the first enum declaration because the location
         tracking will correctly include the enum system_states.  */
 
-    else if (DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(*it)) {
+    else if (DeclaratorDecl *decl = dyn_cast<DeclaratorDecl *>(*it)) {
       SourceRange range = decl->getSourceRange();
 
       const clang::Type *type = ClangCompat::getTypePtr(decl->getType());
