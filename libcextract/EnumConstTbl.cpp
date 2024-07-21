@@ -20,7 +20,7 @@ EnumConstantTable::EnumConstantTable(ASTUnit *ast)
 {
   clang::ASTUnit::top_level_iterator it;
   for (it = ast->top_level_begin(); it != ast->top_level_end(); ++it) {
-    EnumDecl *decl = dynamic_cast<EnumDecl *>(*it);
+    EnumDecl *decl = dyn_cast<EnumDecl *>(*it);
 
     if (decl && decl->isThisDeclarationADefinition()) {
       Insert(decl);
