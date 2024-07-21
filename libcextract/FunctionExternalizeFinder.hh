@@ -2,7 +2,6 @@
  *  clang-extract - Extract functions from projects and its dependencies using
  *                  libclang and LLVM infrastructure.
  *
- *  Copyright (C) 2024 SUSE Software Solutions GmbH
  *
  *  This file is part of clang-extract.
  *
