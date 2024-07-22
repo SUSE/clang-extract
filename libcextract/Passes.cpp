@@ -459,7 +459,7 @@ class FunctionExternalizerPass : public Pass
                         ClangCompat_None, ctx->OFS);
       PrettyPrint::Set_AST(ctx->AST.get());
 
-      if (ctx->Ibt && ctx->AST) {
+      if (ctx->Ibt && ctx->AST && externalizer.Has_Externalizations()) {
         /* Do a sanity check on IBT macros.  Some kernel branches can't use it,
            so do a check here for sanity reasons.  */
         Preprocessor &pp = ctx->AST->getPreprocessor();
