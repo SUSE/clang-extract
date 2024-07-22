@@ -340,6 +340,17 @@ class SymbolExternalizer
     return Log;
   }
 
+  /** Returns true if there was at least one externalized symbol */
+  inline bool Has_Externalizations(void)
+  {
+    for (auto const& [key, val] : SymbolsMap) {
+      if (val.ExtType == ExternalizationType::STRONG)
+        return true;
+    }
+
+    return false;
+  }
+
   /** Dump the SymbolsMap structure into stdout for debugging purposes.  */
   void Dump_SymbolsMap(void);
 
