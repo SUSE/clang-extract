@@ -222,7 +222,23 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       }
     }
 
-    Closure.Add_Decl_And_Prevs(to_mark);
+    Closure.Add_Single_Decl(to_mark);
+
+    /* Also analyze the previous version of this function to make sure we are
+       not losing the version with body.  */
+    TRY_TO(AnalyzePreviousDecls(to_mark));
+
+    return VISITOR_CONTINUE;
+  }
+
+  bool AnalyzePreviousDecls(Decl *decl)
+  {
+    Decl *prev = decl->getPreviousDecl();
+    while (prev) {
+      TRY_TO(TraverseDecl(prev));
+      Closure.Add_Single_Decl(prev);
+      prev = prev->getPreviousDecl();
+    }
 
     return VISITOR_CONTINUE;
   }
@@ -273,7 +289,11 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     }
 
     TRY_TO(ParentRecordDeclHelper(decl));
-    Closure.Add_Decl_And_Prevs(decl);
+
+    Closure.Add_Single_Decl(decl);
+    /* Also analyze the previous version of this decl for any version of it
+       that is nested-declared inside another record.  */
+    TRY_TO(AnalyzePreviousDecls(decl));
 
     return VISITOR_CONTINUE;
   }
@@ -294,7 +314,12 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     }
 
     TRY_TO(ParentRecordDeclHelper(decl));
-    Closure.Add_Decl_And_Prevs(decl);
+    Closure.Add_Single_Decl(decl);
+
+    /* Also analyze the previous version of this decl for any version of it
+       that is nested-declared inside another record.  */
+    TRY_TO(AnalyzePreviousDecls(decl));
+
     return VISITOR_CONTINUE;
   }
 
