@@ -100,6 +100,23 @@ struct SymbolUpdateStatus
     return OldDecl && NewDecl && FirstUse;
   }
 
+  /* For IBT, NewDecl and OldDecl are the same if the symbols is a function, so
+     don't replace text if the name didn't change. */
+  inline bool Needs_Sym_Rename(void) {
+    if (NewDecl == nullptr)
+      return true;
+
+    return NewDecl->getName() != OldDecl->getName();
+    /*
+    llvm::outs() << "XX OldName" << "\n";
+    llvm::outs() << OldDecl->getName() << "\n";
+    llvm::outs() << "XX NewName print" << "\n";
+    NewDecl->print(llvm::outs(), 0);
+    llvm::outs() << "XX NewName name" << "\n";
+    llvm::outs() << NewDecl->getName() << "\n";
+    */
+  }
+
   void Dump(SourceManager &SM)
   {
     llvm::outs() << "SymbolUpdateStatus at 0x" << this << '\n';

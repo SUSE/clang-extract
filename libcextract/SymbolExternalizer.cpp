@@ -121,23 +121,27 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
     ExternalizationType type = sym->ExtType;
     if (type == ExternalizationType::STRONG) {
       if (!sym->Done) {
+        /* If we are dealing with a symbol that is a function, and we are
+         * extracting code with IBT set, do not change the function now with a
+         * prefix. This helps to reduce the number of expanded headers, and also
+         * helps to match the code extracted with teh original source code.
+         */
         std::string sym_name = decl->getName().str();
+        const std::string new_name = SE.Ibt ? sym_name
+                                            : EXTERNALIZED_PREFIX + sym_name;
+        DeclaratorDecl *new_decl = SE.Create_Externalized_Var(decl, new_name);
 
         /* If we found the first instance of the function we want to externalize,
            then proceed to annotate the Decl so we can later decide what to do with
            it.  */
-        const std::string new_name = EXTERNALIZED_PREFIX + sym_name;
-        DeclaratorDecl *new_decl = SE.Create_Externalized_Var(decl, new_name);
         sym->NewName = new_name;
         sym->OldDecl = decl;
         sym->NewDecl = new_decl;
-        SE.Log.push_back({.OldName = sym_name,
-                       .NewName = new_name,
-                       .Type = type});
-
-
         sym->Done = true;
         sym->Wrap = !SE.Ibt;
+        SE.Log.push_back({.OldName = sym_name,
+                         .NewName = new_name,
+                         .Type = type});
       }
     } else if (type == ExternalizationType::WEAK) {
       /* Now checks if this is a function or a variable delcaration.  */
@@ -224,7 +228,7 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
 
     /* We must be careful to ensure that the reference we got is actually
        written cleanly, e.g. it doesn't come from a macro expansion.  */
-    if (sym_name == PrettyPrint::Get_Source_Text(range)) {
+    if (sym_name == PrettyPrint::Get_Source_Text(range) && sym->Needs_Sym_Rename()) {
       /* Issue a text modification.  */
       SE.Replace_Text(range, sym->getUseName(), 100);
     }
@@ -594,6 +598,8 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
     sc
   );
 
+  assert(ret);
+
   /* return node.  */
   return ret;
 }
@@ -722,7 +728,7 @@ void SymbolExternalizer::Rewrite_Macros(void)
 
         if (!maybe_macro && !MacroWalker::Is_Identifier_Macro_Argument(info, id_info)) {
           SymbolUpdateStatus *sym = getSymbolsUpdateStatus(id_info->getName());
-          if (sym)
+          if (sym && sym->Needs_Sym_Rename())
             Replace_Text(SourceRange(tok.getLocation(), tok.getLastLoc()), sym->getUseName(), 10);
         }
       }
@@ -734,7 +740,8 @@ void SymbolExternalizer::Rewrite_Macros(void)
       for (auto &tok_range : ranges) {
         // At this point, tok_range will contain a valid symbol
         SymbolUpdateStatus *sym = getSymbolsUpdateStatus(tok_range.first);
-        Replace_Text(tok_range.second, sym->getUseName(), 10);
+        if (sym->Needs_Sym_Rename())
+          Replace_Text(tok_range.second, sym->getUseName(), 10);
       }
     }
   }

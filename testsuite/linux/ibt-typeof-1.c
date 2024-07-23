@@ -15,7 +15,7 @@ int f(void)
 	return 0;
 }
 
-/* { dg-final { scan-tree-dump "u32 klpe_crc32c|u32 \(klpe_crc32c\)" } } */
+/* { dg-final { scan-tree-dump "u32 \(crc32c\)\(" } } */
 /* { dg-final { scan-tree-dump "KLP_RELOC_SYMBOL\(libcrc32c, libcrc32c, crc32c\)" } } */
-/* { dg-final { scan-tree-dump "typeof\(klpe_crc32c\)" } } */
+/* { dg-final { scan-tree-dump "typeof\(crc32c\)" } } */
 /* { dg-final { scan-tree-dump-not "\(\*klpe_crc32c\)" } } */
