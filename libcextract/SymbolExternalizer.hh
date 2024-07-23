@@ -100,6 +100,15 @@ struct SymbolUpdateStatus
     return OldDecl && NewDecl && FirstUse;
   }
 
+  /* For IBT, NewDecl and OldDecl are the same if the symbols is a function, so
+     don't replace text if the name didn't change. */
+  inline bool Needs_Sym_Rename(void) {
+    if (NewDecl == nullptr)
+      return true;
+
+    return NewDecl->getName() != OldDecl->getName();
+  }
+
   void Dump(SourceManager &SM)
   {
     llvm::outs() << "SymbolUpdateStatus at 0x" << this << '\n';
@@ -323,8 +332,15 @@ class SymbolExternalizer
 
   SymbolUpdateStatus *getSymbolsUpdateStatus(const StringRef &sym);
 
-  /* Drop `static` keyword in decl.  */
   bool Drop_Static(FunctionDecl *decl);
+
+  /* Replace `static` keyword in decl with extern.  */
+  template <typename DECL>
+  bool Add_Extern(DECL *decl);
+
+  /* Replace `static` keyword in decl with extern.  */
+  template <typename DECL>
+  bool Drop_Static_Add_Extern(DECL *decl);
 
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
@@ -375,6 +391,15 @@ class SymbolExternalizer
   void Replace_Text(const SourceRange &range, StringRef new_name, int priority);
   void Remove_Text(const SourceRange &range, int priority);
   void Insert_Text(const SourceLocation &range, StringRef text);
+
+  /** Drop body of function.  */
+  void Drop_Function_Body(FunctionDecl *decl);
+
+  /** Drop Variable Initializer.  */
+  void Drop_Var_Initializer(VarDecl *decl);
+
+  /** Handle externalization on IBT case.  */
+  void Handle_IBT_Ext(SymbolUpdateStatus *);
 
   /** AST in analysis.  */
   ASTUnit *AST;
