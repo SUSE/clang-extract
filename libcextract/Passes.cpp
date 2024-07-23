@@ -26,6 +26,7 @@
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
 #include "HeaderGenerate.hh"
+#include "LLVMMisc.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -103,6 +104,27 @@ std::string Pass::Get_Dump_Name_From_Input(PassManager::Context *ctx)
 
   return no_extension + ".dump." + std::to_string(passnum) +
          "." + std::string(PassName) + extension;
+}
+
+static std::string Get_Output_From_Input_File(std::string &input)
+{
+  std::string work = input;
+
+  size_t last_dot = work.find_last_of(".");
+  std::string no_extension = work.substr(0, last_dot);
+  std::string extension = work.substr(last_dot, work.length());
+
+  return no_extension + ".CE" + extension;
+}
+
+static std::string Get_Output_Path(PassManager::Context *ctx)
+{
+  std::string output_path = ctx->OutputFile;
+  if (output_path == "") {
+    output_path = Get_Output_From_Input_File(ctx->InputPath);
+  }
+
+  return output_path;
 }
 
 /** BuildASTPass: Built the AST object and store it into the Context object.
@@ -277,17 +299,6 @@ class ClosurePass : public Pass
              ctx->FuncExtractNames.size() > 0;
     }
 
-    std::string Get_Output_From_Input_File(std::string &input)
-    {
-      std::string work = input;
-
-      size_t last_dot = work.find_last_of(".");
-      std::string no_extension = work.substr(0, last_dot);
-      std::string extension = work.substr(last_dot, work.length());
-
-      return no_extension + ".CE" + extension;
-    }
-
     virtual bool Run_Pass(PassManager::Context *ctx)
     {
       ctx->CodeOutput = std::string();
@@ -331,10 +342,7 @@ class ClosurePass : public Pass
 
       /* Set output stream to a file if we set to print to a file.  */
       if (PrintToFile) {
-        std::string output_path = ctx->OutputFile;
-        if (output_path == "") {
-          output_path = Get_Output_From_Input_File(ctx->InputPath);
-        }
+        std::string output_path = Get_Output_Path(ctx);
         PrettyPrint::Set_Output_To(output_path);
       } else {
         ctx->CodeOutput = std::string();
@@ -459,16 +467,6 @@ class FunctionExternalizerPass : public Pass
                         ClangCompat_None, ctx->OFS);
       PrettyPrint::Set_AST(ctx->AST.get());
 
-      if (ctx->Ibt && ctx->AST && externalizer.Has_Externalizations()) {
-        /* Do a sanity check on IBT macros.  Some kernel branches can't use it,
-           so do a check here for sanity reasons.  */
-        Preprocessor &pp = ctx->AST->getPreprocessor();
-        if (pp.isMacroDefined("KLP_RELOC_SYMBOL") == false) {
-          throw std::runtime_error("KLP_RELOC_SYMBOL not defined, kernel may not "
-                                   "be compatible with IBT.");
-        }
-      }
-
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return !de.hasErrorOccurred();
     }
@@ -528,6 +526,67 @@ class GenerateDscPass : public Pass
     }
 };
 
+
+/** IbtTailGeneratePass: Generate the tail content of the output file when IBT
+ *                       is enabled.
+ */
+class IbtTailGeneratePass : public Pass
+{
+public:
+  IbtTailGeneratePass(void)
+  {
+    PassName = "IbtTailGeneratePass";
+  }
+
+  virtual bool Gate(PassManager::Context *ctx)
+  {
+    return ctx->Ibt && ctx->Externalize.size() > 0;
+  }
+
+  virtual bool Run_Pass(PassManager::Context *ctx)
+  {
+    PrettyPrint::Print_Raw("/* ---- IBT Tail Content ---- */\n\n");
+    PrettyPrint::Print_Raw(
+                "#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+                "\tasm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
+                "#define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+                "\tKLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n\n");
+
+    for (const ExternalizerLogEntry &entry : ctx->NamesLog) {
+      if (entry.Type == ExternalizationType::STRONG) {
+        DeclContextLookupResult decls = Get_Decl_From_Symtab(ctx->AST.get(),
+                                                             entry.NewName);
+
+        for (auto decl : decls) {
+          /* Make sure our declaration is a DeclaratorDecl (variable or function).  */
+          if (!isa<DeclaratorDecl>(decl)) {
+            continue;
+          }
+
+          std::string o;
+          llvm::raw_string_ostream outstr(o);
+
+          std::string sym_mod = ctx->IA.Get_Symbol_Module(entry.OldName);
+
+          decl->print(outstr);
+
+          outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << ctx->PatchObject << ", " <<
+                 sym_mod << ", " << entry.OldName << ");\n\n";
+
+          PrettyPrint::Print_Raw(o);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  virtual void Dump_Result(PassManager::Context *ctx)
+  {
+    /* The dump is the generated file itself.  */
+  }
+};
+
 class HeaderGenerationPass : public Pass
 {
   public:
@@ -572,6 +631,7 @@ PassManager::PassManager()
     new FunctionExternalizerPass(),
     new GenerateDscPass(),
     new ClosurePass(/*PrintToFile=*/true),
+    new IbtTailGeneratePass(),
     new HeaderGenerationPass(),
   };
 }
