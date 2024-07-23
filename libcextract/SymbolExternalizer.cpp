@@ -207,7 +207,7 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
      * Only execute the code in the visitor if we have already externalized the
      * symbol
      */
-    if (sym == nullptr || !sym->Done)
+    if (sym == nullptr)
       return VISITOR_CONTINUE;
 
     /* Get the first effective use, which means an DeclRefExpr of a decl that
@@ -276,6 +276,24 @@ bool SymbolExternalizer::Drop_Static(FunctionDecl *decl)
 
     /* Update the storage class.  */
     decl->setStorageClass(StorageClass::SC_None);
+
+    return true;
+  }
+
+  return false;
+}
+
+bool SymbolExternalizer::Add_Extern(FunctionDecl *decl)
+{
+  if (decl->isStatic()) {
+    auto ids = Get_Range_Of_Identifier(decl->getSourceRange(), StringRef("static"));
+    assert(ids.size() > 0 && "static decl without static keyword?");
+
+    SourceRange static_range = ids[0].second;
+    Replace_Text(static_range, "extern", 10);
+
+    /* Update the storage class.  */
+    decl->setStorageClass(StorageClass::SC_Extern);
 
     return true;
   }
@@ -886,13 +904,54 @@ void SymbolExternalizer::Late_Externalize(void)
         SE.Remove_Text(sym->OldDecl->getSourceRange(), 1000);
       }
     } else {
-      /* Fallback to the old method of rewriting the declaration.  */
-      SE.Replace_Text(sym->OldDecl->getSourceRange(), outstr.str(), 1000);
+      if (SE.Ibt) {
+          /* Get the last usage (more recent decl), and check if it was the
+           * first usage. If yes, drop the declartion and use the NewDecl form
+           * SymbolUpdateStatus.
+           *
+           * For functions, drop the declarations and change the later
+           * prototypes to have the extern storage type.
+           *
+           * For variables, remove all references but the first one, because
+           * this will also be replaced by outstr (NewDecl from
+           * SymbolUpdateStatus).
+           */
+          Decl *ibt_decl = sym->OldDecl->getMostRecentDecl();
+          if (FunctionDecl *func = dyn_cast<FunctionDecl>(ibt_decl)) {
+            while (func) {
+              if (!func->getPreviousDecl()) {
+                SE.Replace_Text(func->getSourceRange(), outstr.str(), 1000);
+                break;
+              }
 
-      /* Emit a warning for debuging purposes for now.  */
-      if (AllowLateExternalization) {
-        std::string msg = "LateLocation of " + sym->OldDecl->getName().str() + " is invalid\n";
-        DiagsClass::Emit_Warn(msg);
+              if (func->doesThisDeclarationHaveABody()) {
+                SE.Remove_Text(func->getSourceRange(), 1000);
+              } else {
+                Add_Extern(func);
+              }
+
+              func = func->getPreviousDecl();
+            }
+          } else if (VarDecl *var = dyn_cast<VarDecl>(ibt_decl)) {
+            while (var) {
+              if (!var->getPreviousDecl()) {
+                SE.Replace_Text(var->getSourceRange(), outstr.str(), 1000);
+                break;
+              }
+
+              SE.Remove_Text(var->getSourceRange(), 1000);
+              var = var->getPreviousDecl();
+            }
+          }
+      } else {
+        /* Fallback to the old method of rewriting the declaration.  */
+        SE.Replace_Text(sym->OldDecl->getSourceRange(), outstr.str(), 1000);
+
+        /* Emit a warning for debuging purposes for now.  */
+        if (AllowLateExternalization) {
+          std::string msg = "LateLocation of " + sym->OldDecl->getName().str() + " is invalid\n";
+          DiagsClass::Emit_Warn(msg);
+        }
       }
     }
   }

@@ -343,6 +343,9 @@ class SymbolExternalizer
   /* Drop `static` keyword in decl.  */
   bool Drop_Static(FunctionDecl *decl);
 
+  /* Replace `static` keyword in decl with extern.  */
+  bool Add_Extern(FunctionDecl *decl);
+
   /** Commit changes to the loaded source file buffer.  Should NOT modify the
       original file, only the content that was loaded in llvm's InMemory file
       system.  */
