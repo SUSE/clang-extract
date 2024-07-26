@@ -205,3 +205,18 @@ bool Have_Location_Comment(const SourceManager &sm, RawComment *comment)
   }
   return false;
 }
+
+/** Lookup in the symbol table for a declaration with given name passed by info.  */
+DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const IdentifierInfo *info)
+{
+  TranslationUnitDecl *tu = ast->getASTContext().getTranslationUnitDecl();
+  return tu->lookup(DeclarationName(info));
+}
+
+/** Lookup in the symbol table for a declaration with given name passed by name.  */
+DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name)
+{
+  IdentifierTable &symtab = ast->getPreprocessor().getIdentifierTable();
+  IdentifierInfo &info = symtab.get(name);
+  return Get_Decl_From_Symtab(ast, &info);
+}
