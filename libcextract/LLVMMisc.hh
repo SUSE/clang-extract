@@ -89,3 +89,9 @@ std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl);
 
 /** Check if Decl have a Location comment.  */
 bool Have_Location_Comment(const SourceManager &sm, RawComment *comment);
+
+/** Lookup in the symbol table for a declaration with given name passed by info.  */
+DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const IdentifierInfo *info);
+
+/** Lookup in the symbol table for a declaration with given name passed by name.  */
+DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name);

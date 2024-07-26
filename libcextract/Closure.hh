@@ -22,6 +22,7 @@
 #include <unordered_set>
 
 #include "LLVMMisc.hh"
+#include "PrettyPrint.hh"
 
 using namespace clang;
 
@@ -238,6 +239,66 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       TRY_TO(TraverseDecl(prev));
       Closure.Add_Single_Decl(prev);
       prev = prev->getPreviousDecl();
+    }
+
+    return VISITOR_CONTINUE;
+  }
+
+  bool VisitDeclaratorDecl(DeclaratorDecl *decl)
+  {
+    /* There are some types in which we lose the the typedef reference, for
+     * example:
+     *
+     *   typedef void (*XtErrorHandler)(char *);
+     *   extern void XtSetErrorHandler(XtErrorHandler __attribute((noreturn)));
+     *
+     *  The type dump for this is:
+     *
+     *   FunctionProtoType 0x5210000720e0 'void (void (*)(char *) __attribute__((noreturn)))' cdecl
+     *   |-BuiltinType 0x521000014170 'void'
+     *   `-PointerType 0x521000071fd0 'void (*)(char *) __attribute__((noreturn))'
+     *     `-ParenType 0x521000071f70 'void (char *) __attribute__((noreturn))' sugar
+     *       `-FunctionProtoType 0x521000071f30 'void (char *) __attribute__((noreturn))' noreturn cdecl
+     *         |-BuiltinType 0x521000014170 'void'
+     *         `-PointerType 0x521000014d10 'char *'
+     *           `-BuiltinType 0x5210000141b0 'char'
+     *
+     *  Notice that there is no reference for XtErrorHandler.  Somehow clang was
+     *  not able to identify that XtErrorHandler __attribute((noreturn)) is a
+     *  XtErrorHandler.  OTOH, if we drop __attribute((noreturn)) we get:
+     *
+     *   FunctionProtoType 0x521000071ff0 'void (XtErrorHandler)' cdecl
+     *   |-BuiltinType 0x521000014170 'void'
+     *   `-ElaboratedType 0x521000071f00 'XtErrorHandler' sugar
+     *     `-TypedefType 0x521000071ed0 'XtErrorHandler' sugar
+     *       |-Typedef 0x521000071e78 'XtErrorHandler'
+     *       `-PointerType 0x521000071e10 'void (*)(char *)'
+     *         `-ParenType 0x521000071db0 'void (char *)' sugar
+     *           `-FunctionProtoType 0x521000071d70 'void (char *)' cdecl
+     *             |-BuiltinType 0x521000014170 'void'
+     *             `-PointerType 0x521000014d10 'char *'
+     *               `-BuiltinType 0x5210000141b0 'char'
+     *
+     *  which is correct.  Hence we get the SourceText and try to match to any
+     *  decl that is in the symbol table with that name.
+     */
+
+    SourceManager &sm = AST->getSourceManager();
+    const LangOptions &lo = AST->getLangOpts();
+
+    const TypeSourceInfo *typeinfo = decl->getTypeSourceInfo();
+    const TypeLoc &tl = typeinfo->getTypeLoc();
+
+    /* Get the range of the token which we expect is the type of it.  */
+    SourceLocation tok_begin = Lexer::GetBeginningOfToken(tl.getBeginLoc(), sm, lo);
+    SourceLocation tok_end   = Lexer::getLocForEndOfToken(tl.getBeginLoc(), 0, sm, lo);
+
+    StringRef text = PrettyPrint::Get_Source_Text({tok_begin, tok_end});
+
+    /* Lookup in the symbol table for any Decl matching it.  */
+    DeclContextLookupResult decls = Get_Decl_From_Symtab(AST, text);
+    for (auto decl_it : decls) {
+      TRY_TO(TraverseDecl(decl_it));
     }
 
     return VISITOR_CONTINUE;
