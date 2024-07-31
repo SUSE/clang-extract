@@ -217,6 +217,10 @@ DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const IdentifierInfo 
 DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name)
 {
   IdentifierTable &symtab = ast->getPreprocessor().getIdentifierTable();
-  IdentifierInfo &info = symtab.get(name);
-  return Get_Decl_From_Symtab(ast, &info);
+  auto info = symtab.find(name);
+  /* Return an empty DeclContextLookupResult if the identifier is not found */
+  if (info == symtab.end())
+    return DeclContextLookupResult();
+
+  return Get_Decl_From_Symtab(ast, info->getValue());
 }
