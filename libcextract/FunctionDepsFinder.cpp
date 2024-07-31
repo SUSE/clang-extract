@@ -205,7 +205,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
   Decl *prev = nullptr;
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
     Decl *decl = *it;
-    if (isa<TypedefDecl>(decl) || isa<VarDecl>(decl) || isa<TagDecl>(decl)) {
+    if (isa<TypedefDecl>(decl) || isa<DeclaratorDecl>(decl) || isa<TagDecl>(decl)) {
       if (!closure.Is_Decl_Marked(decl))
         continue;
 

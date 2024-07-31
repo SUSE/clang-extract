@@ -1,5 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail } */
 
 typedef long unsigned int size_t;
 typedef void
@@ -19,5 +18,5 @@ void f()
 }
 
 /* { dg-final { scan-tree-dump "\*\(\*AcquireMemoryHandler\)\(size_t\)," } } */
-/* { dg-final { scan-tree-dump "\*\(\*DestroyMemoryHandler\)\(void *\*\)," } } */
+/* { dg-final { scan-tree-dump "\(\*DestroyMemoryHandler\)\(void *\*\)," } } */
 /* { dg-final { scan-tree-dump "\*\(\*ResizeMemoryHandler\)\(void *\*, *size_t\)," } } */
