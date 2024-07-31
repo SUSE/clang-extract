@@ -1,4 +1,4 @@
-/* { dg-compile "-fdump-ipa-clones -O3 -g3"} */
+/* { dg-compile "-fdump-ipa-clones -O3 -g3 -Wno-implicit-int"} */
 /* { dg-options "-compute-closure main"} */
 
 static inline int g(void)
