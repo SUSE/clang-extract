@@ -1,5 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail } */
 
 enum {
   NB_POSNR = 0,
@@ -45,6 +44,6 @@ enum {
 int a[NB_END], b[INB_END];
 void f() { int d = b[2]; }
 
-/* { dg-final { scan-tree-dump "b[INB_END];" } } */
+/* { dg-final { scan-tree-dump "b\[INB_END\];" } } */
 /* { dg-final { scan-tree-dump "NB_END" } } */
 /* { dg-final { scan-tree-dump "INB_END" } } */

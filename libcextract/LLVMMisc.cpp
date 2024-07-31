@@ -160,6 +160,63 @@ Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc)
   return nullptr;
 }
 
+VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc)
+{
+  SourceManager &SM = ast->getSourceManager();
+  /* We don't have a way of accessing the TopLevel vector directly, hence we
+     do this.  */
+  char *p = (char *) &(*ast->top_level_begin());
+  char *q = (char *) &(*ast->top_level_end());
+
+  int n = (((ptrdiff_t)(q - p))/sizeof(Decl *));
+
+  Decl **array = (Decl **)p;
+
+  /* Do binary search.  */
+  int low = 0;
+  int high = n-1;
+  while (low <= high) {
+    int mid = low + (high - low)/2;
+
+    Decl *decl = array[mid];
+    /* Get rid of some weird macro locations.  We want the location where
+       it was expanded.  */
+    SourceLocation begin = SM.getExpansionLoc(decl->getBeginLoc());
+
+    if (begin == loc) {
+      /* Go back to the first declaration.  */
+      int last_l = mid;
+      for (int l = mid; l >= 0; --l) {
+        if (SM.getExpansionLoc(array[l]->getBeginLoc()) == loc) {
+          last_l = l;
+        } else {
+          break;
+        }
+      }
+
+      /* Go forward to the last declaration.  */
+      int last_h = mid;
+      for (int h = mid; h < n; ++h) {
+        if (SM.getExpansionLoc(array[h]->getBeginLoc()) == loc) {
+          last_h = h;
+        } else {
+          break;
+        }
+      }
+
+      return VectorRef(&array[last_l], &array[last_h]);
+    }
+
+    if (SM.isBeforeInTranslationUnit(begin, loc)) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return VectorRef<Decl *>(nullptr, 0U);
+}
+
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc)
 {
   PresumedLoc presumed = sm.getPresumedLoc(loc);

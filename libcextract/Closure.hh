@@ -301,6 +301,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       TRY_TO(TraverseDecl(decl_it));
     }
 
+    /* Also analyze the decls that have the same beginloc, for declarations
+       comming from comma-separated.  */
+    TRY_TO(AnalyzeDeclsWithSameBeginlocHelper(decl));
+
     return VISITOR_CONTINUE;
   }
 
@@ -327,6 +331,20 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       }
 
       return VISITOR_CONTINUE;
+  }
+
+  bool AnalyzeDeclsWithSameBeginlocHelper(Decl *decl)
+  {
+    SourceManager &SM = AST->getSourceManager();
+    VectorRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST,
+                              SM.getExpansionLoc(decl->getBeginLoc()));
+    unsigned n = decls.getSize();
+    Decl **array = decls.getPointer();
+    for (unsigned i = 0; i < n; i++) {
+      TRY_TO(TraverseDecl(array[i]));
+    }
+
+    return VISITOR_CONTINUE;
   }
 
   bool VisitRecordDecl(RecordDecl *decl)
@@ -416,6 +434,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
     // FIXME: Do we need to analyze the previous decls?
     TRY_TO(TraverseType(decl->getUnderlyingType()));
     Closure.Add_Single_Decl(decl);
+
+    TRY_TO(AnalyzeDeclsWithSameBeginlocHelper(decl));
 
     return VISITOR_CONTINUE;
   }

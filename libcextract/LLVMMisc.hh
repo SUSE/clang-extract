@@ -22,6 +22,8 @@
 #include "clang/Sema/IdentifierResolver.h"
 #include "clang/AST/DeclContextInternals.h"
 
+#include "NonLLVMMisc.hh"
+
 class SymbolNotFoundException : public std::exception {
   public:
   SymbolNotFoundException(std::string name)
@@ -77,6 +79,9 @@ Decl         *Get_Bodyless_Or_Itself(Decl *decl);
 
 /* Get the TopLevel Decl that contains the location loc.  */
 Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
+
+/* Get Toplevel decls with same beginloc.  */
+VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc);
 
 /** Build a clang-extract location comment.  */
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc);

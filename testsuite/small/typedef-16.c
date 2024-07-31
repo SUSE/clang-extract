@@ -1,5 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail } */
 
 typedef long unsigned int size_t;
 
@@ -31,4 +30,4 @@ MagickBooleanType f(MagickWand *wand, const ChannelType channel, const double ra
 }
 
 /* { dg-final { scan-tree-dump "typedef long unsigned int size_t;" } } */
-/* { dg-final { scan-tree-dump "MagickAdaptiveSharpenImage\(MagickWand *\*,const double, *\*const double\);" } } */
+/* { dg-final { scan-tree-dump "MagickAdaptiveSharpenImage\(MagickWand *\*,const double, *const double\);" } } */
