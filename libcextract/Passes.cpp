@@ -570,6 +570,7 @@ public:
           if (sym_mod.empty())
             sym_mod = "vmlinux";
 
+          decl->dropAttrs();
           decl->print(outstr);
 
           outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << ctx->PatchObject << ", " <<
