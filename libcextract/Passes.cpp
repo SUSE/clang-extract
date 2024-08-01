@@ -567,6 +567,8 @@ public:
           llvm::raw_string_ostream outstr(o);
 
           std::string sym_mod = ctx->IA.Get_Symbol_Module(entry.OldName);
+          if (sym_mod.empty())
+            sym_mod = "vmlinux";
 
           decl->print(outstr);
 
