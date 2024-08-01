@@ -19,6 +19,8 @@
 
 #include <clang/Basic/Version.h>
 
+#include <filesystem>
+
 #ifndef CLANG_VERSION_MAJOR
 # error "Unable to find clang version"
 #endif
@@ -82,6 +84,17 @@ ArgvParser::ArgvParser(int argc, char **argv)
   }
 
   Insert_Required_Parameters();
+
+  /* For kernel, check if the object patch is not the same as DebugInfo. If they
+   * are not the same, it means that the module from PatchObject is builtin, so
+   * assign vmlinux to PatchObject. */
+  if (Kernel && DebuginfoPath) {
+    std::string obj_path = std::filesystem::path(DebuginfoPath).filename();
+    /* As the DebugInfo can point to a file with suffix (btrfs.ko for example),
+     * check the substring */
+    if (obj_path.find(PatchObject) == std::string::npos)
+      PatchObject = "vmlinux";
+  }
 }
 
 void ArgvParser::Insert_Required_Parameters(void)
