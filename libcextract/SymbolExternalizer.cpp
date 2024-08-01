@@ -871,6 +871,19 @@ void SymbolExternalizer::Drop_Var_Initializer(VarDecl *decl)
     SourceLocation init_loc = init->getSourceRange().getBegin();
     SourceLocation head = init_loc.getLocWithOffset(-1);
 
+    StringRef text = PrettyPrint::Get_Source_Text(init->getSourceRange());
+    if (text.data() == nullptr) {
+      std::string o;
+      llvm::raw_string_ostream outstr(o);
+
+      decl->setInit(nullptr);
+      decl->print(outstr);
+      decl->setInit(init);
+
+      Replace_Text(decl->getSourceRange(), o, 1000);
+      return;
+    }
+
     /* Search for the '=' initializer token.  */
     while (true) {
       StringRef text = PrettyPrint::Get_Source_Text({head, init_loc});
