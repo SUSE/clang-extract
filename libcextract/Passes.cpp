@@ -545,7 +545,6 @@ public:
 
   virtual bool Run_Pass(PassManager::Context *ctx)
   {
-    PrettyPrint::Print_Raw("/* ---- IBT Tail Content ---- */\n\n");
     PrettyPrint::Print_Raw(
                 "#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
                 "\tasm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \",\" #SYM_POS \"\\\"\")\n"
