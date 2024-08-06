@@ -240,6 +240,7 @@ class ElfObject : public Parser
   }
 
   static Elf *decompress_gz(int fd);
+  Elf *decompress_zstd(int fd);
 
   /** Iterator class for ELF sections.  With this one can use C++ iterators
     * to iterate through all sections of the ELF file.  Like this:
@@ -317,6 +318,9 @@ class ElfObject : public Parser
   private:
   /** Wrapped libelf object.  */
   struct Elf *ElfObj;
+
+  /* Memory allocated to hold the decompressed ELF images */
+  unsigned char *DecompressedObj;
 
   /** File descriptor used by libelf object.  */
   int ElfFd;
