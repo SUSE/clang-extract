@@ -22,6 +22,8 @@
 #include <iostream>
 #include <string.h>
 
+#include <zlib.h>
+
 const char *ElfSymbol::Get_Name(void)
 {
   struct Elf *elf = ElfObj.Get_Wrapped_Object();
@@ -105,6 +107,19 @@ ElfObject::ElfObject(const char *path)
     break;
   }
 
+  /* gzip magic number (zlib) */
+  case FileHandling::FILE_TYPE_GZ: {
+    try {
+      ElfObj = decompress_gz(ElfFd);
+      close(ElfFd);
+      ElfFd = -1;
+    } catch (const std::runtime_error &error) {
+      ElfObject::~ElfObject();
+      throw error;
+    }
+    break;
+  }
+
   default:
     close(ElfFd);
     throw std::runtime_error("Format not recognized: " + parser_path + "\n");
@@ -124,6 +139,85 @@ ElfObject::~ElfObject(void)
     close(ElfFd);
     ElfFd = -1;
   }
+}
+
+Elf *ElfObject::decompress_gz(int fd)
+{
+  const size_t CHUNK = 16384;
+
+  unsigned have;
+  unsigned char in[CHUNK];
+  unsigned char out[CHUNK];
+
+  unsigned long dest_size = CHUNK;
+  unsigned char *dest = (unsigned char *)malloc(CHUNK);
+  if (!dest)
+    throw std::runtime_error("zlib dest malloc failed\n");
+
+  unsigned long dest_current = 0;
+
+  z_stream strm;
+  memset(&strm, 0, sizeof(strm));
+
+  /* Allocate inflate state. The size is related to how zlib inflates gzip files. */
+  int ret = inflateInit2(&strm, 16+MAX_WBITS);
+  if (ret != Z_OK)
+    throw std::runtime_error("zlib inflateInit failed\n");
+
+  /* decompress until deflate stream ends or end of file */
+  do {
+    strm.avail_in = read(fd, in, CHUNK);
+    if (strm.avail_in < 0)
+      throw std::runtime_error("zlib read failed: " + std::to_string(strm.avail_in) + "\n");
+
+    if (strm.avail_in == 0)
+      break;
+    strm.next_in = in;
+
+    /* run inflate() on input until output buffer not full */
+    do {
+      strm.avail_out = CHUNK;
+      strm.next_out = out;
+      ret = inflate(&strm, Z_NO_FLUSH);
+
+      switch (ret) {
+        case Z_NEED_DICT:
+          ret = Z_DATA_ERROR;     /* and fall through */
+        case Z_DATA_ERROR:
+        case Z_MEM_ERROR:
+          inflateEnd(&strm);
+          throw std::runtime_error("zlib inflate error: " + std::to_string(ret) + "\n");
+      }
+
+      have = CHUNK - strm.avail_out;
+
+      /* double the buffer when needed */
+      if (have > dest_size - dest_current) {
+        dest_size = dest_size * 2;
+        dest = (unsigned char *)realloc(dest, dest_size);
+      }
+
+      memcpy(dest + dest_current, out, have);
+      dest_current += have;
+    } while (strm.avail_out == 0);
+
+    /* done when inflate() says it's done */
+  } while (ret != Z_STREAM_END);
+
+  inflateEnd(&strm);
+
+  if (ret != Z_STREAM_END)
+      throw std::runtime_error("zlib inflateEnd error: " + std::to_string(ret) + "\n");
+
+  Elf *elf = elf_memory((char *)dest, ret);
+  if (elf == nullptr) {
+    free(dest);
+    throw std::runtime_error("libelf elf_memory error: " + std::string(elf_errmsg(elf_errno())));
+  }
+
+  free(dest);
+
+  return elf;
 }
 
 /** Get the next ELF section.  ELF is a multisection file and we need to

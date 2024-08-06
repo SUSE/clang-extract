@@ -6,11 +6,12 @@ A tool to extract code content from source files using the clang and LLVM infras
 
 ### Compiling clang-extract
 
-clang-extract requires clang, LLVM, libelf, meson and ninja in order to build.
+clang-extract requires clang, LLVM, libelf, zlib, meson and ninja in order to build.
 On openSUSE, you can install them by running:
 ```
 $ sudo zypper install clang18 clang18-devel libclang-cpp18 \
-       clang-tools libLLVM18 llvm18 llvm18-devel libelf-devel meson ninja
+       clang-tools libLLVM18 llvm18 llvm18-devel libelf-devel meson ninja \
+       zlib-devel
 ```
 It's advised to use LLVM 18 and higher, since it's well tested. But there
 support for LLVM 16 and 17 as well, but you might find issues with it.

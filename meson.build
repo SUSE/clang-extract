@@ -72,6 +72,7 @@ clang_dep += cpp.find_library('clang-cpp', dirs : llvm_libdir)
 clang_dep += cpp.find_library('LLVM', dirs : llvm_libdir)
 ############################# #########################
 elf_dep = dependency('libelf') # libelf
+zlib_dep = dependency('zlib')
 
 subdir('libcextract')
 
@@ -81,14 +82,14 @@ executable('ce-inline', 'Inline.cpp',
   include_directories : incdir,
   install : true,
   link_with : libcextract_static,
-  dependencies : elf_dep
+  dependencies : [elf_dep, zlib_dep]
 )
 
 executable('clang-extract', 'Main.cpp',
   include_directories : incdir,
   install : true,
   link_with : libcextract_static,
-  dependencies : [elf_dep, clang_dep]
+  dependencies : [elf_dep, clang_dep, zlib_dep]
 )
 
 #########
