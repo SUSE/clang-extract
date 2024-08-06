@@ -22,8 +22,10 @@
 #include <iostream>
 #include <string.h>
 
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#include <zstd.h>
 
 const char *ElfSymbol::Get_Name(void)
 {
@@ -140,16 +142,51 @@ ElfObject::ElfObject(const char *path)
     ElfObj = elf_memory((char *)dest, ret);
     if (ElfObj == nullptr) {
       free(dest);
-      close(ElfFd);
       throw std::runtime_error("libelf elf_memory error on file " + parser_path + ": "
                                    + std::string(elf_errmsg(elf_errno())));
     }
 
     free(dest);
 
+  /* zstd magic number */
+  } else if (buf[0] == 0x28 && buf[1] == 0xb5 && buf[2] == 0x2f && buf[3] == 0xfd) {
+    struct stat st;
+
+    int ret = fstat(ElfFd, &st);
+    if (ret)
+      throw std::runtime_error("stat on " + parser_path + " failed\n");
+
+    /* It seems that the extracted file can be 5 times bigger than the
+     * compressed time */
+    size_t deflate_len = st.st_size * 5;
+    void *dest = malloc(deflate_len);
+    if (!dest)
+      throw std::runtime_error("malloc for " + parser_path + " failed\n");
+
+    void *sourcep = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, ElfFd, 0);
+
+    ret = ZSTD_decompress(dest, deflate_len, sourcep, st.st_size);
+    if (ret < 0) {
+      munmap(sourcep, st.st_size);
+      free(dest);
+      throw std::runtime_error("gzread error on " + parser_path + " failed: " + std::to_string(ret) + "\n");
+    }
+
+    ElfObj = elf_memory((char *)dest, ret);
+    if (ElfObj == nullptr) {
+      munmap(sourcep, st.st_size);
+      free(dest);
+      throw std::runtime_error("libelf elf_memory error on file " + parser_path + ": "
+                                   + std::string(elf_errmsg(elf_errno())));
+    }
+
+    munmap(sourcep, st.st_size);
+    // FIXME: the free below makes gelf_getshdr to fail later on...
+    //free(dest);
+
   } else {
-      close(ElfFd);
-      throw std::runtime_error("Format not recognized: " + parser_path + "\n");
+    close(ElfFd);
+    throw std::runtime_error("Format not recognized: " + parser_path + "\n");
   }
 }
 
