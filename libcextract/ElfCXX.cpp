@@ -22,6 +22,9 @@
 #include <iostream>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <zlib.h>
+
 const char *ElfSymbol::Get_Name(void)
 {
   struct Elf *elf = ElfObj.Get_Wrapped_Object();
@@ -91,12 +94,62 @@ ElfObject::ElfObject(const char *path)
     throw std::runtime_error("ELF file not found: " + parser_path);
   }
 
-  /* Create libelf object and store it in the class variable.  */
-  ElfObj = elf_begin(ElfFd, ELF_C_READ, nullptr);
-  if (ElfObj == nullptr) {
-    close(ElfFd);
-    throw std::runtime_error("libelf error on file " + parser_path + ": "
-                                 + std::string(elf_errmsg(elf_errno())));
+  unsigned char buf[4];
+
+  read(ElfFd, buf, 4);
+  /* reset file pointer */
+  lseek(ElfFd, 0, SEEK_SET);
+
+  /* Check if the file is an ELF */
+  if (buf[0] == 0x7f && buf[1] == 0x45 && buf[2] == 0x4c && buf[3] == 0x46) {
+    /* Create libelf object and store it in the class variable.  */
+    ElfObj = elf_begin(ElfFd, ELF_C_READ, nullptr);
+    if (ElfObj == nullptr) {
+      close(ElfFd);
+      throw std::runtime_error("libelf error on file " + parser_path + ": "
+                                   + std::string(elf_errmsg(elf_errno())));
+    }
+  /* gzip magic number (zlib) */
+  } else if (buf[0] == 0x1f && buf[1] == 0x8b) {
+    struct stat st;
+
+    gzFile gzfile = gzopen(parser_path.c_str(), "r");
+    if (!gzfile)
+      throw std::runtime_error("could not gzopen " + parser_path + "\n");
+
+    int ret = fstat(ElfFd, &st);
+    if (ret)
+      throw std::runtime_error("stat on " + parser_path + " failed\n");
+
+    /* It seems that the extracted file can be 5 times bigger than the
+     * compressed time */
+    unsigned long deflate_len = st.st_size * 5;
+    void *dest = malloc(deflate_len);
+    if (!dest)
+      throw std::runtime_error("malloc for " + parser_path + " failed\n");
+
+    /* gzread read and decompresses the file to dest buffer */
+    ret = gzread(gzfile, dest, deflate_len);
+    if (ret == -1) {
+      free(dest);
+      throw std::runtime_error("gzread error on " + parser_path + " failed: " + std::to_string(ret) + "\n");
+    }
+
+    gzclose(gzfile);
+
+    ElfObj = elf_memory((char *)dest, ret);
+    if (ElfObj == nullptr) {
+      free(dest);
+      close(ElfFd);
+      throw std::runtime_error("libelf elf_memory error on file " + parser_path + ": "
+                                   + std::string(elf_errmsg(elf_errno())));
+    }
+
+    free(dest);
+
+  } else {
+      close(ElfFd);
+      throw std::runtime_error("Format not recognized: " + parser_path + "\n");
   }
 }
 
