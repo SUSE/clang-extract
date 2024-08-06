@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include <zlib.h>
+#include <zstd.h>
 
 const char *ElfSymbol::Get_Name(void)
 {
@@ -82,6 +83,7 @@ const char *ElfSymbol::Bind_As_String(unsigned link)
 ElfObject::ElfObject(const char *path)
   : Parser(path),
     ElfObj(nullptr),
+    DecompressedObj(nullptr),
     ElfFd(-1)
 {
   /* Libelf quirks.  If not present it fails to load current Linux binaries.  */
@@ -120,6 +122,19 @@ ElfObject::ElfObject(const char *path)
     break;
   }
 
+  /* zstd magic number */
+  case FileHandling::FILE_TYPE_ZSTD: {
+    try {
+      ElfObj = decompress_zstd(ElfFd);
+      close(ElfFd);
+      ElfFd = -1;
+    } catch (const std::runtime_error &error) {
+      ElfObject::~ElfObject();
+      throw error;
+    }
+    break;
+  }
+
   default:
     close(ElfFd);
     throw std::runtime_error("Format not recognized: " + parser_path + "\n");
@@ -133,6 +148,9 @@ ElfObject::~ElfObject(void)
     /* ELF object is valid.  Destroy it.  */
     elf_end(ElfObj);
   }
+
+  if (DecompressedObj)
+    free(DecompressedObj);
 
   if (ElfFd != -1) {
     /* File Descriptor is still open.  */
@@ -216,6 +234,63 @@ Elf *ElfObject::decompress_gz(int fd)
   }
 
   free(dest);
+
+  return elf;
+}
+
+Elf *ElfObject::decompress_zstd(int fd)
+{
+  size_t buffInSize = ZSTD_DStreamInSize();
+  unsigned char buffIn[buffInSize];
+
+  size_t buffOutSize = ZSTD_DStreamOutSize();
+  unsigned char buffOut[buffOutSize];
+
+  unsigned long dest_size = buffOutSize;
+  DecompressedObj = (unsigned char *)malloc(dest_size);
+  if (!DecompressedObj)
+    throw std::runtime_error("zstd malloc failed\n");
+
+  unsigned long dest_current = 0;
+
+  ZSTD_DCtx* dctx = ZSTD_createDCtx();
+  if (!dctx)
+    throw std::runtime_error("zstd createDCtx failed\n");
+
+  size_t bytes_read;
+  while ((bytes_read = read(fd, buffIn, buffInSize)) ) {
+
+    if (bytes_read < 0) {
+      ZSTD_freeDCtx(dctx);
+      throw std::runtime_error("ZSTD read failed: " + std::to_string(bytes_read) + "\n");
+    }
+
+    ZSTD_inBuffer input = { buffIn, bytes_read, 0 };
+
+    while (input.pos < input.size) {
+      ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
+
+      size_t ret = ZSTD_decompressStream(dctx, &output , &input);
+      if (ZSTD_isError(ret)) {
+        ZSTD_freeDCtx(dctx);
+        throw std::runtime_error("ZSTD_decompressStream failed: " + std::string(ZSTD_getErrorName(ret)) + "\n");
+      }
+
+      if (output.size > dest_size - dest_current) {
+        dest_size = dest_size * 2;
+        DecompressedObj = (unsigned char *)realloc(DecompressedObj, dest_size);
+      }
+
+      memcpy(DecompressedObj + dest_current, buffOut, output.pos);
+      dest_current += output.size;
+    }
+  }
+
+  ZSTD_freeDCtx(dctx);
+
+  Elf *elf = elf_memory((char *)DecompressedObj, dest_size);
+  if (elf == nullptr)
+    throw std::runtime_error("libelf elf_memory error: " + std::string(elf_errmsg(elf_errno())));
 
   return elf;
 }
