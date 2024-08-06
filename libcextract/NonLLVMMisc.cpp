@@ -24,6 +24,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+
+#include <iostream>
 
 /** @brief Handle some quirks of getline.  */
 char *getline_easy(FILE *file)
@@ -101,4 +104,39 @@ bool check_color_available(void)
 
   const char *term = getenv("TERM");
   return term && strcmp(term, "dumb") != 0 && isatty(STDOUT_FILENO);
+}
+
+enum FileHandling::FileType FileHandling::Get_File_Type(int fd)
+{
+
+  unsigned char buf[4] = { 0 };
+
+  /* Make sure that we are in the beginning of the file */
+  lseek(fd, 0, SEEK_SET);
+
+  int ret = read(fd, buf, 4);
+  if (ret < 0) {
+   throw std::runtime_error("error reading ELF file: " + std::to_string(ret));
+  } else if (ret == 0) {
+   throw std::runtime_error("error reading ELF file: empty file?");
+  }
+
+  /* reset file pointer */
+  lseek(fd, 0, SEEK_SET);
+
+  const unsigned char elf_magic[4] =  { 0x7f, 0x45, 0x4c, 0x46 };
+  const unsigned char zlib_magic[2] = { 0x1f, 0x8b };
+  const unsigned char zstd_magic[4] = { 0x28, 0xb5, 0x2f, 0xfd };
+
+  /* Check if the file is an ELF */
+  if (!memcmp(buf, elf_magic, 4))
+    return FILE_TYPE_ELF;
+
+  else if (!memcmp(buf, zlib_magic, 2))
+    return FILE_TYPE_GZ;
+
+  else if (!memcmp(buf, zstd_magic, 4))
+    return FILE_TYPE_ZSTD;
+
+  return FILE_TYPE_UNKNOWN;
 }
