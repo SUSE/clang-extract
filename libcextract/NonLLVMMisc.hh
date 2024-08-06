@@ -115,3 +115,16 @@ class VectorRef
   T *Ref;
   unsigned Size;
 };
+
+class FileHandling
+{
+  public:
+  enum FileType {
+    FILE_TYPE_ELF,
+    FILE_TYPE_GZ,
+    FILE_TYPE_ZSTD,
+    FILE_TYPE_UNKNOWN,
+  };
+
+  static enum FileType Get_File_Type(int fd);
+};

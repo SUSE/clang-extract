@@ -91,12 +91,23 @@ ElfObject::ElfObject(const char *path)
     throw std::runtime_error("ELF file not found: " + parser_path);
   }
 
-  /* Create libelf object and store it in the class variable.  */
-  ElfObj = elf_begin(ElfFd, ELF_C_READ, nullptr);
-  if (ElfObj == nullptr) {
+  enum FileHandling::FileType ft = FileHandling::Get_File_Type(ElfFd);
+
+  switch (ft) {
+  case FileHandling::FILE_TYPE_ELF: {
+    /* Create libelf object and store it in the class variable.  */
+    ElfObj = elf_begin(ElfFd, ELF_C_READ, nullptr);
+    if (ElfObj == nullptr) {
+      close(ElfFd);
+      throw std::runtime_error("libelf error on file " + parser_path + ": "
+                                   + std::string(elf_errmsg(elf_errno())));
+    }
+    break;
+  }
+
+  default:
     close(ElfFd);
-    throw std::runtime_error("libelf error on file " + parser_path + ": "
-                                 + std::string(elf_errmsg(elf_errno())));
+    throw std::runtime_error("Format not recognized: " + parser_path + "\n");
   }
 }
 
