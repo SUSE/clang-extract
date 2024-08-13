@@ -239,8 +239,8 @@ class ElfObject : public Parser
     return ElfObj;
   }
 
-  static Elf *decompress_gz(int fd);
-  Elf *decompress_zstd(int fd);
+  Elf *decompress_gz(void);
+  Elf *decompress_zstd(void);
 
   /** Iterator class for ELF sections.  With this one can use C++ iterators
     * to iterate through all sections of the ELF file.  Like this:

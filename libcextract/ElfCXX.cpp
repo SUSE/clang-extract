@@ -112,7 +112,7 @@ ElfObject::ElfObject(const char *path)
   /* gzip magic number (zlib) */
   case FileHandling::FILE_TYPE_GZ: {
     try {
-      ElfObj = decompress_gz(ElfFd);
+      ElfObj = decompress_gz();
       close(ElfFd);
       ElfFd = -1;
     } catch (const std::runtime_error &error) {
@@ -125,7 +125,7 @@ ElfObject::ElfObject(const char *path)
   /* zstd magic number */
   case FileHandling::FILE_TYPE_ZSTD: {
     try {
-      ElfObj = decompress_zstd(ElfFd);
+      ElfObj = decompress_zstd();
       close(ElfFd);
       ElfFd = -1;
     } catch (const std::runtime_error &error) {
@@ -159,7 +159,7 @@ ElfObject::~ElfObject(void)
   }
 }
 
-Elf *ElfObject::decompress_gz(int fd)
+Elf *ElfObject::decompress_gz(void)
 {
   const size_t CHUNK = 16384;
 
@@ -184,7 +184,7 @@ Elf *ElfObject::decompress_gz(int fd)
 
   /* decompress until deflate stream ends or end of file */
   do {
-    strm.avail_in = read(fd, in, CHUNK);
+    strm.avail_in = read(ElfFd, in, CHUNK);
     if (strm.avail_in < 0)
       throw std::runtime_error("zlib read failed: " + std::to_string(strm.avail_in) + "\n");
 
@@ -238,7 +238,7 @@ Elf *ElfObject::decompress_gz(int fd)
   return elf;
 }
 
-Elf *ElfObject::decompress_zstd(int fd)
+Elf *ElfObject::decompress_zstd()
 {
   size_t buffInSize = ZSTD_DStreamInSize();
   unsigned char buffIn[buffInSize];
@@ -258,7 +258,7 @@ Elf *ElfObject::decompress_zstd(int fd)
     throw std::runtime_error("zstd createDCtx failed\n");
 
   size_t bytes_read;
-  while ((bytes_read = read(fd, buffIn, buffInSize)) ) {
+  while ((bytes_read = read(ElfFd, buffIn, buffInSize)) ) {
 
     if (bytes_read < 0) {
       ZSTD_freeDCtx(dctx);
