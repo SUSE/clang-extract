@@ -136,27 +136,27 @@ class DependencyGraphVisitor : public RecursiveASTVisitor<DependencyGraphVisitor
     DependencyNode *back = DependencyStack.top();
     DependencyNode *front = DG.getOrCreateDependencyNode(expr->getDecl());
 
-    DG.createDependencyEdge(back, front);
+    DG.createDependencyEdge(back, front, expr);
 
     return VISITOR_CONTINUE;
   }
 
-  bool VisitTagType(const TagType *type)
+  bool VisitTagType(TagType *type)
   {
     DependencyNode *back = DependencyStack.top();
     DependencyNode *front = DG.getOrCreateDependencyNode(type->getDecl());
 
-    DG.createDependencyEdge(back, front);
+    DG.createDependencyEdge(back, front, type);
 
     return VISITOR_CONTINUE;
   }
 
-  bool VisitTypedefType(const TypedefType *type)
+  bool VisitTypedefType(TypedefType *type)
   {
     DependencyNode *back = DependencyStack.top();
     DependencyNode *front = DG.getOrCreateDependencyNode(type->getDecl());
 
-    DG.createDependencyEdge(back, front);
+    DG.createDependencyEdge(back, front, type);
 
     return VISITOR_CONTINUE;
   }
@@ -211,12 +211,28 @@ DependencyNode *DependencyGraph::getDependencyNode(Decl *decl)
   return it->second;
 }
 
-DependencyEdge *DependencyGraph::createDependencyEdge(DependencyNode *backward, DependencyNode *forward)
+template <typename LABEL>
+DependencyEdge *DependencyGraph::createDependencyEdge(DependencyNode *backward, DependencyNode *forward, LABEL label)
+{
+  /* Allocate the edge object on our pool.  */
+  DependencyEdge *edge = new DependencyEdge(backward, forward, label);
+  EdgePool.push_back(edge);
+
+  /* Link nodes.  */
+  backward->ForwardEdges.push_back(edge);
+  forward->BackwardEdges.push_back(edge);
+
+  return edge;
+}
+
+DependencyEdge *DependencyGraph::createDependencyEdge(DependencyNode *backward,
+                                                      DependencyNode *forward)
 {
   DependencyEdge *b = backward->getForwardEdgeAdjacentTo(forward);
   DependencyEdge *f = forward->getBackwardEdgeAdjacentTo(backward);
   if (f && b && f == b) {
-    /* Keep the graph simple.  */
+    /* If we don't want to add a label, then there is no point in adding
+       multiple edges to the same label.  */
     return f;
   }
 
@@ -256,10 +272,27 @@ void DependencyNode::getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec)
 
   for (DependencyEdge *edge : BackwardEdges) {
     DependencyNode *node = edge->getBackward();
-    if (Decl *decl = node->getAsDecl()) {
+    if (Decl *decl = node->getAsDecl(); !node->isMarked()) {
       vec.push_back(decl);
     }
     node->getDeclsDependingOnMe(vec);
+  }
+}
+
+void DependencyNode::getReachableBackwardEdges(llvm::SmallVector<DependencyEdge *> &vec)
+{
+  if (isMarked()) {
+    return;
+  }
+
+  mark();
+
+  for (DependencyEdge *edge : BackwardEdges) {
+    vec.push_back(edge);
+    DependencyNode *node = edge->getBackward();
+    if (node->isDecl()) {
+      node->getReachableBackwardEdges(vec);
+    }
   }
 }
 

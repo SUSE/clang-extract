@@ -377,6 +377,25 @@ class SymbolExternalizer
 
   private:
 
+  enum RenamePrefix
+  {
+    NONE,
+    KLPR,
+    KLPP,
+    KLPE
+  };
+
+  struct RenameEntry
+  {
+    Decl *decl;
+    PreprocessedEntity *entity;
+    RenamePrefix prefix;
+  };
+
+  std::vector<RenameEntry> SymsToRename;
+
+  void Compute_Symbols_To_Rename(const std::vector<std::string> &to_externalize);
+
   /** Get the ExternalizationType from a string.  */
   enum ExternalizationType Get_Symbol_Ext_Type(const std::string &to_externalize);
 

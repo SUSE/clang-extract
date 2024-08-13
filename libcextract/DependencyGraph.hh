@@ -74,6 +74,16 @@ class DependencyGraph
       return (Type == NodeType::PREPROCESSED_ENTITY) ? AsPrep : nullptr;
     }
 
+    inline bool isDecl(void) const
+    {
+      return Type == NodeType::DECL;
+    }
+
+    inline bool isPreprocessedEntity(void) const
+    {
+      return Type == NodeType::PREPROCESSED_ENTITY;
+    }
+
     inline std::vector<DependencyEdge *> &getBackwardEdges(void)
     {
       return BackwardEdges;
@@ -115,6 +125,7 @@ class DependencyGraph
     StringRef getName(void) const;
 
     void getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec);
+    void getReachableBackwardEdges(llvm::SmallVector<DependencyEdge *> &vec);
 
     void dumpSingleNode(FILE *f = stdout) const;
     void dumpGraphviz(FILE *f = stdout, int depth = 0);
@@ -136,12 +147,96 @@ class DependencyGraph
     std::vector<DependencyEdge *> ForwardEdges;
   };
 
+  class DependencyLabel
+  {
+    public:
+
+    enum DepType {
+      NONE,
+      DECL_REF_EXPR,
+      TAG_TYPE,
+      TYPEDEF_TYPE,
+    };
+
+    inline DependencyLabel(void)
+      : Info(nullptr),
+        Type(NONE)
+    {
+    }
+
+    inline DependencyLabel(DeclRefExpr *expr)
+      : Info(expr),
+        Type(DECL_REF_EXPR)
+    {
+    }
+
+    inline DependencyLabel(TagType *type)
+      : Info(type),
+        Type(TAG_TYPE)
+    {
+    }
+
+    inline DependencyLabel(TypedefType *type)
+      : Info(type),
+        Type(TYPEDEF_TYPE)
+    {
+    }
+
+    inline DepType getType(void)
+    {
+      return Type;
+    }
+
+    inline bool isDeclRefExpr(void)
+    {
+      return Type == DECL_REF_EXPR;
+    }
+
+    inline bool isTagType(void)
+    {
+      return Type == TAG_TYPE;
+    }
+
+    inline bool isTypedefType(void)
+    {
+      return Type == TYPEDEF_TYPE;
+    }
+
+    inline DeclRefExpr *getAsDeclRefExpr(void)
+    {
+      return isDeclRefExpr() ? static_cast<DeclRefExpr *>(Info) : nullptr;
+    }
+
+    inline TagType *getAsTagType(void)
+    {
+      return isTagType() ? static_cast<TagType *>(Info) : nullptr;
+    }
+
+    inline TypedefType *getAsTypedefDecl(void)
+    {
+      return isTypedefType() ? static_cast<TypedefType *>(Info) : nullptr;
+    }
+
+    protected:
+    void *Info;
+    DepType Type;
+  };
+
   class DependencyEdge
   {
     public:
+
     inline DependencyEdge(DependencyNode *backward, DependencyNode *forward)
       : Backward(backward),
         Forward(forward)
+    {
+    }
+
+    template <typename LABEL>
+    inline DependencyEdge(DependencyNode *backward, DependencyNode *forward, LABEL label)
+      : Backward(backward),
+        Forward(forward),
+        Label(label)
     {
     }
 
@@ -165,6 +260,16 @@ class DependencyGraph
       return Forward;
     }
 
+    inline DependencyLabel &getLabel(void)
+    {
+      return Label;
+    }
+
+    inline const DependencyLabel &getLabel(void) const
+    {
+      return Label;
+    }
+
     inline void setBackward(DependencyNode *node)
     {
       Backward = node;
@@ -180,13 +285,20 @@ class DependencyGraph
     protected:
     DependencyNode *Backward;
     DependencyNode *Forward;
+    DependencyLabel Label;
   };
 
   DependencyNode *getOrCreateDependencyNode(Decl *);
 
   DependencyNode *getDependencyNode(Decl *);
 
-  DependencyEdge *createDependencyEdge(DependencyNode *back, DependencyNode *foward);
+  template <typename LABEL>
+  DependencyEdge *createDependencyEdge(DependencyNode *back,
+                                       DependencyNode *foward,
+                                       LABEL label);
+
+  DependencyEdge *createDependencyEdge(DependencyNode *back,
+                                       DependencyNode *foward);
 
   llvm::SmallVector<Decl *> getDeclsDependingOn(DependencyNode *node);
 
@@ -200,7 +312,7 @@ class DependencyGraph
 
   ASTUnit *AST;
 
-  llvm::DenseMap<Decl *, DependencyNode *> DeclMap;
+  std::unordered_map<Decl *, DependencyNode *> DeclMap;
   std::vector<DependencyEdge *> EdgePool;
   std::vector<DependencyNode *> NodePool;
 };
