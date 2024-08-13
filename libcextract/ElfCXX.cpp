@@ -168,9 +168,9 @@ Elf *ElfObject::decompress_gz(void)
   unsigned char out[CHUNK];
 
   unsigned long dest_size = CHUNK;
-  unsigned char *dest = (unsigned char *)malloc(CHUNK);
-  if (!dest)
-    throw std::runtime_error("zlib dest malloc failed\n");
+  DecompressedObj = (unsigned char *)malloc(CHUNK);
+  if (!DecompressedObj)
+    throw std::runtime_error("zlib malloc failed\n");
 
   unsigned long dest_current = 0;
 
@@ -212,10 +212,10 @@ Elf *ElfObject::decompress_gz(void)
       /* double the buffer when needed */
       if (have > dest_size - dest_current) {
         dest_size = dest_size * 2;
-        dest = (unsigned char *)realloc(dest, dest_size);
+        DecompressedObj = (unsigned char *)realloc(DecompressedObj, dest_size);
       }
 
-      memcpy(dest + dest_current, out, have);
+      memcpy(DecompressedObj + dest_current, out, have);
       dest_current += have;
     } while (strm.avail_out == 0);
 
@@ -227,13 +227,9 @@ Elf *ElfObject::decompress_gz(void)
   if (ret != Z_STREAM_END)
       throw std::runtime_error("zlib inflateEnd error: " + std::to_string(ret) + "\n");
 
-  Elf *elf = elf_memory((char *)dest, ret);
-  if (elf == nullptr) {
-    free(dest);
+  Elf *elf = elf_memory((char *)DecompressedObj, ret);
+  if (elf == nullptr)
     throw std::runtime_error("libelf elf_memory error: " + std::string(elf_errmsg(elf_errno())));
-  }
-
-  free(dest);
 
   return elf;
 }
