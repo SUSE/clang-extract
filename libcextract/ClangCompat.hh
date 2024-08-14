@@ -1,34 +1,16 @@
-/*
- *  clang-extract - Extract functions from projects and its dependencies using
- *                  libclang and LLVM infrastructure.
- *
- *  Copyright (C) 2024 SUSE Software Solutions GmbH
- *
- *  This file is part of clang-extract.
- *
- *  clang-extract is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 3 of the License, or (at your option) any later version.
- *
- *  clang-extract is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with clang-extract.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-
-/** Header providing compatibility with older versions of clang.
- *
- * Clang API often have minor changes across versions. For this tool to be
- * compatible with multiple versions, we have to provide a minimal interface
- * between them.
- *
- * Author: Giuliano Belinassi
- */
+//===- ClangCompat.hh - Compatibility layer for multiple clang versions *- C++ -*-===//
+//
+// This project is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+/// \file
+/// This file provides a compatibility layer to clang-extract for it to compile
+/// with multiple versions of clang and LLVM.
+//
+//===----------------------------------------------------------------------===//
 
 #pragma once
 
