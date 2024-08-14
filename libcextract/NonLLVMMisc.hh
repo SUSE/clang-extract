@@ -79,43 +79,6 @@ const char *Extract_Single_Arg_C(const char *str);
 /** Check if output supports colors.  */
 bool check_color_available(void);
 
-/** Vector reference.  */
-template <typename T>
-class VectorRef
-{
-  public:
-  VectorRef(T *reference, unsigned size)
-    : Ref(reference),
-      Size(size)
-  {
-  }
-
-  VectorRef(T *base, T *top)
-  {
-    if (base == nullptr) {
-      Ref = nullptr, Size = 0;
-      return;
-    }
-
-    Ref = base;
-    Size = ((ptrdiff_t)top - (ptrdiff_t)base)/sizeof(T) + 1;
-  }
-
-  inline T *getPointer(void)
-  {
-    return Ref;
-  }
-
-  inline unsigned getSize(void)
-  {
-    return Size;
-  }
-
-  private:
-  T *Ref;
-  unsigned Size;
-};
-
 class FileHandling
 {
   public:

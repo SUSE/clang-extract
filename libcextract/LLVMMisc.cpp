@@ -160,7 +160,7 @@ Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc)
   return nullptr;
 }
 
-VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc)
+ArrayRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc)
 {
   SourceManager &SM = ast->getSourceManager();
   /* We don't have a way of accessing the TopLevel vector directly, hence we
@@ -204,7 +204,7 @@ VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const Source
         }
       }
 
-      return VectorRef(&array[last_l], &array[last_h]);
+      return ArrayRef(&array[last_l], &array[last_h+1]);
     }
 
     if (SM.isBeforeInTranslationUnit(begin, loc)) {
@@ -214,7 +214,7 @@ VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const Source
     }
   }
 
-  return VectorRef<Decl *>(nullptr, 0U);
+  return ArrayRef<Decl *>(nullptr, 0UL);
 }
 
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc)

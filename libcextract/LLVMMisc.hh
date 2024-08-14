@@ -81,7 +81,7 @@ Decl         *Get_Bodyless_Or_Itself(Decl *decl);
 Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
 
 /* Get Toplevel decls with same beginloc.  */
-VectorRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc);
+ArrayRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc);
 
 /** Build a clang-extract location comment.  */
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc);
