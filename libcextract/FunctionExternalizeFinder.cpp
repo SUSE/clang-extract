@@ -44,7 +44,12 @@ FunctionExternalizeFinder::FunctionExternalizeFinder(ASTUnit *ast,
 
 bool FunctionExternalizeFinder::Should_Externalize(CallGraphNode *node)
 {
-  return Should_Externalize(dynamic_cast<FunctionDecl *>(node->getDecl()));
+  Decl *decl = node->getDecl();
+  if (decl) {
+    return Should_Externalize(dyn_cast<FunctionDecl>(decl));
+  }
+
+  return false;
 }
 
 bool FunctionExternalizeFinder::Should_Externalize(const DeclaratorDecl *decl)
@@ -125,7 +130,8 @@ bool FunctionExternalizeFinder::Analyze_Function(FunctionDecl *decl)
 
 bool FunctionExternalizeFinder::Analyze_Node(CallGraphNode *node)
 {
-  FunctionDecl *decl = dynamic_cast<FunctionDecl *>(node->getDecl());
+  Decl *ndecl = node->getDecl();
+  FunctionDecl *decl = ndecl ? dyn_cast<FunctionDecl>(ndecl) : nullptr;
 
   if (Is_Already_Analyzed(node)) {
     return false;
@@ -170,7 +176,7 @@ bool FunctionExternalizeFinder::Externalize_DeclRefs(Stmt *stmt)
 
   if (DeclRefExpr::classof(stmt)) {
     DeclRefExpr *expr = (DeclRefExpr *) stmt;
-    DeclaratorDecl *decl = dynamic_cast<DeclaratorDecl *>(expr->getDecl());
+    DeclaratorDecl *decl = dyn_cast<DeclaratorDecl>(expr->getDecl());
 
     if (Should_Externalize(decl)) {
       externalized = Mark_For_Externalization(decl->getNameAsString());
