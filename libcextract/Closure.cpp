@@ -523,12 +523,11 @@ bool DeclClosureVisitor::ParentRecordDeclHelper(TagDecl *decl)
 bool DeclClosureVisitor::AnalyzeDeclsWithSameBeginlocHelper(Decl *decl)
 {
   SourceManager &SM = AST->getSourceManager();
-  VectorRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST,
-                            SM.getExpansionLoc(decl->getBeginLoc()));
-  unsigned n = decls.getSize();
-  Decl **array = decls.getPointer();
-  for (unsigned i = 0; i < n; i++) {
-    TRY_TO(TraverseDecl(array[i]));
+  ArrayRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST,
+                           SM.getExpansionLoc(decl->getBeginLoc()));
+
+  for (auto it = decls.begin(); it != decls.end(); ++it) {
+    TRY_TO(TraverseDecl(*it));
   }
 
   return VISITOR_CONTINUE;
