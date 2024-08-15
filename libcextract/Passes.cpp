@@ -538,9 +538,23 @@ public:
     PassName = "IbtTailGeneratePass";
   }
 
+  /* There are a few cases where we don't want IBT tail declarations to be
+   * defined:
+   * * If IBT is not enabled
+   * * If there are not externalized symbols
+   * * If all the externalized symbols are weak
+   */
   virtual bool Gate(PassManager::Context *ctx)
   {
-    return ctx->Ibt && ctx->Externalize.size() > 0;
+    if (!ctx->Ibt || ctx->Externalize.size() == 0)
+      return false;
+
+    for (const ExternalizerLogEntry &entry : ctx->NamesLog) {
+      if (entry.Type == ExternalizationType::STRONG)
+        return true;
+    }
+
+    return false;
   }
 
   virtual bool Run_Pass(PassManager::Context *ctx)

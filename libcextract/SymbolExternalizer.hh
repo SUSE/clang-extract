@@ -101,8 +101,13 @@ struct SymbolUpdateStatus
   }
 
   /* For IBT, NewDecl and OldDecl are the same if the symbols is a function, so
-     don't replace text if the name didn't change. */
+     don't replace text if the name didn't change.
+     In the case of WEAK externalization NewDecl will also be empty, but in this
+     case we don't want a symbol rename. */
   inline bool Needs_Sym_Rename(void) {
+    if (ExtType == ExternalizationType::WEAK)
+      return false;
+
     if (NewDecl == nullptr)
       return true;
 
