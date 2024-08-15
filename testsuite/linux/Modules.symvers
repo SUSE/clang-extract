@@ -1,1 +1,2 @@
-0x00000000	crc32c	lib/libcrc32c	EXPORT_SYMBOL	
+0x00000000	crc32c	lib/libcrc32c	EXPORT_SYMBOL
+0x00000000	bpf_prog_put	vmlinux	EXPORT_SYMBOL_GPL

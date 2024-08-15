@@ -296,6 +296,12 @@ ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym
 {
   if (Symv) {
     const std::string &sym_mod = Symv->Get_Symbol_Module(sym);
+    /* If the symbol comes from vmlinux, then we should use Weak
+     * externalization, since the symbol is always present when loading the
+     * livepatch. */
+    if (sym_mod == "vmlinux")
+      return ExternalizationType::WEAK;
+
     /*
      * If the symbol exists on Symvers we can decide whether the symbol must be
      * externalized or not, and not rely on ELF.
