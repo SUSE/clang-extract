@@ -87,7 +87,10 @@ bool DeclClosureVisitor::TraverseDecl(Decl *decl)
 {
   DO_NOT_RUN_IF_ALREADY_ANALYZED(decl);
   Mark_As_Analyzed(decl);
-  return RecursiveASTVisitor::TraverseDecl(decl);
+  Stack.push_back(decl);
+  bool ret = RecursiveASTVisitor::TraverseDecl(decl);
+  Stack.pop_back();
+  return ret;
 }
 
 bool DeclClosureVisitor::VisitFunctionDecl(FunctionDecl *decl)
@@ -506,7 +509,15 @@ bool DeclClosureVisitor::ParentRecordDeclHelper(TagDecl *decl)
   /* In case this references a struct/union defined inside a struct (nested
      struct), then we also need to analyze the parent struct.  */
   RecordDecl *parent = dyn_cast<RecordDecl>(decl->getLexicalDeclContext());
-  if (parent) {
+  Decl *analysis_parent = nullptr;
+
+  /* Check if we are not coming from an analysis from the RecordDecl, i.e. from
+     a stack perspective the Decl that is at the bottom of the Decl.  */
+  if (Stack.size() >= 2) {
+    analysis_parent = Stack[Stack.size() - 2];
+  }
+
+  if (parent && analysis_parent != parent) {
     /* If the parent struct is flagged as not needing a complete definition
        then we need to set it to true, else the nested struct won't be
        output as of only a partial definition of the parent struct is
