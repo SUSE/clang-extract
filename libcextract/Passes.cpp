@@ -79,7 +79,7 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
 
   auto AU = ASTUnit::LoadFromCompilerInvocation(
-      CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 1,
+      CInvok, PCHContainerOps, Diags, FileMgr, false, CaptureDiagsKind::None, 0,
       TU_Complete, false, false, false);
 
   if (AU == nullptr) {
