@@ -140,7 +140,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   public:
   DeclClosureVisitor(ASTUnit *ast)
     : RecursiveASTVisitor(),
-      AST(ast)
+      AST(ast),
+      Closure(),
+      AnalyzedDecls(),
+      Stack()
   {
   }
 
@@ -273,4 +276,14 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   /** The set of all analyzed Decls.  */
   std::unordered_set<Decl *> AnalyzedDecls;
+
+  /** Stack of Decls.  Implement using a vector because we may need to access
+      the second element on the top, and we also need its continuity.  */
+  llvm::SmallVector<Decl *, 128> Stack;
+
+  /** Return what is on top of our stack.  */
+  inline Decl *Stack_Top(void)
+  {
+    return Stack[Stack.size() - 1];
+  }
 };
