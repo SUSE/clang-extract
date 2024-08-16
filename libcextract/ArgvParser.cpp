@@ -115,6 +115,9 @@ void ArgvParser::Insert_Required_Parameters(void)
     "-Wno-unused-function", // May happen when trying to extract a static function.
     "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
     "-fno-builtin", // clang interposes some glibc functions and then it fails to find the declaration of them.
+    "-Wno-duplicate-decl-specifier", // Disabled due to kernel issues. See more
+                                     // at https://github.com/ClangBuiltLinux/linux/issues/2013
+                                     // and https://github.com/llvm/llvm-project/issues/93449
   };
 
   for (const char *arg : priv_args) {
