@@ -977,9 +977,11 @@ void SymbolExternalizer::Late_Externalize(void)
       SE.Insert_Text(sym->LateInsertLocation, outstr.str());
 
       /* In case the symbol is in the main file already, we must delete it.  */
-      SourceLocation loc = sm.getExpansionLoc(sym->OldDecl->getBeginLoc());
+      DeclaratorDecl *old_decl = Get_With_Body_Or_Itself(sym->OldDecl);
+
+      SourceLocation loc = sm.getExpansionLoc(old_decl->getBeginLoc());
       if (sm.getFileID(loc) == sm.getMainFileID()) {
-        SE.Remove_Text(sym->OldDecl->getSourceRange(), 1000);
+        SE.Remove_Text(old_decl->getSourceRange(), 1000);
       }
     } else {
       /* Fallback to the old method of rewriting the declaration.  */

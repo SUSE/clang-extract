@@ -77,6 +77,12 @@ FunctionDecl *Get_Bodyless_Or_Itself(FunctionDecl *decl);
 TagDecl      *Get_Bodyless_Or_Itself(TagDecl *decl);
 Decl         *Get_Bodyless_Or_Itself(Decl *decl);
 
+/** Get version of declarator with body.  */
+DeclaratorDecl *Get_With_Body(DeclaratorDecl *decl);
+
+/** Get version of declarator with body or itself.  */
+DeclaratorDecl *Get_With_Body_Or_Itself(DeclaratorDecl *decl);
+
 /* Get the TopLevel Decl that contains the location loc.  */
 Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
 
