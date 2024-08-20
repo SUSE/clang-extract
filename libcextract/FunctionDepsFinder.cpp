@@ -57,8 +57,10 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 {
   ClosureSet &closure = Visitor.Get_Closure();
   std::unordered_set<Decl *> &closure_set = closure.Get_Set();
+  bool inc;
 
-  for (auto it = closure_set.begin(); it != closure_set.end(); ++it) {
+  for (auto it = closure_set.begin(); it != closure_set.end(); inc ? ++it : it) {
+    inc = true;
     /* Handle the case where a enum or struct is declared as:
 
         typedef enum Hand {
@@ -198,9 +200,27 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         }
       }
     }
+
+    /* Try to remove any decls in the main file which are
+       redundant, which means that have equivalent previous decl.  */
+    Decl *decl = *it;
+
+    if (AST->isInMainFileID(decl->getBeginLoc()) &&
+        AST->isInMainFileID(decl->getEndLoc())) {
+
+      for (Decl *prev = decl->getPreviousDecl();
+           prev != nullptr;
+           prev = prev->getPreviousDecl()) {
+        if (closure.Is_Decl_Marked(prev) && Is_Decl_Equivalent_To(decl, prev)) {
+          ++it;
+          inc = false;
+          closure.Remove_Decl(decl);
+          break;
+        }
+      }
+    }
   }
 
-  // FIXME: use interval tree
   ASTUnit::top_level_iterator it;
   Decl *prev = nullptr;
   for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
