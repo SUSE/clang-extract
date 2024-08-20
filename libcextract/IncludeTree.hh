@@ -139,8 +139,11 @@ class IncludeTree
     }
 
     /** Dump, for debugging reasons.  */
+    void Dump_Single_Node(llvm::raw_ostream &out);
+    void Dump(llvm::raw_ostream &out, unsigned ident = 0);
+
     void Dump_Single_Node(void);
-    void Dump(unsigned ident = 0);
+    void Dump(void);
 
     private:
 
@@ -209,6 +212,7 @@ class IncludeTree
   IncludeNode *Get(const InclusionDirective *);
 
   /** Dump for debugging purposes.  */
+  void Dump(llvm::raw_ostream &out);
   void Dump(void);
 
   private:

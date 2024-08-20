@@ -367,6 +367,13 @@ class ClosurePass : public Pass
     {
       std::error_code ec;
       llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
+
+      /* Dump the IncludeTree.  */
+      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy, ctx->HeadersToExpand);
+      out << "/** IncludeTree: \n\n";
+      IT.Dump(out);
+      out << "\n */\n";
+
       out << ctx->CodeOutput;
       out.close();
     }
@@ -486,6 +493,12 @@ class FunctionExternalizerPass : public Pass
         out << "  " << h << '\n';
       }
       out << "*/\n";
+
+      /* Dump the IncludeTree.  */
+      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy, ctx->HeadersToExpand);
+      out << "/** IncludeTree: \n\n";
+      IT.Dump(out);
+      out << "\n */\n";
 
       /* Then the code.  */
       out << ctx->CodeOutput;
