@@ -281,3 +281,18 @@ DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name
 
   return Get_Decl_From_Symtab(ast, info->getValue());
 }
+
+/** Check if two Decls are equivalent.  */
+bool Is_Decl_Equivalent_To(Decl *a, Decl *b)
+{
+  std::string a_str;
+  std::string b_str;
+
+  llvm::raw_string_ostream a_stream(a_str);
+  llvm::raw_string_ostream b_stream(b_str);
+
+  a->print(a_stream);
+  b->print(b_stream);
+
+  return a_str == b_str;
+}

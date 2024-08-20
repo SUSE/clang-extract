@@ -100,3 +100,6 @@ DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const IdentifierInfo 
 
 /** Lookup in the symbol table for a declaration with given name passed by name.  */
 DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name);
+
+/** Check if two Decls are equivalent.  */
+bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
