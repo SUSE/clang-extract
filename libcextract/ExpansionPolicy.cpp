@@ -21,6 +21,12 @@
 bool KernelExpansionPolicy::Must_Expand(const StringRef &absolute_path,
                                         const StringRef &relative_path)
 {
+  // absolute_path and relative_path are different when extracting code from a
+  // compiled kernel directory, so we need to check whether the include paths
+  // start from include paths.
+  if (absolute_path != relative_path)
+    return !relative_path.starts_with("./include");
+
   std::vector<std::string> include_paths = { "/include/", "/arch/" };
 
   for (auto &path : include_paths) {
