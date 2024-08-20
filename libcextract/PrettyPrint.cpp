@@ -424,6 +424,20 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
         if (tok->is(semicolon)) {
           /* Found the ';', now go back a character to *not* include the ';'.  */
           furthest = head.getLocWithOffset(-1);
+
+          /* There is a bizarre case where a decl have an #endif at the end of
+             it, just before the ';' (see small/attr-14.c).  Try to workaround
+             this case by emiting the ';' that was there, which will result in
+             two ';' being print.  This is visually not cute, but at least
+             won't cause the compiler to cry.  */
+          StringRef endstr = PrettyPrint::Get_Source_Text({furthest, furthest});
+          if (const char *data_str = endstr.data()) {
+            /* Check for newline.  */
+            if (*data_str != '\0' && *data_str == '\n') {
+              /* Set 'furthest' back to where it was.  */
+              furthest = furthest.getLocWithOffset(1);
+            }
+          }
           break;
         }
       }
