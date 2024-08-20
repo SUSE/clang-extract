@@ -121,6 +121,25 @@ Decl *Get_Bodyless_Or_Itself(Decl *decl)
   return bodyless ? bodyless : decl;
 }
 
+DeclaratorDecl *Get_With_Body(DeclaratorDecl *decl)
+{
+  if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
+    return fdecl->getDefinition();
+  }
+
+  if (VarDecl *vdecl = dyn_cast<VarDecl>(decl)) {
+    return vdecl->getDefinition();
+  }
+
+  return nullptr;
+}
+
+DeclaratorDecl *Get_With_Body_Or_Itself(DeclaratorDecl *decl)
+{
+  DeclaratorDecl *with_body = Get_With_Body(decl);
+  return with_body ? with_body : decl;
+}
+
 /* Get the TopLevel Decl that contains the location loc.  */
 Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc)
 {
