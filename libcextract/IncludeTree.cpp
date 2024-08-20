@@ -251,13 +251,14 @@ IncludeNode *IncludeTree::Get(const SourceLocation &loc)
   return nullptr;
 }
 
+void IncludeTree::Dump(llvm::raw_ostream &out)
+{
+  Root->Dump(out);
+}
+
 void IncludeTree::Dump(void)
 {
   Root->Dump();
-
-  llvm::outs() << "Tree map:\n";
-  for (auto &p: Map)
-    llvm::outs() << " " << p.first << " => " << p.second << '\n';
 }
 
 /* ----- IncludeNode ------ */
@@ -565,18 +566,29 @@ void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
   }
 }
 
-void IncludeTree::IncludeNode::Dump_Single_Node(void)
+void IncludeTree::IncludeNode::Dump_Single_Node(llvm::raw_ostream &out)
 {
-  llvm::outs() << File->getName() << " Expand: " << ShouldBeExpanded <<
-                  " Output: " << ShouldBeOutput << '\n';
+  out << File->getName() << " Expand: " << ShouldBeExpanded <<
+         " Output: " << ShouldBeOutput << " -include: " <<
+         IsFromMinusInclude << '\n';
 }
 
-void IncludeTree::IncludeNode::Dump(unsigned ident)
+void IncludeTree::IncludeNode::Dump_Single_Node(void)
 {
-  llvm::outs() << std::string(ident*2, ' ');
-  Dump_Single_Node();
+  Dump_Single_Node(llvm::outs());
+}
+
+void IncludeTree::IncludeNode::Dump(llvm::raw_ostream &out, unsigned ident)
+{
+  out << std::string(ident*2, ' ');
+  Dump_Single_Node(out);
 
   for (IncludeNode *child : Childs) {
-    child->Dump(ident + 1);
+    child->Dump(out, ident + 1);
   }
+}
+
+void IncludeTree::IncludeNode::Dump(void)
+{
+  Dump(llvm::outs());
 }
