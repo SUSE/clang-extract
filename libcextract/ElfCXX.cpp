@@ -365,6 +365,30 @@ ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
   }
 }
 
+/** Get symbol if available in either symtab.  Returns in which symtab this
+    symbol was found.  */
+std::pair<unsigned char, ElfSymtabType>
+ElfSymbolCache::Get_Symbol_Info(const std::string &sym)
+{
+  unsigned char ret = 0;
+
+  /* Try the dynsym first, which means this symbol is most likely public
+     visible.  */
+  ret = Get_Symbol_Info_Dynsym(sym);
+  if (ret != 0) {
+    return std::make_pair(ret, ElfSymtabType::DYNSYM);
+  }
+
+  /* Symbol not available on dynsym.  Try symtab.  */
+  ret = Get_Symbol_Info_Symtab(sym);
+  if (ret != 0) {
+    return std::make_pair(ret, ElfSymtabType::SYMTAB);
+  }
+
+  /* If symbol is not here there is nothing I can do.  */
+  return std::make_pair(0, ElfSymtabType::TAB_NONE);
+}
+
 std::vector<std::string> ElfSymbolCache::Get_All_Symbols(void)
 {
   std::vector<std::string> vec;

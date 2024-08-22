@@ -74,7 +74,9 @@ class InlineAnalysis
                                       const char *output_path);
 
   /** Get the ELF info of a symbol.  */
-  unsigned char Get_Symbol_Info(const std::string &sym);
+
+  std::pair<unsigned char, ElfSymtabType>
+  Get_Symbol_Info(const std::string &sym);
 
   ExternalizationType Needs_Externalization(const std::string &sym);
 

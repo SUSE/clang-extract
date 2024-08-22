@@ -162,7 +162,9 @@ void InlineAnalysis::Print_Node_Colors(const std::set<IpaCloneNode *> &set, FILE
 
   for (IpaCloneNode *node : set) {
     const char *demangled = InlineAnalysis::Demangle_Symbol(node->Name.c_str());
-    unsigned char syminfo = Get_Symbol_Info(node->Name);
+    std::pair<unsigned char, ElfSymtabType> infos = Get_Symbol_Info(node->Name);
+    unsigned char syminfo = infos.first;
+    ElfSymtabType symtab = infos.second;
     if (syminfo == 0) {
       fprintf(fp, "\n\"%s\" [style=dotted]", demangled);
     } else {
@@ -170,8 +172,10 @@ void InlineAnalysis::Print_Node_Colors(const std::set<IpaCloneNode *> &set, FILE
       unsigned char bind = ElfSymbol::Bind_Of(syminfo);
       if (bind == STB_LOCAL) {
         fprintf(fp, "\n\"%s\" [color=red]", demangled);
-      } else if (bind == STB_GLOBAL) {
+      } else if (bind == STB_GLOBAL && symtab == SHT_DYNSYM) {
         fprintf(fp, "\n\"%s\" [color=black]", demangled);
+      } else if (bind == STB_GLOBAL && symtab == SHT_SYMTAB) {
+        fprintf(fp, "\n\"%s\" [color=red]", demangled);
       } else if (bind == STB_WEAK) {
         fprintf(fp, "\n\"%s\" [color=green]", demangled);
       } else {
@@ -247,29 +251,21 @@ void InlineAnalysis::Dump(void)
   }
 }
 
-unsigned char InlineAnalysis::Get_Symbol_Info(const std::string &sym)
+std::pair<unsigned char, ElfSymtabType>
+InlineAnalysis::Get_Symbol_Info(const std::string &sym)
 {
   /* Try the dynsym first, which means this symbol is most likely publically
      visible.  */
-  unsigned char ret = 0;
   if (ElfCache == nullptr) {
     /* If we don't have the ElfCache there is nothing we can do.  */
-    return ret;
+    return std::make_pair(0, ElfSymtabType::TAB_NONE);
   }
 
-  ret = ElfCache->Get_Symbol_Info_Dynsym(sym);
-  if (ret != 0) {
-    return ret;
-  }
-
-  /* Symbol not available on dynsym.  Try symtab.  */
-  ret = ElfCache->Get_Symbol_Info_Symtab(sym);
-
-  /* If symbol is not here there is nothing I can do.  */
-  return ret;
+  /* Forward this to ElfCXX.  */
+  return ElfCache->Get_Symbol_Info(sym);
 }
 
-static const char *Bind(unsigned link)
+static const char *Bind(unsigned link, ElfSymtabType symtab)
 {
   switch (link) {
     case STB_LOCAL:
@@ -277,7 +273,13 @@ static const char *Bind(unsigned link)
     break;
 
     case STB_GLOBAL:
-      return "Public symbol";
+      if (symtab == SHT_SYMTAB) {
+        return "Private symbol";
+      } else if (symtab == SHT_DYNSYM) {
+        return "Public symbol";
+      } else {
+        assert(0 && "Unreachable");
+      }
     break;
 
     case STB_WEAK:
@@ -311,7 +313,9 @@ ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym
                                                     : ExternalizationType::NONE;
   }
 
-  unsigned char info = Get_Symbol_Info(sym);
+  auto infos = Get_Symbol_Info(sym);
+  unsigned char info = infos.first;
+  ElfSymtabType symtab = infos.second;
   if (info > 0) {
     unsigned bind = ElfSymbol::Bind_Of(info);
     switch (bind) {
@@ -325,7 +329,17 @@ ExternalizationType InlineAnalysis::Needs_Externalization(const std::string &sym
         if (Kernel) {
           return ExternalizationType::STRONG;
         }
-        return ExternalizationType::WEAK;
+
+        /* We need to be careful with the symbol table this came from.  If this
+           is from SYMTAB we can't weakly externalize it.  */
+        if (symtab == SHT_SYMTAB) {
+          return ExternalizationType::STRONG;
+        } else if (symtab == SHT_DYNSYM) {
+          return ExternalizationType::WEAK;
+        } else {
+          assert(0 && "Unreachable.");
+        }
+
         break;
       case STB_LOCAL:
         return ExternalizationType::STRONG;
@@ -455,12 +469,15 @@ void InlineAnalysis::Print_Symbol_Set(const std::set<std::string> &symbol_set,
 
     /* In case we have debuginfo, also print if symbols was completely inlined.  */
     if (have_debuginfo) {
-      unsigned char syminfo = Get_Symbol_Info(s);
+      auto syminfos = Get_Symbol_Info(s);
+      unsigned char syminfo = syminfos.first;
+      ElfSymtabType symtab = syminfos.second;
+
       unsigned type = ElfSymbol::Type_Of(syminfo);
       unsigned bind = ElfSymbol::Bind_Of(syminfo);
 
       const char *type_str = ElfSymbol::Type_As_String(type);
-      const char *bind_str = (syminfo > 0) ? Bind(bind) : "Inlined";
+      const char *bind_str = (syminfo > 0) ? Bind(bind, symtab) : "Inlined";
 
       if (csv) {
         fprintf(out,"%s;%s\n", type_str, bind_str);

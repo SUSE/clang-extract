@@ -38,6 +38,14 @@ class ElfObject;
 class ElfSection;
 class ElfSymbol;
 
+
+/** The symbol table in which this symbol was found.  */
+enum ElfSymtabType {
+  TAB_NONE = 0,
+  SYMTAB = SHT_SYMTAB,
+  DYNSYM = SHT_DYNSYM,
+};
+
 /** @brief ELF symbol.
   *
   * An ELF executable may contain multiple symbols (variables, functions, ...).
@@ -357,6 +365,10 @@ class ElfSymbolCache
     }
     return 0;
   }
+
+  /** Get symbol if available in either symtab.  Returns in which symtab this
+      symbo was found.  */
+  std::pair<unsigned char, ElfSymtabType> Get_Symbol_Info(const std::string &sym);
 
   std::string Get_Symbol_Module(const std::string &)
   {
