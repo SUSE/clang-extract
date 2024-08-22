@@ -7,5 +7,5 @@ int f(void)
   return global;
 }
 
-/* { dg-final { scan-tree-dump "static int \*klpe_global;" } } */
+/* { dg-final { scan-tree-dump "static int \*klpe_global __attribute__\(\(used\)\);" } } */
 /* { dg-final { scan-tree-dump "clang-extract: from .*location-1.h:29:1" } } */
