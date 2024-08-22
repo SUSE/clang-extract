@@ -632,6 +632,10 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
     sc
   );
 
+  if (!Ibt) {
+    ret->addAttr(UsedAttr::Create(astctx));
+  }
+
   /* return node.  */
   return ret;
 }

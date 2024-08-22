@@ -10,5 +10,5 @@ int f()
   return OPENSSL_strdup("aaa");
 }
 
-/* { dg-final { scan-tree-dump "static char \(\*klpe_CRYPTO_strdup\)\(const char \*, const char \*, int\);" } } */
+/* { dg-final { scan-tree-dump "static char \(\*klpe_CRYPTO_strdup\)\(const char \*, const char \*, int\) __attribute__\(\(used\)\);" } } */
 /* { dg-final { scan-tree-dump "\(\*klpe_CRYPTO_strdup\)\(str," } } */

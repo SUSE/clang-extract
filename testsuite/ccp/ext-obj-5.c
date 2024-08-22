@@ -12,5 +12,5 @@ void pu_f(void)
         ee_o;
 }
 
-/* { dg-final { scan-tree-dump "static char \(\*klpe_ee_o\)\[4\];" } } */
+/* { dg-final { scan-tree-dump "static char \(\*klpe_ee_o\)\[4\] __attribute__\(\(used\)\);" } } */
 /* { dg-final { scan-tree-dump "char s\[sizeof\(\(\*klpe_ee_o\)\)\], t\[sizeof\(\(\*klpe_ee_o\)\)\]\[sizeof\(\(\*klpe_ee_o\)\)\];" } } */

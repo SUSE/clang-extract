@@ -10,4 +10,4 @@ int f(void)
 }
 
 /* { dg-final { scan-tree-dump-not "DEFINE_STATIC_KEY_FALSE\(\*klpe_aaa\)" } } */
-/* { dg-final { scan-tree-dump "static struct AA \*klpe_aaa;" } } */
+/* { dg-final { scan-tree-dump "static struct AA \*klpe_aaa __attribute__\(\(used\)\);" } } */

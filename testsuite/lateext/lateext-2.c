@@ -10,5 +10,5 @@ int h(void)
 }
 
 /* { dg-final { scan-tree-dump "#define MACRO\n#include \"lateext-2.h\"\n#undef MACRO\n#include \"lateext-2.h\"" } } */
-/* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(void\);" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_f\)\(void\) __attribute__\(\(used\)\);" } } */
 /* { dg-final { scan-tree-dump "return \(\*klpe_f\)\(\) \+ g\(\);" } } */
