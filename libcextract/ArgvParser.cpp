@@ -74,7 +74,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     Ibt(false),
     AllowLateExternalization(false),
     PatchObject(""),
-    DebuginfoPath(nullptr),
+    Debuginfos(),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
     DescOutputPath(nullptr),
@@ -88,6 +88,11 @@ ArgvParser::ArgvParser(int argc, char **argv)
   }
 
   Insert_Required_Parameters();
+
+  const char *DebuginfoPath = nullptr;
+  if (Debuginfos.size() > 0) {
+    DebuginfoPath = Debuginfos[0].c_str();
+  }
 
   /* For kernel, check if the object patch is not the same as DebugInfo. If they
    * are not the same, it means that the module from PatchObject is builtin, so
@@ -252,7 +257,7 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
     return true;
   }
   if (prefix("-DCE_DEBUGINFO_PATH=", str)) {
-    DebuginfoPath = Extract_Single_Arg_C(str);
+    Debuginfos = Extract_Args(str);
 
     return true;
   }

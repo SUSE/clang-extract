@@ -58,7 +58,7 @@ class PassManager {
             PatchObject(args.Get_PatchObject()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
-            DebuginfoPath(args.Get_Debuginfo_Path()),
+            Debuginfos(args.Get_Debuginfo_Path()),
             IpaclonesPath(args.Get_Ipaclones_Path()),
             SymversPath(args.Get_Symvers_Path()),
             DscOutputPath(args.Get_Dsc_Output_Path()),
@@ -67,7 +67,7 @@ class PassManager {
                                args.Get_Include_Expansion_Policy(), Kernel)),
             NamesLog(),
             PassNum(0),
-            IA(DebuginfoPath, IpaclonesPath, SymversPath, args.Is_Kernel())
+            IA(Debuginfos, IpaclonesPath, SymversPath, args.Is_Kernel())
         {
         }
 
@@ -121,7 +121,7 @@ class PassManager {
         std::vector<const char *> &ClangArgs;
 
         /* Path to Debuginfo, if exists.  */
-        const char *DebuginfoPath;
+        std::vector<std::string> &Debuginfos;
 
         /* Path to Ipaclones, if exists.  */
         const char *IpaclonesPath;

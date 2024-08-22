@@ -22,10 +22,10 @@
 #include <cxxabi.h>
 #include <stdexcept>
 
-InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
-                              const char *symvers_path, bool is_kernel)
-  : ElfObj(nullptr),
-    ElfCache(nullptr),
+InlineAnalysis::InlineAnalysis(const std::vector<std::string> &elfs_path,
+                               const char *ipaclones_path,
+                               const char *symvers_path, bool is_kernel)
+  : ElfCache(nullptr),
     Ipa(nullptr),
     Symv(nullptr),
     Kernel(is_kernel)
@@ -33,9 +33,16 @@ InlineAnalysis::InlineAnalysis(const char *elf_path, const char *ipaclones_path,
   try {
     /* Debuginfo information is not needed for inline analysis.  But is desired
        for better precision.  That is why whe declare those objects dynamically.  */
-    if (elf_path) {
-      ElfObj = new ElfObject(elf_path);
-      ElfCache = new ElfSymbolCache(*ElfObj);
+    if (elfs_path.size() > 0) {
+      /* Only create an ElfSymbolCache if we received elfs from command line.  */
+      ElfCache = new ElfSymbolCache();
+    }
+
+    /* Initialize the SymbolCache.  */
+    for (auto it = elfs_path.begin(); it != elfs_path.end(); ++it) {
+      const std::string &path = *it;
+      ElfObject elf(path);
+      ElfCache->Analyze_ELF(elf);
     }
 
     if (ipaclones_path) {
@@ -62,8 +69,6 @@ InlineAnalysis::~InlineAnalysis(void)
 {
   if (ElfCache)
     delete ElfCache;
-  if (ElfObj)
-    delete ElfObj;
   if (Ipa)
     delete Ipa;
   if (Symv)

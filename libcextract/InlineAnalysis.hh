@@ -48,7 +48,15 @@ class InlineAnalysis
       available, and ipaclone_path can be a directory full of many ipa-clones
       generated through LTO or not. Symvers can be NULL is we are creating a
       userspace livepatch   */
-  InlineAnalysis(const char *elf_path, const char *ipaclone_path, const char *symvers_path, bool is_kernel);
+  InlineAnalysis(const std::vector<std::string> &elfs_path,
+                 const char *ipaclone_path, const char *symvers_path,
+                 bool is_kernel);
+
+  InlineAnalysis(const char *elf_path, const char *ipaclone_path,
+                 const char *symvers_path, bool is_kernel)
+    : InlineAnalysis(std::vector<std::string>({elf_path}),
+                     ipaclone_path, symvers_path, is_kernel)
+  {}
 
   ~InlineAnalysis(void);
 
@@ -93,12 +101,27 @@ class InlineAnalysis
   /** True if this class was built with debuginfo enabled.  */
   inline bool Have_Debuginfo(void)
   {
-    return ElfObj && ElfCache;
+    return ElfCache;
   }
 
   inline const std::string &Get_Debuginfo_Path(void)
   {
-    return ElfObj->Get_Path();
+    if (ElfCache) {
+      return ElfCache->Get_Debuginfo_Path();
+    }
+
+    static const std::string empty;
+    return empty;
+  }
+
+  inline const std::string &Get_Object_Path(void)
+  {
+    if (ElfCache) {
+      return ElfCache->Get_Object_Path();
+    }
+
+    static const std::string empty;
+    return empty;
   }
 
   /** Check if we have Ipa-clones information.  */
@@ -143,7 +166,6 @@ class InlineAnalysis
   /** Put color information in the graphviz .DOT file.  */
   void Print_Node_Colors(const std::set<IpaCloneNode *> &set, FILE *fp);
 
-  ElfObject *ElfObj;
   ElfSymbolCache *ElfCache;
   IpaClones *Ipa;
   Symvers *Symv;

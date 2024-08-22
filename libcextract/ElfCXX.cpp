@@ -335,19 +335,30 @@ void ElfSymbolCache::Insert_Symbols_Into_Hash(SymbolTableHash &map, ElfSection &
 }
 
 ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
-  : EO(eo)
+  : ElfSymbolCache()
+{
+  Analyze_ELF(eo);
+}
+
+void ElfSymbolCache::Analyze_ELF(ElfObject &eo)
 {
   /* Look for dynsym and symtab sections.  */
-  for (auto it = EO.section_begin(); it != EO.section_end(); ++it)
+  for (auto it = eo.section_begin(); it != eo.section_end(); ++it)
   {
     ElfSection &section = *it;
     switch (section.Get_Section_Type()) {
       case SHT_DYNSYM:
         Insert_Symbols_Into_Hash(DynsymMap, section);
+
+        assert(ObjectPath == "" && "Multiple libraries passed as debuginfo?");
+        ObjectPath = eo.Get_Path();
         break;
 
       case SHT_SYMTAB:
         Insert_Symbols_Into_Hash(SymtabMap, section);
+
+        /* We can also have symtab in the .so library.  */
+        DebuginfoPath = eo.Get_Path();
         break;
 
       case SHT_PROGBITS:

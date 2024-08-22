@@ -346,6 +346,18 @@ class ElfSymbolCache
   /** Build cache from ElfObject).  */
   ElfSymbolCache(ElfObject &eo);
 
+  /** Build empty cache to be filled later.  */
+  ElfSymbolCache(void)
+    : DynsymMap(),
+      SymtabMap(),
+      Mod(""),
+      DebuginfoPath(""),
+      ObjectPath("")
+  {};
+
+  /** Analyze ELF object.  */
+  void Analyze_ELF(ElfObject &eo);
+
   /* Get symbol if available in the Dynsym table.  Or 0 if not available.  */
   inline unsigned char Get_Symbol_Info_Dynsym(const std::string &sym)
   {
@@ -377,6 +389,16 @@ class ElfSymbolCache
 
   std::vector<std::string> Get_All_Symbols(void);
 
+  inline const std::string &Get_Debuginfo_Path(void) const
+  {
+    return DebuginfoPath;
+  }
+
+  inline const std::string &Get_Object_Path(void) const
+  {
+    return ObjectPath;
+  }
+
   /** Dump for debugging reasons.  */
   void Dump_Cache(void);
 
@@ -394,6 +416,9 @@ class ElfSymbolCache
   /** Kernel module name, if .modinfo section is present. */
   std::string Mod;
 
-  /** Reference to the ElfObject used to build this object.  */
-  ElfObject &EO;
+  /** Path to the debuginfo object (contains .symtab section).  */
+  std::string DebuginfoPath;
+
+  /** Path to the .so file object (contains .dynsym section).  */
+  std::string ObjectPath;
 };

@@ -94,9 +94,9 @@ class ArgvParser
       return PatchObject;
   }
 
-  inline const char *Get_Debuginfo_Path(void)
+  inline std::vector<std::string> &Get_Debuginfo_Path(void)
   {
-    return DebuginfoPath;
+    return Debuginfos;
   }
 
   inline const char *Get_Ipaclones_Path(void)
@@ -163,7 +163,8 @@ class ArgvParser
   bool AllowLateExternalization;
   std::string PatchObject;
 
-  const char *DebuginfoPath;
+  std::vector<std::string> Debuginfos;
+
   const char *IpaclonesPath;
   const char *SymversPath;
 
