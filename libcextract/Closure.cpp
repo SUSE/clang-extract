@@ -91,8 +91,8 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
   if ((CALL_EXPR) == VISITOR_STOP)           \
     return VISITOR_STOP
 
-#define DO_NOT_RUN_IF_ALREADY_ANALYZED(decl) \
-  if (Already_Analyzed(decl) == true)        \
+#define DO_NOT_RUN_IF_ALREADY_ANALYZED(decl)    \
+  if (!decl || Already_Analyzed(decl) == true)  \
     return VISITOR_CONTINUE
 
 bool DeclClosureVisitor::TraverseDecl(Decl *decl)
@@ -472,6 +472,14 @@ bool DeclClosureVisitor::VisitTypedefType(const TypedefType *type)
 bool DeclClosureVisitor::VisitTemplateSpecializationType(
                     const TemplateSpecializationType *type)
 {
+  const TemplateName &name = type->getTemplateName();
+
+  if (TemplateDecl *decl = name.getAsTemplateDecl()) {
+    TRY_TO(TraverseDecl(decl));
+  } else if (UsingShadowDecl *decl = name.getAsUsingShadowDecl()) {
+    TRY_TO(TraverseDecl(decl));
+  }
+
   /* For some reason the Traverse do not run on the original template
      C++ Record, only on its specializations.  Hence do it here.  */
   return TraverseDecl(type->getAsCXXRecordDecl());
