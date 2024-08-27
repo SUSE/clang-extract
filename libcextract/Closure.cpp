@@ -38,6 +38,18 @@ bool ClosureSet::Add_Decl_And_Prevs(Decl *decl)
   return inserted;
 }
 
+/** Add a single decl to the set.  */
+bool ClosureSet::Add_Single_Decl(Decl *decl)
+{
+  /* Do not insert builtin decls.  */
+  if (Is_Builtin_Decl(decl)) {
+    return false;
+  }
+
+  Dependencies.insert(decl);
+  return true;
+}
+
 void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::string> &names,
                                           std::unordered_set<std::string> *matched_names)
 {
@@ -61,7 +73,7 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
       continue;
     }
 
-    const std::string &decl_name = decl->getName().str();
+    const std::string &decl_name = decl->getNameAsString();
     /* If the symbol name is in the set...   */
     if (setof_names.find(decl_name) != setof_names.end()) {
       /* Mark that name as matched.  */
@@ -292,7 +304,7 @@ bool DeclClosureVisitor::VisitEnumConstantDecl(EnumConstantDecl *decl)
 bool DeclClosureVisitor::VisitTypedefNameDecl(TypedefNameDecl *decl)
 {
   // FIXME: Do we need to analyze the previous decls?
-  TRY_TO(TraverseType(decl->getUnderlyingType()));
+  TRY_TO(TraverseTypeLoc(decl->getTypeSourceInfo()->getTypeLoc()));
   Closure.Add_Single_Decl(decl);
 
   TRY_TO(AnalyzeDeclsWithSameBeginlocHelper(decl));
@@ -470,6 +482,19 @@ bool DeclClosureVisitor::VisitDeducedTemplateSpecializationType(
 {
   TemplateName template_name = type->getTemplateName();
   return TraverseDecl(template_name.getAsTemplateDecl());
+}
+
+bool DeclClosureVisitor::VisitUsingType(const UsingType *type)
+{
+  UsingShadowDecl *decl = type->getFoundDecl();
+
+  // FIXME: Do we need a custom UsingShadowDeclVisitor?
+  TRY_TO(TraverseDecl(decl));
+
+  // Analyze underlying type.
+  TRY_TO(TraverseType(type->getUnderlyingType()));
+
+  return VISITOR_CONTINUE;
 }
 
 /* ----------- Other C++ stuff ----------- */

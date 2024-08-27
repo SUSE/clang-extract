@@ -37,16 +37,7 @@ class ClosureSet
   bool Add_Decl_And_Prevs(Decl *decl);
 
   /** Add a single decl to the set.  */
-  bool Add_Single_Decl(Decl *decl)
-  {
-    /* Do not insert builtin decls.  */
-    if (Is_Builtin_Decl(decl)) {
-      return false;
-    }
-
-    Dependencies.insert(decl);
-    return true;
-  }
+  bool Add_Single_Decl(Decl *decl);
 
   inline std::unordered_set<Decl *> &Get_Set(void)
   {
@@ -235,6 +226,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitDeducedTemplateSpecializationType(
       const DeducedTemplateSpecializationType *type);
+
+  bool VisitUsingType(const UsingType *type);
 
   /* ----------- Other C++ stuff ----------- */
   bool TraverseNestedNameSpecifier(NestedNameSpecifier *nns);
