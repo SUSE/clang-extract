@@ -1,4 +1,4 @@
-/* { dg-compile "-fdump-ipa-clones -O3 -g3 -shared"} */
+/* { dg-compile "-fdump-ipa-clones -O3 -g3 -shared -Wno-implicit-int"} */
 /* { dg-options "-where-is-inlined g"} */
 
 static inline int g(void)
@@ -6,7 +6,7 @@ static inline int g(void)
   return 42;
 }
 
-static __attribute__((noinline)) h(void)
+static __attribute__((noipa)) h(void)
 {
   return g();
 }
