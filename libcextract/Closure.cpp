@@ -634,8 +634,18 @@ bool DeclClosureVisitor::VisitUsingType(const UsingType *type)
   // FIXME: Do we need a custom UsingShadowDeclVisitor?
   TRY_TO(TraverseDecl(decl));
 
+  // Traverse the original decl that introduced the UsingDecl.
+  TRY_TO(TraverseDecl(decl->getIntroducer()));
+
   // Analyze underlying type.
   TRY_TO(TraverseType(type->getUnderlyingType()));
+
+  return VISITOR_CONTINUE;
+}
+
+bool DeclClosureVisitor::VisitBaseUsingDecl(BaseUsingDecl *decl)
+{
+  Closure.Add_Single_Decl(decl);
 
   return VISITOR_CONTINUE;
 }
