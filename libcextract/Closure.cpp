@@ -316,6 +316,12 @@ bool DeclClosureVisitor::VisitTypedefNameDecl(TypedefNameDecl *decl)
 
 bool DeclClosureVisitor::VisitVarDecl(VarDecl *decl)
 {
+  /* Avoid running this visitor if this decl is actually a result of a
+     template, that means, do not add it into the Closure.  */
+  if (isa<VarTemplateSpecializationDecl>(decl)) {
+    return VISITOR_CONTINUE;
+  }
+
   /* Avoid adding variables that are not global.  */
   // FIXME: Do we need to analyze every previous decl?
   if (decl->hasGlobalStorage()) {
@@ -420,6 +426,20 @@ bool DeclClosureVisitor::VisitClassTemplateSpecializationDecl(
   TRY_TO(VisitClassTemplateDecl(decl->getSpecializedTemplate()));
 
   Closure.Add_Decl_And_Prevs(decl);
+
+  return VISITOR_CONTINUE;
+}
+
+bool DeclClosureVisitor::VisitVarTemplateDecl(VarTemplateDecl *decl)
+{
+  Closure.Add_Single_Decl(decl);
+
+  return VISITOR_CONTINUE;
+}
+
+bool DeclClosureVisitor::VisitVarTemplateSpecializationDecl(VarTemplateSpecializationDecl *decl)
+{
+  TRY_TO(TraverseDecl(decl->getSpecializedTemplate()));
 
   return VISITOR_CONTINUE;
 }

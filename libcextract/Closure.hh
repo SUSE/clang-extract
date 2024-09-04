@@ -203,6 +203,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl *decl);
 
+  bool VisitVarTemplateDecl(VarTemplateDecl *decl);
+
+  bool VisitVarTemplateSpecializationDecl(VarTemplateSpecializationDecl *decl);
+
   /* ----------- Statements -------------- */
 
   bool VisitDeclRefExpr(DeclRefExpr *expr);
