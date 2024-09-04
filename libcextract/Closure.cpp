@@ -15,6 +15,8 @@
 
 #include "Closure.hh"
 
+#include "clang/AST/TemplateName.h"
+
 /** Add a decl to the Dependencies set and all its previous declarations in the
     AST. A function can have multiple definitions but its body may only be
     defined later.  */
@@ -359,6 +361,42 @@ bool DeclClosureVisitor::VisitCXXRecordDecl(CXXRecordDecl *decl)
 
 bool DeclClosureVisitor::VisitClassTemplateDecl(ClassTemplateDecl *decl)
 {
+  // FIXME: Not all specializations may be necessary, but there seems to be no
+  // straightfoward way of solvings expressions such as
+  // "__make_unsigned_selector<_Tp>::__type", which may point to a Decl defined
+  // in some of its specializations.  Furthermore, there seems to not be a way
+  // to know partial specializations, for example:
+  //
+  //template<typename _Unqualified, bool _IsConst, bool _IsVol>
+  //  struct __cv_selector;
+  //
+  //template<typename _Unqualified>
+  //  struct __cv_selector<_Unqualified, false, false>
+  //  { typedef _Unqualified __type; };
+  //
+  //template<typename _Qualified, typename _Unqualified,
+  //  bool _IsConst = false,
+  //  bool _IsVol = false>
+  //  class __match_cv_qualifiers
+  //  {
+  //    typedef __cv_selector<_Unqualified, _IsConst, _IsVol> __match;
+  //
+  //  public:
+  //    typedef typename __match::__type __type;
+  //  };
+  //
+  // Here there is no way to know that __match_cv_qualifiers<char, false, false>
+  // actually points to the second declaration, not the first one.  Hence we
+  // add every partial template specification to the closure until we find a
+  // better way of finding such things.
+
+  for (ClassTemplateSpecializationDecl *spec : decl->specializations()) {
+    if (auto specialized = spec->getSpecializedTemplateOrPartial();
+        auto class_p = dyn_cast<ClassTemplatePartialSpecializationDecl*>(specialized)) {
+      TRY_TO(TraverseDecl(class_p));
+    }
+  }
+
   Closure.Add_Decl_And_Prevs(decl);
 
   return VISITOR_CONTINUE;
@@ -379,7 +417,11 @@ bool DeclClosureVisitor::VisitClassTemplateSpecializationDecl(
   TRY_TO(TraverseTemplateArguments(decl->getTemplateArgs().asArray()));
 
   /* This call will add the V to the closure.  */
-  return VisitClassTemplateDecl(decl->getSpecializedTemplate());
+  TRY_TO(VisitClassTemplateDecl(decl->getSpecializedTemplate()));
+
+  Closure.Add_Decl_And_Prevs(decl);
+
+  return VISITOR_CONTINUE;
 }
 
 /* ----------- Statements -------------- */
@@ -475,7 +517,9 @@ bool DeclClosureVisitor::VisitTemplateSpecializationType(
   const TemplateName &name = type->getTemplateName();
 
   if (TemplateDecl *decl = name.getAsTemplateDecl()) {
-    TRY_TO(TraverseDecl(decl));
+    /* We must be sure that we got the most recent decl, otherwise we may fail
+       to catch every redeclaration of this template.  */
+    TRY_TO(TraverseDecl(decl->getMostRecentDecl()));
   } else if (UsingShadowDecl *decl = name.getAsUsingShadowDecl()) {
     TRY_TO(TraverseDecl(decl));
   }
@@ -483,6 +527,77 @@ bool DeclClosureVisitor::VisitTemplateSpecializationType(
   /* For some reason the Traverse do not run on the original template
      C++ Record, only on its specializations.  Hence do it here.  */
   return TraverseDecl(type->getAsCXXRecordDecl());
+}
+
+bool DeclClosureVisitor::VisitDependentNameType(const DependentNameType *type)
+{
+  /* Attempt to find a template specialization which matches the type we want.
+     For example, in:
+
+  template<typename _Tp>
+    struct make_unsigned
+    { typedef typename __make_unsigned_selector<_Tp>::__type type; };
+
+  this typedef will fail to find the correct typedef declaration:
+
+  template<typename _Tp,
+    bool _IsInt = is_integral<_Tp>::value,
+    bool _IsEnum = is_enum<_Tp>::value>
+    class __make_unsigned_selector;
+
+  template<typename _Tp>
+    class __make_unsigned_selector<_Tp, true, false>
+    {
+      using __unsigned_type
+ = typename __make_unsigned<__remove_cv_t<_Tp>>::__type;
+
+    public:
+      using __type
+ = typename __match_cv_qualifiers<_Tp, __unsigned_type>::__type;
+    };
+
+  The second one is correct, not the first.  What we do here is to look for
+  the identifier in the set of template specifiers and check if there is a
+  match.  If there is then we add it to the closure.
+
+  */
+
+  NestedNameSpecifier *nns = type->getQualifier();
+  const IdentifierInfo *info = type->getIdentifier();
+
+  const clang::Type *ntype = nns->getAsType();
+
+  if (ntype == nullptr)
+    return VISITOR_CONTINUE;
+
+  const TemplateSpecializationType *template_type =
+      dyn_cast<TemplateSpecializationType>(ntype);
+
+  if (template_type == nullptr)
+    return VISITOR_CONTINUE;
+
+  TemplateDecl *decl = template_type->getTemplateName().getAsTemplateDecl();
+  ClassTemplateDecl *cdecl = dyn_cast<ClassTemplateDecl>(decl);
+
+  if (cdecl == nullptr)
+    return VISITOR_CONTINUE;
+
+  for (ClassTemplateSpecializationDecl *spec : cdecl->specializations()) {
+    if (auto specialized = spec->getSpecializedTemplateOrPartial();
+        auto class_p = dyn_cast<ClassTemplatePartialSpecializationDecl*>(specialized)) {
+
+      DeclContextLookupResult match = class_p->lookup(DeclarationName(info));
+      for (Decl *d : match) {
+        TRY_TO(TraverseDecl(d));
+      }
+
+      if (!match.empty()) {
+        TRY_TO(TraverseDecl(class_p));
+      }
+    }
+  }
+
+  return VISITOR_CONTINUE;
 }
 
 bool DeclClosureVisitor::VisitDeducedTemplateSpecializationType(

@@ -227,6 +227,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   bool VisitDeducedTemplateSpecializationType(
       const DeducedTemplateSpecializationType *type);
 
+  bool VisitDependentNameType(const DependentNameType *type);
+
   bool VisitUsingType(const UsingType *type);
 
   /* ----------- Other C++ stuff ----------- */
