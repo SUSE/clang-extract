@@ -36,7 +36,7 @@
 
 /* Tokenize away the function-like macro stuff or expression, we only want
    the identifier.  */
-#define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|\r\n\t"
+#define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|!\r\n\t"
 
 /* Return the ranges for all identifiers on the ids vector */
 template <typename T>
