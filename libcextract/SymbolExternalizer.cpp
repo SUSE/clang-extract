@@ -91,6 +91,29 @@ using namespace llvm;
 /* IntervalTree.  */
 using namespace Intervals;
 
+static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
+{
+  const SourceManager &sm = ast->getSourceManager();
+
+  /* Get a more precise source range of declaration.  */
+  SourceLocation start = range.getBegin();
+
+  /* Some declarations start with macro expansion, which the Rewriter
+     class simple rejects.  Get one which it will accept.  */
+  if (!start.isFileID()) {
+    start = sm.getExpansionLoc(start);
+  }
+
+  SourceLocation end = Lexer::getLocForEndOfToken(
+      range.getEnd(),
+      0,
+      sm,
+      ast->getLangOpts());
+
+  SourceRange new_range(start, end);
+  return new_range;
+}
+
 class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
 {
   public:
@@ -157,8 +180,9 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
       }
     } else if (type == ExternalizationType::RENAME) {
       /* Get SourceRange where the function identifier is.  */
-      auto ids = Get_Range_Of_Identifier(decl->getSourceRange(),
-                                                     decl->getName());
+      SourceRange range = Get_Range_For_Rewriter(SE.AST, decl->getSourceRange());
+
+      auto ids = Get_Range_Of_Identifier(range, decl->getName());
       assert(ids.size() > 0 && "Decl name do not match required identifier?");
 
       SourceRange id_range = ids[0].second;
@@ -241,33 +265,12 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
   SymbolExternalizer &SE;
 };
 
-static SourceRange Get_Range_For_Rewriter(const ASTUnit *ast, const SourceRange &range)
-{
-  const SourceManager &sm = ast->getSourceManager();
-
-  /* Get a more precise source range of declaration.  */
-  SourceLocation start = range.getBegin();
-
-  /* Some declarations start with macro expansion, which the Rewriter
-     class simple rejects.  Get one which it will accept.  */
-  if (!start.isFileID()) {
-    start = sm.getExpansionLoc(start);
-  }
-
-  SourceLocation end = Lexer::getLocForEndOfToken(
-      range.getEnd(),
-      0,
-      sm,
-      ast->getLangOpts());
-
-  SourceRange new_range(start, end);
-  return new_range;
-}
-
 bool SymbolExternalizer::Drop_Static(FunctionDecl *decl)
 {
   if (decl->isStatic()) {
-    auto ids = Get_Range_Of_Identifier(decl->getSourceRange(), StringRef("static"));
+    SourceRange range = Get_Range_For_Rewriter(AST, decl->getSourceRange());
+
+    auto ids = Get_Range_Of_Identifier(range, StringRef("static"));
     assert(ids.size() > 0 && "static decl without static keyword?");
 
     SourceRange static_range = ids[0].second;
@@ -286,7 +289,9 @@ template <typename DECL>
 bool SymbolExternalizer::Drop_Static_Add_Extern(DECL *decl)
 {
   if (decl->getStorageClass() == StorageClass::SC_Static) {
-    auto ids = Get_Range_Of_Identifier(decl->getSourceRange(), StringRef("static"));
+    SourceRange range = Get_Range_For_Rewriter(AST, decl->getSourceRange());
+
+    auto ids = Get_Range_Of_Identifier(range, StringRef("static"));
     assert(ids.size() > 0 && "static decl without static keyword?");
 
     SourceRange static_range = ids[0].second;
