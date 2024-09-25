@@ -309,47 +309,6 @@ void PrettyPrint::Debug_SourceLoc(const SourceLocation &loc)
   loc.dump(AST->getSourceManager());
 }
 
-bool PrettyPrint::Contains_From_LineCol(const SourceRange &a, const SourceRange &b)
-{
-  SourceManager &SM = AST->getSourceManager();
-  PresumedLoc a_begin = SM.getPresumedLoc(a.getBegin());
-  PresumedLoc a_end   = SM.getPresumedLoc(a.getEnd());
-  PresumedLoc b_begin = SM.getPresumedLoc(b.getBegin());
-  PresumedLoc b_end   = SM.getPresumedLoc(b.getEnd());
-
-  assert(a_begin.getFileID() == a_end.getFileID());
-  assert(b_begin.getFileID() == b_end.getFileID());
-
-  if (a_begin.getFileID() != b_begin.getFileID()) {
-    /* Files are distinct, thus we can't easily determine which comes first.  */
-    return false;
-  }
-
-  bool a_begin_smaller = false;
-  bool b_end_smaller = false;
-
-  if ((a_begin.getLine() < b_begin.getLine()) ||
-      (a_begin.getLine() == b_begin.getLine() && a_begin.getColumn() <= b_begin.getColumn())) {
-    a_begin_smaller = true;
-  }
-
-  if ((b_end.getLine() < a_end.getLine()) ||
-      (b_end.getLine() == a_end.getLine() && b_end.getColumn() <= a_end.getColumn())) {
-    b_end_smaller = true;
-  }
-
-  return a_begin_smaller && b_end_smaller;
-}
-
-bool PrettyPrint::Contains(const SourceRange &a, const SourceRange &b)
-{
-  if (a.fullyContains(b)) {
-    return true;
-  }
-
-  return Contains_From_LineCol(a, b);
-}
-
 /** Compare if SourceLocation a is after SourceLocation b in the source code.  */
 bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
 {

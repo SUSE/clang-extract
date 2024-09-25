@@ -315,3 +315,14 @@ bool Is_Decl_Equivalent_To(Decl *a, Decl *b)
 
   return a_str == b_str;
 }
+
+bool Range_Fully_Contains_Range(ASTUnit *ast, const SourceRange &a,
+                                const SourceRange &b)
+{
+  SourceManager &SM = ast->getSourceManager();
+
+  SourceRange a_exp(SM.getExpansionLoc(a.getBegin()), SM.getExpansionLoc(a.getEnd()));
+  SourceRange b_exp(SM.getExpansionLoc(b.getBegin()), SM.getExpansionLoc(b.getEnd()));
+
+  return a_exp.fullyContains(b_exp);
+}

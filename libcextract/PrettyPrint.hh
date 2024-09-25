@@ -78,10 +78,6 @@ class PrettyPrint
 
   static void Debug_SourceLoc(const SourceLocation &loc);
 
-  static bool Contains_From_LineCol(const SourceRange &a, const SourceRange &b);
-
-  static bool Contains(const SourceRange &a, const SourceRange &b);
-
   static inline void Set_AST(ASTUnit *ast)
   {
     AST = ast;
