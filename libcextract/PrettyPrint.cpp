@@ -578,6 +578,55 @@ void RecursivePrint::Print_Preprocessed(PreprocessedEntity *prep)
   }
 }
 
+void RecursivePrint::Print_NamespaceDecl(NamespaceDecl *namespacedecl)
+{
+  if (namespacedecl->isInline()) {
+     (*PrettyPrint::Out)  << "inline ";
+  }
+
+  (*PrettyPrint::Out) << "namespace " << namespacedecl->getName() << " {\n  ";
+
+  /* Iterate on each macro.  */
+  for (auto child : namespacedecl->decls()) {
+    Print_Decl(child);
+  }
+  (*PrettyPrint::Out) << "}\n";
+}
+
+void RecursivePrint::Print_LinkageSpecDecl(LinkageSpecDecl *decl)
+{
+  /* In case this decl doesn't have braces, then it is safe to print it as any
+     other ordinary decl.  */
+  if (!decl->hasBraces()) {
+    Print_OrdinaryDecl(decl);
+    return;
+  }
+
+  /* Now we only print the marked decls in this DeclContext.  */
+  (*PrettyPrint::Out) << "extern \"C\" {\n";
+  for (Decl *child : decl->decls()) {
+    Print_Decl(child);
+  }
+  (*PrettyPrint::Out) << "};\n";
+}
+
+void RecursivePrint::Print_OrdinaryDecl(Decl *decl)
+{
+  SourceManager &sm = AST->getSourceManager();
+  ASTContext &ctx = AST->getASTContext();
+  RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
+  if (decl->getBeginLoc().isValid()) {
+    if (!Have_Location_Comment(sm, comment)) {
+      std::string comment = Build_CE_Location_Comment(sm, decl->getBeginLoc());
+      PrettyPrint::Print_Raw(comment);
+    } else {
+      /* Just output what it had.  */
+      PrettyPrint::Print_RawComment(sm, comment);
+    }
+  }
+  PrettyPrint::Print_Decl(decl);
+}
+
 void RecursivePrint::Print_Decl(Decl *decl)
 {
   if (!Is_Decl_Marked(decl)) {
@@ -588,32 +637,11 @@ void RecursivePrint::Print_Decl(Decl *decl)
      that can be unused in the program.  Hence we need to handle it
      carefully to remove what we don't need.  */
   if (NamespaceDecl *namespacedecl = dyn_cast<NamespaceDecl>(decl)) {
-    if (namespacedecl->isInline()) {
-       (*PrettyPrint::Out)  << "inline ";
-    }
-
-    (*PrettyPrint::Out) <<"namespace " << namespacedecl->getName() << " {\n  ";
-
-    /* Iterate on each macro.  */
-    for (auto child : namespacedecl->decls()) {
-      Print_Decl(child);
-    }
-    (*PrettyPrint::Out) << "}\n";
+    Print_NamespaceDecl(namespacedecl);
+  } else if (LinkageSpecDecl *linkage = dyn_cast<LinkageSpecDecl>(decl)) {
+    Print_LinkageSpecDecl(linkage);
   } else {
-
-    SourceManager &sm = AST->getSourceManager();
-    ASTContext &ctx = AST->getASTContext();
-    RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
-    if (decl->getBeginLoc().isValid()) {
-      if (!Have_Location_Comment(sm, comment)) {
-        std::string comment = Build_CE_Location_Comment(sm, decl->getBeginLoc());
-        PrettyPrint::Print_Raw(comment);
-      } else {
-        /* Just output what it had.  */
-        PrettyPrint::Print_RawComment(sm, comment);
-      }
-    }
-    PrettyPrint::Print_Decl(decl);
+    Print_OrdinaryDecl(decl);
   }
 }
 

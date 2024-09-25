@@ -212,6 +212,13 @@ bool DeclClosureVisitor::VisitDeclaratorDecl(DeclaratorDecl *decl)
      comming from comma-separated.  */
   TRY_TO(AnalyzeDeclsWithSameBeginlocHelper(decl));
 
+  /* Look for the LinkageSpecDecl in order to catch constructions such as:
+   *  extern "C" memcpy(void *, void *, unsigned long n);
+   */
+  if (LinkageSpecDecl *link = dyn_cast<LinkageSpecDecl>(decl->getLexicalDeclContext())) {
+    Closure.Add_Single_Decl(link);
+  }
+
   return VISITOR_CONTINUE;
 }
 

@@ -202,6 +202,20 @@ class RecursivePrint
   /** Print a Macro Undef into ostream `Out`.  */
   void Print_Macro_Undef(MacroDirective *directive);
 
+  /** Helper methods.  */
+  /* Handle linkagespecs, such as:
+      extern "C {};  */
+  void Print_LinkageSpecDecl(LinkageSpecDecl *decl);
+
+  /* Print any decl that does not need fancy handling.  */
+  void Print_OrdinaryDecl(Decl *decl);
+
+
+  /* Handle namespaces.  Namespace declaration can contain many functions
+     that can be unused in the program.  Hence we need to handle it
+     carefully to remove what we don't need.  */
+  void Print_NamespaceDecl(NamespaceDecl *);
+
   protected:
 
   /** Remove decls and macros that are already covered by includes that are
