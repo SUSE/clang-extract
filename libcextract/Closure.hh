@@ -37,16 +37,7 @@ class ClosureSet
   bool Add_Decl_And_Prevs(Decl *decl);
 
   /** Add a single decl to the set.  */
-  bool Add_Single_Decl(Decl *decl)
-  {
-    /* Do not insert builtin decls.  */
-    if (Is_Builtin_Decl(decl)) {
-      return false;
-    }
-
-    Dependencies.insert(decl);
-    return true;
-  }
+  bool Add_Single_Decl(Decl *decl);
 
   inline std::unordered_set<Decl *> &Get_Set(void)
   {
@@ -198,6 +189,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitVarDecl(VarDecl *decl);
 
+  bool VisitNamedDecl(NamedDecl *decl);
+
   /* --------- C++ Declarations ---------- */
 
   bool VisitFunctionTemplateDecl(FunctionTemplateDecl *decl);
@@ -211,6 +204,12 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   bool VisitClassTemplateDecl(ClassTemplateDecl *decl);
 
   bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl *decl);
+
+  bool VisitVarTemplateDecl(VarTemplateDecl *decl);
+
+  bool VisitVarTemplateSpecializationDecl(VarTemplateSpecializationDecl *decl);
+
+  bool VisitBaseUsingDecl(BaseUsingDecl *decl);
 
   /* ----------- Statements -------------- */
 
@@ -235,6 +234,10 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitDeducedTemplateSpecializationType(
       const DeducedTemplateSpecializationType *type);
+
+  bool VisitDependentNameType(const DependentNameType *type);
+
+  bool VisitUsingType(const UsingType *type);
 
   /* ----------- Other C++ stuff ----------- */
   bool TraverseNestedNameSpecifier(NestedNameSpecifier *nns);
