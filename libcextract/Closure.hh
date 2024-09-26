@@ -189,6 +189,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 
   bool VisitVarDecl(VarDecl *decl);
 
+  bool VisitNamedDecl(NamedDecl *decl);
+
   /* --------- C++ Declarations ---------- */
 
   bool VisitFunctionTemplateDecl(FunctionTemplateDecl *decl);

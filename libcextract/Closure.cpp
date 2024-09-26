@@ -212,13 +212,6 @@ bool DeclClosureVisitor::VisitDeclaratorDecl(DeclaratorDecl *decl)
      comming from comma-separated.  */
   TRY_TO(AnalyzeDeclsWithSameBeginlocHelper(decl));
 
-  /* Look for the LinkageSpecDecl in order to catch constructions such as:
-   *  extern "C" memcpy(void *, void *, unsigned long n);
-   */
-  if (LinkageSpecDecl *link = dyn_cast<LinkageSpecDecl>(decl->getLexicalDeclContext())) {
-    Closure.Add_Single_Decl(link);
-  }
-
   return VISITOR_CONTINUE;
 }
 
@@ -333,6 +326,22 @@ bool DeclClosureVisitor::VisitVarDecl(VarDecl *decl)
   // FIXME: Do we need to analyze every previous decl?
   if (decl->hasGlobalStorage()) {
     Closure.Add_Single_Decl(decl);
+  }
+
+  return VISITOR_CONTINUE;
+}
+
+bool DeclClosureVisitor::VisitNamedDecl(NamedDecl *decl)
+{
+  /* Make sure we recusively add the parent decls in order to output this
+     decl we marked as visited.  For example where we need this see
+     c++-linkage-4.cpp, where the definition of align_val_t is inside a
+     LinkageDecl inside a NamespaceDecl.  */
+  DeclContext *ctx = decl->getLexicalDeclContext();
+  while (ctx) {
+    Decl *d = cast<Decl>(ctx);
+    Closure.Add_Single_Decl(d);
+    ctx = ctx->getParent();
   }
 
   return VISITOR_CONTINUE;
