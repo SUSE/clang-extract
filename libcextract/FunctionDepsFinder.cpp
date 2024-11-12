@@ -122,7 +122,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
               PrettyPrint::Get_Source_Text(type_range) != "") {
 
             /* Using .fullyContains() fails in some declarations.  */
-            if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+            if (Range_Fully_Contains_Range(AST, range, type_range)) {
               closure.Remove_Decl(typedecl);
             }
           }
@@ -195,7 +195,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         SourceRange type_range = typedecl->getSourceRange();
 
         /* Using .fullyContains() fails in some declarations.  */
-        if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+        if (Range_Fully_Contains_Range(AST, range, type_range)) {
           closure.Remove_Decl(typedecl);
         }
       }
@@ -266,8 +266,8 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
        */
       if (PrettyPrint::Get_Source_Text(decl->getSourceRange()) != "" &&
           PrettyPrint::Get_Source_Text(prev->getSourceRange()) != "" &&
-          PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
-                                              prev->getSourceRange())) {
+          Range_Fully_Contains_Range(AST, decl->getSourceRange(),
+                                          prev->getSourceRange())) {
         /*
          * If the prev and the current decl have the same start LoC, but
          * different ending, remove the prev from the closure and set the
