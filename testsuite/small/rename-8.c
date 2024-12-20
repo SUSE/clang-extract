@@ -10,6 +10,6 @@ int f()
   return A + B ;
 }
 
-/* { dg-final { scan-tree-dump "static int \*klpe_bbb __attribute__\(\(used\)\);" } } */
+/* { dg-final { scan-tree-dump "static int \*klpe_bbb __attribute__\(\(used\)\);|__attribute__\(\(used\)\) static int \*klpe_bbb;" } } */
 /* { dg-final { scan-tree-dump "#define A \(\*klpe_bbb\)" } } */
 /* { dg-final { scan-tree-dump "#define B \(\*klpe_bbb\)" } } */

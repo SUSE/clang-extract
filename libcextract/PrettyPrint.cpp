@@ -125,7 +125,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
     /* If for some reason Get_Source_Text is unable to find the source range
        which comes this declaration because it is very complex, then fall back
        to AST dump.  */
-    if (decl_source.equals("")) {
+    if (decl_source == "") {
       /* TODO: warn user that we had to fallback to AST dump.  */
 
       if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {

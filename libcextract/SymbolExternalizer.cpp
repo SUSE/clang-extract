@@ -403,7 +403,12 @@ bool TextModifications::Insert_Into_FileEntryMap(const SourceLocation &loc)
   FileID begin_id = SM.getFileID(loc);
 
   /* Insert into the list of FileIDs.  */
-  const FileEntry *fentry = SM.getFileEntryForID(begin_id);
+  OptionalFileEntryRef fentry_ref = SM.getFileEntryRefForID(begin_id);
+  const FileEntry *fentry = nullptr;
+
+  if (fentry_ref.has_value()) {
+    fentry = &fentry_ref->getFileEntry();
+  }
 
   /* There are some cases where the fentry is known to return NULL.  Check if
      those are the cases we already acknownledged.  */
@@ -424,7 +429,7 @@ bool TextModifications::Insert_Into_FileEntryMap(const SourceLocation &loc)
   /* Insert the FileEntry if we don't have one.  */
   if (FileEntryMap.find(fentry) == FileEntryMap.end()) {
     /* Insert it.  */
-    FileEntryMap[fentry] = begin_id;
+    FileEntryMap[fentry] = std::pair(begin_id, fentry_ref->getName());
     return true;
   }
 
@@ -490,7 +495,7 @@ void TextModifications::Dump(unsigned num, const Delta &a)
     /*
     const FileEntry *fentry = it->first;
     */
-    FileID id = it->second;
+    FileID id = it->second.first;
 
     /* Our updated file buffer.  */
     const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
@@ -676,8 +681,8 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
        because it may translate to the FileID that do not contain any changed
        buffer.  Hence we do our own thing here, which is look at our own
        FileEntry => FileID that we are sure to have modifications.  */
-    const FileEntry *fentry = it->first;
-    FileID id = it->second;
+    FileID id = it->second.first;
+    StringRef filename = it->second.second;
 
     const RewriteBuffer *rewritebuf = RW.getRewriteBufferFor(id);
 
@@ -690,15 +695,14 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
          it to the SourceManager.  */
       std::string modified_str = std::string(rewritebuf->begin(), rewritebuf->end());
 
-      if (new_mfs->addFile(fentry->getName(),
+      if (new_mfs->addFile(filename,
                        0, MemoryBuffer::getMemBufferCopy(modified_str)) == false) {
-        llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
+        llvm::outs() << "Unable to add " << filename << " into InMemoryFS.\n";
       }
 
       /* In case this is not the main file, we need to mark it for expansion.  */
       if (id != sm.getMainFileID()) {
-        StringRef file_name = fentry->getName();
-        includes_to_expand.push_back(file_name.str());
+        includes_to_expand.push_back(filename.str());
       } else {
         main_file_inserted = true;
       }
@@ -710,12 +714,14 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
   /* Make sure we inserted the main file.  */
   if (main_file_inserted == false) {
       FileID id = sm.getMainFileID();
-      const FileEntry *fentry = sm.getFileEntryForID(id);
+      OptionalFileEntryRef fentry_ref = sm.getFileEntryRefForID(id);
+      StringRef filename = fentry_ref->getName();
+
       const std::string &main_file_content = Get_Modifications_To_Main_File();
-      if (new_mfs->addFile(fentry->getName(),
+      if (new_mfs->addFile(filename,
                        0,
                        MemoryBuffer::getMemBufferCopy(main_file_content)) == false) {
-        llvm::outs() << "Unable to add " << fentry->getName() << " into InMemoryFS.\n";
+        llvm::outs() << "Unable to add " << filename << " into InMemoryFS.\n";
       }
   }
 

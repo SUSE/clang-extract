@@ -7,5 +7,5 @@ int g(void)
   return f();
 }
 
-/* { dg-final { scan-tree-dump "static int \(\*\*klpe_f\)\(void\) __attribute__\(\(used\)\);" } } */
+/* { dg-final { scan-tree-dump "static int \(\*\*klpe_f\)\(void\) __attribute__\(\(used\)\);|__attribute__\(\(used\)\) static int \(\*\*klpe_f\)\(void\);" } } */
 /* { dg-final { scan-tree-dump "int g\(void\)\n{\n *return \(\*klpe_f\)\(\)" } } */

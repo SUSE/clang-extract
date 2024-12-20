@@ -225,7 +225,10 @@ class TextModifications
   void Commit(void);
 
   /* Get FileEntry map.  */
-  inline const std::unordered_map<const FileEntry *, FileID> &Get_FileEntry_Map(void)
+  typedef std::unordered_map<const FileEntry *, std::pair<FileID, StringRef>>
+    FileEntryMapType;
+
+  inline const FileEntryMapType &Get_FileEntry_Map(void)
   {
     return FileEntryMap;
   }
@@ -272,7 +275,7 @@ class TextModifications
 
   /* Our own mapping from FileEntry to FileID to get the modifications to the
      files.  */
-  std::unordered_map<const FileEntry *, FileID> FileEntryMap;
+  FileEntryMapType FileEntryMap;
 };
 
 /** Class encapsulating the Symbol externalizer mechanism.
