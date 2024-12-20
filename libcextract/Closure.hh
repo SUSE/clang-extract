@@ -23,12 +23,21 @@
 
 #include "LLVMMisc.hh"
 #include "PrettyPrint.hh"
+#include "DependencyGraph.hh"
 
 using namespace clang;
 
 class ClosureSet
 {
   public:
+  ClosureSet(void)
+    : Dependencies()
+  {}
+
+  ClosureSet(const std::unordered_set<Decl *> &set)
+    : Dependencies(set)
+  {}
+
   /** Check if a given declaration was already marked as dependency.  */
   inline bool Is_Decl_Marked(Decl *decl)
   { return Dependencies.find(decl) != Dependencies.end(); }
@@ -143,7 +152,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       AST(ast),
       Closure(),
       AnalyzedDecls(),
-      Stack()
+      Stack(),
+      DG(AST)
   {
   }
 
@@ -280,6 +290,8 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   /** Stack of Decls.  Implement using a vector because we may need to access
       the second element on the top, and we also need its continuity.  */
   llvm::SmallVector<Decl *, 128> Stack;
+
+  DependencyGraph DG;
 
   /** Return what is on top of our stack.  */
   inline Decl *Stack_Top(void)

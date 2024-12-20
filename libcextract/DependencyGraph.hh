@@ -21,6 +21,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <vector>
 #include <stdio.h>
+#include <unordered_set>
 
 
 using namespace clang;
@@ -124,8 +125,37 @@ class DependencyGraph
 
     StringRef getName(void) const;
 
-    void getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec);
-    void getReachableBackwardEdges(llvm::SmallVector<DependencyEdge *> &vec);
+
+    typedef std::function<void (DependencyNode *)> NodeActionFunction;
+    typedef std::function<void (DependencyEdge *)> EdgeActionFunction;
+
+    void iterateForwardDFS(std::function<void (DependencyNode *)> &node_action,
+                           std::function<void (DependencyEdge *)> &edge_action);
+
+    void iterateBackwardDFS(std::function<void (DependencyNode *)> &node_action,
+                            std::function<void (DependencyEdge *)> &edge_action);
+
+    /* Versions of the above function with empty actions.  */
+
+    inline void iterateForwardDFS(void)
+    {
+      NodeActionFunction node_action = [](DependencyNode *) {};
+      EdgeActionFunction edge_action = [](DependencyEdge *) {};
+
+      iterateForwardDFS(node_action, edge_action);
+    }
+
+    inline void iterateBackwardDFS(void)
+    {
+      NodeActionFunction node_action = [](DependencyNode *) {};
+      EdgeActionFunction edge_action = [](DependencyEdge *) {};
+
+      iterateBackwardDFS(node_action, edge_action);
+    }
+
+    llvm::SmallVector<Decl *> getDeclsDependingOnMe(void);
+    llvm::SmallVector<DependencyEdge *> getReachableBackwardEdges(void);
+
 
     void dumpSingleNode(FILE *f = stdout) const;
     void dumpGraphviz(FILE *f = stdout, int depth = 0);
@@ -300,10 +330,29 @@ class DependencyGraph
   DependencyEdge *createDependencyEdge(DependencyNode *back,
                                        DependencyNode *foward);
 
+
+  /* When issuing Declarations to print, we must expand the closure
+     (reached Decls) up all the way to the TranslationUnitDecl so that
+     the Decls are print correctly.  */
+  void expandMarkedNodesUpwardsCtx(void);
+
+  std::unordered_set<Decl *> getMarkedNodesAsSet(void);
+
   llvm::SmallVector<Decl *> getDeclsDependingOn(DependencyNode *node);
 
   void dumpGraphviz(FILE *f = stdout);
   void dumpGraphviz(const std::string &name, FILE *f = stdout);
+  inline void dumpGraphviz(const char *path)
+  {
+    FILE *f = fopen(path, "w");
+    printf("Dumping\n");
+    dumpGraphviz(f);
+    fclose(f);
+  }
+
+  void dumpMarkedNodes(FILE *f = stdout);
+
+  static Decl* getDeclContextDominating(Decl *a, Decl *b);
 
   private:
   void buildDependencyGraph(void);

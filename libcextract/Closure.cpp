@@ -14,6 +14,7 @@
 /* Author: Giuliano Belinassi  */
 
 #include "Closure.hh"
+#include "DependencyGraph.hh"
 
 /** Add a decl to the Dependencies set and all its previous declarations in the
     AST. A function can have multiple definitions but its body may only be
@@ -68,9 +69,14 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
       if (matched_names)
         matched_names->insert(decl_name);
       /* Find its dependencies.  */
+      //DG.iterateForwardDFS();
       TraverseDecl(decl);
     }
   }
+
+  DG.expandMarkedNodesUpwardsCtx();
+  DG.dumpGraphviz("/tmp/out.dot");
+  DG.dumpMarkedNodes();
 }
 
 /* ------ DeclClosureVisitor methods ------ */
@@ -85,6 +91,17 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
 
 bool DeclClosureVisitor::TraverseDecl(Decl *decl)
 {
+  std::function<void (DependencyNode *)> node_action = [this](DependencyNode *node) {
+    this->Closure.Add_Single_Decl(node->getAsDecl());
+  };
+
+  std::function<void (DependencyEdge *)> edge_action = [](DependencyEdge *) {
+  };
+
+  DependencyNode *node = DG.getDependencyNode(decl);
+  node->iterateForwardDFS(node_action, edge_action);
+  return true;
+
   DO_NOT_RUN_IF_ALREADY_ANALYZED(decl);
   Mark_As_Analyzed(decl);
   Stack.push_back(decl);

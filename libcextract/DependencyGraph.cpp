@@ -262,38 +262,102 @@ StringRef DependencyNode::getName(void) const
   }
 }
 
-void DependencyNode::getDeclsDependingOnMe(llvm::SmallVector<Decl *> &vec)
+llvm::SmallVector<Decl *> DependencyNode::getDeclsDependingOnMe(void)
+{
+  llvm::SmallVector<Decl *> vec;
+  NodeActionFunction node_action = [&vec](DependencyNode *node) {
+    if (Decl *decl = node->getAsDecl()) {
+      vec.push_back(decl);
+    }
+  };
+
+  EdgeActionFunction edge_action = [](DependencyEdge *edge) {
+  };
+
+  iterateBackwardDFS(node_action, edge_action);
+  return vec;
+}
+
+llvm::SmallVector<DependencyEdge *> DependencyNode::getReachableBackwardEdges(void)
+{
+  llvm::SmallVector<DependencyEdge *> vec;
+  NodeActionFunction node_action = [](DependencyNode *node) {
+  };
+
+  EdgeActionFunction edge_action = [&vec](DependencyEdge *edge) {
+    vec.push_back(edge);
+  };
+
+  iterateForwardDFS(node_action, edge_action);
+  return vec;
+}
+
+void DependencyNode::iterateForwardDFS(NodeActionFunction &node_action,
+                                       EdgeActionFunction &edge_action)
 {
   if (isMarked()) {
     return;
   }
 
   mark();
+  node_action(this);
 
-  for (DependencyEdge *edge : BackwardEdges) {
-    DependencyNode *node = edge->getBackward();
-    if (Decl *decl = node->getAsDecl(); !node->isMarked()) {
-      vec.push_back(decl);
+  for (DependencyEdge *edge : ForwardEdges) {
+    edge_action(edge);
+    DependencyNode *node = edge->getForward();
+    if (node->isDecl()) {
+      node->iterateForwardDFS(node_action, edge_action);
     }
-    node->getDeclsDependingOnMe(vec);
   }
 }
 
-void DependencyNode::getReachableBackwardEdges(llvm::SmallVector<DependencyEdge *> &vec)
+void DependencyNode::iterateBackwardDFS(NodeActionFunction &node_action,
+                                        EdgeActionFunction &edge_action)
 {
   if (isMarked()) {
     return;
   }
 
   mark();
+  node_action(this);
 
-  for (DependencyEdge *edge : BackwardEdges) {
-    vec.push_back(edge);
-    DependencyNode *node = edge->getBackward();
+  for (DependencyEdge *edge : ForwardEdges) {
+    edge_action(edge);
+    DependencyNode *node = edge->getForward();
     if (node->isDecl()) {
-      node->getReachableBackwardEdges(vec);
+      node->iterateForwardDFS(node_action, edge_action);
     }
   }
+}
+
+void DependencyGraph::expandMarkedNodesUpwardsCtx(void)
+{
+  for (DependencyNode *node : NodePool) {
+    if (node->Aux) {
+      if (Decl *decl = node->getAsDecl()) {
+        while (decl) {
+          DependencyNode *n = getDependencyNode(decl);
+          if (NamedDecl *ndecl = dyn_cast<NamedDecl>(decl))
+            printf("Marking %s\n", ndecl->getName().str().c_str());
+          n->mark();
+          DeclContext *ctx = decl->getDeclContext();
+          decl = ctx ? cast<Decl>(ctx) : nullptr;
+        }
+      }
+    }
+  }
+}
+
+std::unordered_set<Decl *> DependencyGraph::getMarkedNodesAsSet(void)
+{
+  std::unordered_set<Decl *> ret;
+  for (DependencyNode *node : NodePool) {
+    if (Decl *decl = node->getAsDecl(); node->Aux) {
+      ret.insert(decl);
+    }
+  }
+
+  return ret;
 }
 
 void DependencyGraph::dumpGraphviz(FILE *file)
@@ -322,6 +386,17 @@ void DependencyGraph::dumpGraphviz(const std::string &name, FILE *file)
   unmarkAllNodes();
 }
 
+void DependencyGraph::dumpMarkedNodes(FILE *f)
+{
+  for (DependencyNode *node : NodePool) {
+    if (node->Aux) {
+      if (NamedDecl *decl = dyn_cast<NamedDecl>(node->getAsDecl())) {
+        printf("Name: %s\n", decl->getName().str().c_str());
+      }
+    }
+  }
+}
+
 void DependencyGraph::unmarkAllNodes(void)
 {
   for (DependencyNode *node : NodePool) {
@@ -331,9 +406,52 @@ void DependencyGraph::unmarkAllNodes(void)
 
 llvm::SmallVector<Decl *> DependencyGraph::getDeclsDependingOn(DependencyNode *node)
 {
-  llvm::SmallVector<Decl *> ret;
-  node->getDeclsDependingOnMe(ret);
+  llvm::SmallVector<Decl *> ret = node->getDeclsDependingOnMe();
   unmarkAllNodes();
 
   return ret;
+}
+
+Decl *DependencyGraph::getDeclContextDominating(Decl *a, Decl *b)
+{
+  assert(a != b && "Called with a = b. Dominance is useless");
+
+  DeclContext *ctx_a = dyn_cast<DeclContext>(a);
+  DeclContext *ctx_b = dyn_cast<DeclContext>(b);
+  bool a_doms = false, b_doms = false;
+
+  // Check if a dominates b.
+  if (ctx_a != nullptr) {
+    while (b != nullptr) {
+      if (ctx_a->containsDecl(b)) {
+        a_doms = true;
+        break;
+      }
+
+      b = cast<Decl>(b->getDeclContext());
+    }
+  }
+
+  // Checks if b dominates a.
+  if (ctx_b != nullptr) {
+    while (a != nullptr) {
+      if (ctx_b->containsDecl(a)) {
+        b_doms = true;
+        break;
+      }
+
+      a = cast<Decl>(a->getDeclContext());
+    }
+  }
+
+  assert(!(a_doms && b_doms) && "Does this even makes sense?");
+  if (a_doms) {
+    return a;
+  }
+
+  if (b_doms) {
+    return b;
+  }
+
+  return nullptr;
 }

@@ -1013,26 +1013,14 @@ void SymbolExternalizer::Late_Externalize(void)
 
 void SymbolExternalizer::Compute_Symbols_To_Rename(const std::vector<std::string> &to_externalize_array)
 {
+  return;
+  FILE *f = fopen("/tmp/graph.dot", "w");
+
   DependencyGraph DG(AST);
-  llvm::SmallVector<Decl *> deps;
+  DG.dumpGraphviz(f);
 
-  for (const std::string &to_externalize : to_externalize_array) {
-    DeclContextLookupResult decls = Get_Decl_From_Symtab(AST, to_externalize);
-    for (Decl *decl : decls) {
-      DependencyNode *node = DG.getDependencyNode(decl);
-      node->getDeclsDependingOnMe(deps);
-    }
-  }
-
-  for (Decl *decl : deps) {
-    llvm::outs() << "decl addr: " << decl;
-    if (NamedDecl *ndecl = dyn_cast<NamedDecl>(decl))
-      llvm::outs() << " name: " << ndecl->getName();
-    if (TranslationUnitDecl *tu = dyn_cast<TranslationUnitDecl>(decl))
-      llvm::outs() << " TranslationUnit";
-    llvm::outs() << '\n';
-  }
-
+  fclose(f);
+  exit(0);
 }
 
 void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_externalize_array,
