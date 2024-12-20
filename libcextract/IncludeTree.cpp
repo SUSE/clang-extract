@@ -192,7 +192,7 @@ void IncludeTree::Build_Header_Map(void)
 
     /* For Files.  */
     OptionalFileEntryRef file = node->Get_FileEntry();
-    const FileEntry *fentry = &file->getFileEntry();
+    const FileEntryRef fentry = *file;
     if (Map.find(fentry) != Map.end()) {
       /* FIXME: Find a way to correcly map the FileEntry to the node instead of
          discarding future appearances.  */
@@ -526,8 +526,9 @@ bool IncludeNode::Is_Reachable_From_Main(void)
                                         nullptr);
 
   if (ref.has_value()) {
-    const FileEntry &entry = (*ref).getFileEntry();
-    if (Tree.IEP->Must_Expand(entry.tryGetRealPathName(), entry.getName())) {
+    const FileEntryRef &entry = *ref;
+    const FileEntry &fentry = ref->getFileEntry();
+    if (Tree.IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName())) {
       /* Lie telling it is unreachable, which would force an expansion.  */
       return false;
     }

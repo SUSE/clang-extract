@@ -18,4 +18,4 @@ int f(void)
 }
 
 /* { dg-final { scan-tree-dump "return \(\*klpe_g\)\(3\);" } } */
-/* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(int\) __attribute__\(\(used\)\);" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(int\) __attribute__\(\(used\)\);|__attribute__\(\(used\)\) static int \(\*klpe_g\)\(int\);" } } */

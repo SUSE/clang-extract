@@ -98,7 +98,7 @@ bool MacroWalker::Is_Identifier_Macro_Argument(MacroInfo *info, StringRef tok_st
 {
   for (const IdentifierInfo *arg : info->params()) {
     StringRef arg_str = arg->getName();
-    if (tok_str.equals(arg_str)) {
+    if (tok_str == arg_str) {
       return true;
     }
   }

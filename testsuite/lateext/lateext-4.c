@@ -10,5 +10,5 @@ MACRO f(void)
 }
 
 /* { dg-final { scan-tree-dump "#include \"lateext-4.h\"" } } */
-/* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(void\) __attribute__\(\(used\)\);" } } */
+/* { dg-final { scan-tree-dump "static int \(\*klpe_g\)\(void\) __attribute__\(\(used\)\);|__attribute__\(\(used\)\) static int \(\*klpe_g\)\(void\);" } } */
 /* { dg-final { scan-tree-dump "return \(\*klpe_g\)\(\);" } } */
