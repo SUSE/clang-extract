@@ -79,7 +79,7 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
     diagopts->ShowColors = true;
   }
 
-  Diags = CompilerInstance::createDiagnostics(diagopts);
+  Diags = ClangCompat::createDiagnostics(*_Hack_VFS, diagopts);
 
   if (ctx->IgnoreClangErrors) {
     Diags->setWarningsAsErrors(false);
