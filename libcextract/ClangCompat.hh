@@ -102,4 +102,15 @@ namespace ClangCompat
     return A;
 #endif
   }
+
+  static inline IntrusiveRefCntPtr<DiagnosticsEngine> createDiagnostics(
+                llvm::vfs::FileSystem &VFS,
+                DiagnosticOptions *Opts)
+  {
+#if CLANG_VERSION_MAJOR >= 20
+    return CompilerInstance::createDiagnostics(VFS, Opts);
+#else
+    return CompilerInstance::createDiagnostics(Opts);
+#endif
+  }
 }
