@@ -18,6 +18,9 @@
 #include <clang/Frontend/TextDiagnostic.h>
 #include <clang/Basic/LangOptions.h>
 
+// For CLANG_VERSION_MAJOR
+#include <clang/Basic/Version.h>
+
 using namespace clang;
 
 /* Creates a special DiagnosticOptions with forced ShowColors.  */
@@ -30,6 +33,21 @@ class DiagnosticOptionsWithColor
   {
     return DOpts;
   }
+
+/* Because clang changed the constructor of TextDiagnostics, we need this
+   special method here that returns the correct type just for it according
+   to clang's version.  */
+#if CLANG_VERSION_MAJOR >= 21
+  inline DiagnosticOptions &getDiagsOptsToEngine(void)
+  {
+    return *DOpts;
+  }
+#else
+  inline DiagnosticOptions *getDiagsOptsToEngine(void)
+  {
+    return DOpts;
+  }
+#endif
 
   inline bool Is_Colored(void)
   {

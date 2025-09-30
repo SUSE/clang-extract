@@ -15,7 +15,7 @@ jobs:
         opensuse: [tumbleweed]
         compiler: [clang]
         build-type: [debug, release]
-        version: [18, 19, 20]
+        version: [18, 19, 20, 21]
 
     container:
       image: opensuse/${{ matrix.opensuse }}

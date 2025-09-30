@@ -28,7 +28,7 @@ DiagsClass DiagsClass::sDiag;
 DiagsClass::DiagsClass(void)
   : LangOpts(),
     DOpts(DiagnosticOptionsWithColor()),
-    DiagsEngine(llvm::outs(), LangOpts, DOpts.Get_DiagnosticOptions())
+    DiagsEngine(llvm::outs(), LangOpts, DOpts.getDiagsOptsToEngine())
 {}
 
 /* Print error giving a piece of source code that caused the error.  */
