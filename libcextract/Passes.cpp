@@ -74,10 +74,8 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
 
   /* Built the ASTUnit from the passed command line and set its SourceManager
      to the PrettyPrint class.  */
-  DiagnosticOptions *diagopts = new DiagnosticOptions();
-  if (check_color_available()) {
-    diagopts->ShowColors = true;
-  }
+  auto diagopts = ClangCompat::createDiagnosticOptions();
+  diagopts->ShowColors = check_color_available();
 
   Diags = ClangCompat::createDiagnostics(*_Hack_VFS, diagopts);
 
@@ -93,11 +91,18 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
 
 
   /* Hacked function call, see ASTUnitHack.cpp.  */
-  auto AU = ASTUnit::create(CInvok, Diags, CaptureDiagsKind::None, false);
+  auto AU = ASTUnit::create(ClangCompat_ASTUP(CInvok,
+                                              diagopts,
+                                              Diags,
+                                              CaptureDiagsKind::None,
+                                              false));
   std::unique_ptr<ASTUnit> *ErrAST = nullptr;
 
-  ASTUnit::LoadFromCompilerInvocationAction(CInvok, PCHContainerOps,
-                                            Diags, nullptr, AU.get(),
+  ASTUnit::LoadFromCompilerInvocationAction(ClangCompat_ASTULFCIAP(
+                                            CInvok, PCHContainerOps,
+                                            diagopts,
+                                            Diags,
+                                            nullptr, AU.get(),
                                             /*Persistent=*/true,
                                             /*ResourceFilesPath=*/StringRef(),
                                             /*OnlyLocalDecls=*/false,
@@ -105,7 +110,7 @@ static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::Fil
                                             /*PrecompilePreambleAfterNParses=*/0,
                                             /*CacheCodeCompletionResults=*/false,
                                             /*UserFilesAreVolatile=*/false,
-                                            ErrAST);
+                                            ErrAST));
 
   _Hack_VFS = nullptr;
 

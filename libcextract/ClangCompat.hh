@@ -38,6 +38,17 @@ namespace ClangCompat
 # define ClangCompat_GetTokenPtr(token) (token).getPointer()
 #endif
 
+/** Starting from LLVM-21, ASTUnit::create requires one more parameter.  */
+#if CLANG_VERSION_MAJOR >= 21
+# define ClangCompat_ASTUP(CI, DO, D, CP, UFAV) CI, DO, D, CP, UFAV
+# define ClangCompat_ASTULFCIAP(CI, PCH, DO, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST) \
+  CI, PCH, DO, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST
+#else
+# define ClangCompat_ASTUP(CI, DO, D, CP, UFAV) CI, D, CP, UFAV
+# define ClangCompat_ASTULFCIAP(CI, PCH, DO, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST) \
+  CI, PCH, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST
+#endif
+
   static inline const clang::TypedefType *Get_Type_As_TypedefType(const clang::Type *type)
   {
 #if CLANG_VERSION_MAJOR >= 16
@@ -103,14 +114,37 @@ namespace ClangCompat
 #endif
   }
 
+#if CLANG_VERSION_MAJOR >= 21
+  static inline IntrusiveRefCntPtr<DiagnosticsEngine> createDiagnostics(
+                llvm::vfs::FileSystem &VFS,
+                std::shared_ptr<DiagnosticOptions> Opts)
+  {
+    return CompilerInstance::createDiagnostics(VFS, *Opts);
+  }
+#endif
+
   static inline IntrusiveRefCntPtr<DiagnosticsEngine> createDiagnostics(
                 llvm::vfs::FileSystem &VFS,
                 DiagnosticOptions *Opts)
   {
-#if CLANG_VERSION_MAJOR >= 20
+#if CLANG_VERSION_MAJOR >= 21
+    return CompilerInstance::createDiagnostics(VFS, *Opts);
+#elif CLANG_VERSION_MAJOR == 20
     return CompilerInstance::createDiagnostics(VFS, Opts);
 #else
     return CompilerInstance::createDiagnostics(Opts);
 #endif
   }
+
+#if CLANG_VERSION_MAJOR >= 21
+  static inline std::shared_ptr<DiagnosticOptions> createDiagnosticOptions(void)
+  {
+    return std::make_shared<DiagnosticOptions>();
+  }
+#else
+  static inline DiagnosticOptions *createDiagnosticOptions(void)
+  {
+    return new DiagnosticOptions();
+  }
+#endif
 }
