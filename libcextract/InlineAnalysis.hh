@@ -54,7 +54,9 @@ class InlineAnalysis
 
   InlineAnalysis(const char *elf_path, const char *ipaclone_path,
                  const char *symvers_path, bool is_kernel)
-    : InlineAnalysis(std::vector<std::string>({elf_path}),
+    : InlineAnalysis(elf_path == nullptr ?
+                     std::vector<std::string>() :
+                     std::vector<std::string>({elf_path}),
                      ipaclone_path, symvers_path, is_kernel)
   {}
 
