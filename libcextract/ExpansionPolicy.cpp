@@ -39,25 +39,40 @@ bool KernelExpansionPolicy::Must_Expand(const StringRef &absolute_path,
   return true;
 }
 
-IncludeExpansionPolicy *IncludeExpansionPolicy::Get_Expansion_Policy(
-                                                IncludeExpansionPolicy::Policy p)
+bool SystemExpansionPolicy::Must_Expand(const StringRef &absolute_path,
+                                        const StringRef &relative_path)
 {
-  switch (p) {
-    case Policy::NOTHING:
-      return new NoIncludeExpansionPolicy();
-      break;
+  const char *absolute_path_c = absolute_path.data();
 
-    case Policy::EVERYTHING:
-      return new ExpandEverythingExpansionPolicy();
-      break;
-
-    case Policy::KERNEL:
-      return new KernelExpansionPolicy();
-      break;
-
-    default:
-      assert(false && "Invalid policy");
+  /* Look for system headers by looking to specific prefixes.  */
+  const char *include_paths[] = { "/usr/include/", "/usr/lib64/",
+                                  "/usr/lib/", "/usr/local/include/", };
+  for (unsigned i = 0; i < ARRAY_LENGTH(include_paths); i++) {
+    if (prefix(include_paths[i], absolute_path_c)) {
+      return false; // Do not expand.
+    }
   }
+
+  /* Expand anything that doesn't match this.  */
+  return true;
+}
+
+bool CompilerExpansionPolicy::Must_Expand(const StringRef &absolute_path,
+                                          const StringRef &relative_path)
+{
+  const char *absolute_path_c = absolute_path.data();
+
+  /* Look for clang compiler headers by looking to specific prefixes.  */
+  const char *include_paths[] = { "/usr/lib64/clang/", "/usr/lib/clang/",
+                                  "/usr/local/lib64/clang/", "/usr/local/lib64/clang/", };
+  for (unsigned i = 0; i < ARRAY_LENGTH(include_paths); i++) {
+    if (prefix(include_paths[i], absolute_path_c)) {
+      return false; // Do not expand.
+    }
+  }
+
+  /* Expand anything that doesn't match this.  */
+  return true;
 }
 
 std::unique_ptr<IncludeExpansionPolicy> IncludeExpansionPolicy::Get_Expansion_Policy_Unique(
@@ -79,6 +94,16 @@ std::unique_ptr<IncludeExpansionPolicy> IncludeExpansionPolicy::Get_Expansion_Po
                 KernelExpansionPolicy());
       break;
 
+    case Policy::SYSTEM:
+      return std::make_unique<SystemExpansionPolicy>(
+                SystemExpansionPolicy());
+      break;
+
+    case Policy::COMPILER:
+      return std::make_unique<CompilerExpansionPolicy>(
+                CompilerExpansionPolicy());
+      break;
+
     default:
       assert(false && "Invalid policy");
   }
@@ -96,7 +121,9 @@ IncludeExpansionPolicy::Policy IncludeExpansionPolicy::Get_From_String(const cha
   } policies[] = {
     { "nothing",    IncludeExpansionPolicy::NOTHING    },
     { "everything", IncludeExpansionPolicy::EVERYTHING },
-    { "kernel",     IncludeExpansionPolicy::KERNEL     }
+    { "kernel",     IncludeExpansionPolicy::KERNEL     },
+    { "system",     IncludeExpansionPolicy::SYSTEM     },
+    { "compiler",   IncludeExpansionPolicy::COMPILER   },
   };
 
   for (unsigned long i = 0; i < ARRAY_LENGTH(policies); i++) {

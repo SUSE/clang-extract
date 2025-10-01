@@ -157,7 +157,7 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_KEEP_INCLUDES=<policy>\n"
 "                           Keep all possible #include<file> directives, but using the\n"
 "                           specified include expansion <policy>.  Valid values are\n"
-"                           nothing, everything and kernel.\n"
+"                           nothing, everything, kernel, system and compiler.\n"
 "  -DCE_EXPAND_INCLUDES=<args>\n"
 "                           Force expansion of the headers provided in <args>.\n"
 "  -DCE_RENAME_SYMBOLS      Allow renaming of extracted symbols.\n"
