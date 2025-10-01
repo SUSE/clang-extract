@@ -32,6 +32,8 @@ class IncludeExpansionPolicy
     NOTHING,
     EVERYTHING,
     KERNEL,
+    SYSTEM,
+    COMPILER,
   };
 
   static IncludeExpansionPolicy *Get_Expansion_Policy(Policy policy);
@@ -75,7 +77,22 @@ class ExpandEverythingExpansionPolicy : public IncludeExpansionPolicy
   }
 };
 
+/** Expand any header according to kernel livepatching rules.  */
 class KernelExpansionPolicy : public IncludeExpansionPolicy
+{
+  public:
+  virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+};
+
+/** Expand any header that is not installed in the system.  */
+class SystemExpansionPolicy : public IncludeExpansionPolicy
+{
+  public:
+  virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+};
+
+/** Expand any header that is not compiler-specific.  */
+class CompilerExpansionPolicy : public IncludeExpansionPolicy
 {
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);

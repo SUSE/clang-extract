@@ -93,6 +93,17 @@ Notice how *any reference to unused_function is removed* and *all headers has be
 $ clang out.c -O2 -o a
 ```
 If you desire to keep the includes, see `-DCE_KEEP_INCLUDES` options and the _Supported options_ chapter.
+The following expansion policies are supported:
+ - `nothing`: Do not expand any header.
+ - `everything`: Expand all headers.  Has the same semantic effect of not passing `-DCE_KEEP_INCLUDES`, but forces clang-extract to pass it through its header expansion logics (slow and very likely buggy!).
+ - `kernel`: Special policy used by the kernel livepatching developers.
+ - `system`: Keep all system headers installed in `/usr/include`, etc.
+ - `compiler`: Keep all compiler-specific headers, such as `stdatomic.h`. Useful if you want to expand everything but still want to ensure compatibility with other compilers.
+
+You may want to use `clang-tidy` to cleanup the generated file afterwards to remove duplicated includes:
+```
+$ clang-tidy -checks='-*,readability-duplicate-include,misc-include-cleaner' -fix <out.c>
+```
 
 ### Symbol Externalization
 
@@ -192,7 +203,7 @@ Clang-extract support many options which controls the output code:
 - `-DCE_NO_EXTERNALIZATION`       Disable symbol externalization.
 - `-DCE_DUMP_PASSES`              Dump the results of each transformation pass into files. Files will be dumped at the same path of the input files. Additional files are also generated on `/tmp/` folder.
 - `-DCE_KEEP_INCLUDES`            Keep all possible `#include<file>` directives.
-- `-DCE_KEEP_INCLUDES=<policy>`   Keep all possible `#include<file>` directives, but using the specified include expansion <policy>.  Valid values are nothing, everything and kernel.
+- `-DCE_KEEP_INCLUDES=<policy>`   Keep all possible `#include<file>` directives, but using the specified include expansion <policy>.  Valid values are `nothing`, `everything`, `kernel`, `system` and `compiler`.
 - `-DCE_EXPAND_INCLUDES=<args>`   Force expansion of the headers provided in <args>.
 - `-DCE_RENAME_SYMBOLS`           Allow renaming of extracted symbols.
 - `-DCE_DEBUGINFO_PATH=<arg>`     Path to the compiled (ELF) object of the desired program to extract.  This is used to decide if externalization is necessary or not for given symbol.
