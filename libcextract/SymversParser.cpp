@@ -14,12 +14,12 @@
 /* Author: Marcos de Paulo Souza  */
 
 #include "SymversParser.hh"
+#include <filesystem>
 
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <libgen.h>
 
 Symvers::Symvers(const std::string &path)
     : Parser(path)
@@ -64,7 +64,7 @@ void Symvers::Parse()
     std::getline(ss, sym_mod, '\t');
 
     // Only get the name of the module, instead of the path to it
-    Symbol sym(sym_name, basename(sym_mod.data()));
+    Symbol sym(sym_name, std::filesystem::path(sym_mod).filename().string().c_str());
     Insert_Symbols_Into_Hash(sym);
   }
 }

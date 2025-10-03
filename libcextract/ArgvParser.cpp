@@ -16,14 +16,13 @@
 #include "ArgvParser.hh"
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
+#include <filesystem>
 
 #include <clang/Basic/Version.h>
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-/* Use the basename version that doesn't change the input string */
-#include <string.h>
 
 #ifndef CLANG_VERSION_MAJOR
 # error "Unable to find clang version"
@@ -99,7 +98,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
    * are not the same, it means that the module from PatchObject is builtin, so
    * assign vmlinux to PatchObject. */
   if (Kernel && DebuginfoPath) {
-    std::string obj_path = basename(DebuginfoPath);
+    std::string obj_path = std::filesystem::path(DebuginfoPath).filename().string();
     /* As the DebugInfo can point to a file with suffix (btrfs.ko for example),
      * check the substring */
     if (obj_path.find(PatchObject) == std::string::npos)
