@@ -233,7 +233,7 @@ ArrayRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceL
     }
   }
 
-  return ArrayRef<Decl *>(nullptr, 0UL);
+  return ArrayRef<Decl *>(nullptr, size_t(0));
 }
 
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc)
