@@ -109,3 +109,6 @@ DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name
 
 /** Check if two Decls are equivalent.  */
 bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
+
+bool Range_Fully_Contains_Range(ASTUnit *ast, const SourceRange &a,
+                                const SourceRange &b);
