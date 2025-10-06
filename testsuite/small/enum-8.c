@@ -32,6 +32,6 @@ int f() {
 }
 
 /* { dg-final { scan-tree-dump "TRACE_EVENT_FL_TRACEPOINT_BIT," } } */
-/* { dg-final { scan-tree-dump "TRACE_EVENT_FL_TRACEPOINT *= \(1 << TRACE_EVENT_FL_TRACEPOINT_BIT\)," } } */
+/* { dg-final { scan-tree-dump "TRACE_EVENT_FL_TRACEPOINT( |\t)*= \(1 << TRACE_EVENT_FL_TRACEPOINT_BIT\)," } } */
 /* { dg-final { scan-tree-dump "#define MACRO TRACE_EVENT_FL_TRACEPOINT" } } */
 /* { dg-final { scan-tree-dump "return 1 \+ MACRO;" } } */

@@ -58,6 +58,8 @@ static const char *UnsupportedGCCArgs[] = {
   "-Wno-stringop-truncation",
   "-Werror=designated-init",
   "-Wimplicit-fallthrough=",
+  "-Wendif-labels",
+  "-Wmissing-selector-name",
 };
 
 ArgvParser::ArgvParser(int argc, char **argv)

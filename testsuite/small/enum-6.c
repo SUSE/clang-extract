@@ -16,4 +16,4 @@ int f()
 
 /* { dg-final { scan-tree-dump "ANOTHER_CONST = 1 << CONST0" } } */
 /* { dg-final { scan-tree-dump "return ANOTHER_CONST;" } } */
-/* { dg-final { scan-tree-dump "enum *{\n *CONST0" } } */
+/* { dg-final { scan-tree-dump "enum\n? *{\n? *CONST0" } } */

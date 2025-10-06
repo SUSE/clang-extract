@@ -38,7 +38,7 @@ class PrettyPrint
 {
   public:
   /** Print a Decl node into ostream `Out`.  */
-  static void Print_Decl(Decl *decl);
+  static void Print_Decl(Decl *decl, bool keep_includes = false);
 
   /** Print Decl node as is, without any kind of processing.  */
   static void Print_Decl_Raw(Decl *decl);
