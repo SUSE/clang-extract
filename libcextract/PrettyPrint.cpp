@@ -20,12 +20,13 @@
 #include "LLVMMisc.hh"
 
 #include <clang/AST/Attr.h>
+#include <llvm/Support/Regex.h>
 
 /** Public methods.  */
 
 #define Out (*Out)
 
-void PrettyPrint::Print_Decl(Decl *decl)
+void PrettyPrint::Print_Decl(Decl *decl, bool keep_includes)
 {
   /* When handling C code, we need to check if given declaration is a function
      with body.  If yes, we can simply print the declaration, but otherwise
@@ -38,22 +39,22 @@ void PrettyPrint::Print_Decl(Decl *decl)
   if (f && f->hasBody() && f->isThisDeclarationADefinition()) {
     Print_Decl_Raw(f);
     Out << "\n\n";
-  } else if (e) {
-      decl->print(Out, PPolicy);
-      Out << ";\n\n";
   } else if (!e && t && t->getName() == "") {
     /* If the RecordType doesn't have a name, then don't print it.  Except when
        it is an empty named enum declaration, which in this case we must print
        because it contains declared constants.  */
   } else {
-    /* Structs and prototypes */
+    /* Structs, enums, and prototypes */
 
-    /** Check if we can get a partial declaration of `decl` rather than a full
-        declaration.  */
-    bool full_def_removed = false;
-    if (t && t->isCompleteDefinitionRequired() == false) {
-      /* We don't need the full defintion.  Hide the body for Print_Decl_Raw.  */
-      t->setCompleteDefinition(false);
+    /** Check if the output string has an include directive.  In that case, if we
+        don't want to keep the includes, we must print the ast dump rather than
+        the source text to get rid of the #include directive.
+        FIXME:  regexes are slow.  */
+    static llvm::Regex regex("# *include *(<|\")");
+
+    /* FIXME: Why isCompleteDefinitionRequired does not work for EnumDecls?  */
+    if (t && ((!e && t->isCompleteDefinitionRequired() == false)
+              || (!keep_includes && regex.match(Get_Source_Text(t->getSourceRange()))))) {
 
       /* FIXME: The Print_Decl_Raw class will attempt to write this declaration
          as the user wrote, that means WITH a body.  To avoid this, we set
@@ -63,7 +64,15 @@ void PrettyPrint::Print_Decl(Decl *decl)
          correct way of doing this would be update the source location to
          the correct range.  */
       t->setLocStart(t->getEndLoc());
+    }
 
+    /** Check if we can get a partial declaration of `decl` rather than a full
+        declaration.  */
+    bool full_def_removed = false;
+    /* FIXME: Why isCompleteDefinitionRequired does not work for EnumDecls?  */
+    if (t && !e && t->isCompleteDefinitionRequired() == false) {
+      /* We don't need the full defintion.  Hide the body for Print_Decl_Raw.  */
+      t->setCompleteDefinition(false);
       full_def_removed = true;
     }
 
@@ -613,7 +622,7 @@ void RecursivePrint::Print_Decl(Decl *decl)
         PrettyPrint::Print_RawComment(sm, comment);
       }
     }
-    PrettyPrint::Print_Decl(decl);
+    PrettyPrint::Print_Decl(decl, KeepIncludes);
   }
 }
 
@@ -656,13 +665,7 @@ void RecursivePrint::Print(void)
         decl = (*ASTIterator).AsDecl;
         Print_Decl(decl);
         ++ASTIterator;
-
-        /* Skip to the end of the Declaration.  */
-        if (!dyn_cast<EnumDecl>(decl)) {
-          /* EnumDecls are handled somewhat differently: we dump the AST, not
-             what the user wrote.  */
-          ASTIterator.Skip_Until(decl->getEndLoc());
-        }
+        ASTIterator.Skip_Until(decl->getEndLoc());
         break;
 
       case TopLevelASTIterator::ReturnType::TYPE_PREPROCESSED_ENTITY:
