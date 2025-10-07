@@ -142,13 +142,13 @@ enum FileHandling::FileType FileHandling::Get_File_Type(int fd)
 }
 
 /** Get basename of a string.  Works like the gnu version.  */
-const char *get_basename(const char *filename)
+const char *get_basename(const char *path)
 {
-#if defined(_WIN32) || defined(WIN32)
-  const char delim = '\\';
-#else
-  const char delim = '/';
+  const char *base = strrchr(path, '/');
+#ifdef _WIN32
+  const char *backslash = strrchr(path, '\\');
+  if (backslash > base)
+    base = backslash;
 #endif
-  const char *p = strrchr (filename, delim);
-  return p ? p + 1 : (char *) filename;
+  return base ? base+1 : path;
 }
