@@ -315,3 +315,55 @@ bool Is_Decl_Equivalent_To(Decl *a, Decl *b)
 
   return a_str == b_str;
 }
+
+#define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|!\r\n\t"
+
+/** Check if string has unmatched #if, #ifdef, #ifndef.  */
+bool Has_Balanced_Ifdef(const StringRef &string)
+{
+  /* Create a temporary buffer for strtok and copy the string.  */
+  size_t len = string.size();
+  char buf[len + 1];
+  memcpy(buf, string.data(), len);
+  buf[len] = '\0';
+
+  /* Count the number of parenthesis problem. ifdef, ifndef, if increases,
+     endif decreases.  */
+  int balance = 0;
+
+  /* Tokenize.  */
+  bool in_comments = false;
+  char *tok = strtok(buf, TOKEN_VECTOR);
+  while (tok != nullptr) {
+    /* There is the silly case in which #ifdef is written as `#  ifdef`.  */
+    if (*tok == '#') {
+      /* Now check if it got into the same token or if we need to pull another
+         token.  */
+      if (tok[1] == '\0') {
+        tok = strtok(nullptr, TOKEN_VECTOR);
+      } else {
+        tok++;
+      }
+
+      assert(tok != nullptr && "tok is null! why?");
+
+      /* Case 1: #ifdef, #ifndef, and #if has "if" as prefix.  */
+      if (prefix("if", tok)) {
+        balance++;
+      }
+
+      /* Case 2: #endif.  Decrease the balance counter.  */
+      else if (strcmp("endif", tok) == 0) {
+        balance--;
+        if (balance < 0) {
+          /* Impossible.  This means there is an #endif for no matching #if.  */
+          return false;
+        }
+      }
+    }
+
+    tok = strtok(nullptr, TOKEN_VECTOR);
+  }
+
+  return balance == 0;
+}
