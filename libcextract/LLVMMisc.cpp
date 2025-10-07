@@ -332,7 +332,6 @@ bool Has_Balanced_Ifdef(const StringRef &string)
   int balance = 0;
 
   /* Tokenize.  */
-  bool in_comments = false;
   char *tok = strtok(buf, TOKEN_VECTOR);
   while (tok != nullptr) {
     /* There is the silly case in which #ifdef is written as `#  ifdef`.  */

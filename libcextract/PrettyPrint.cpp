@@ -203,11 +203,6 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
          from struct rtld_global_ro and below, which would only include the
          #endif, and not the #ifdef.  In case its not balanced we fallback to
          AST dumping.  */
-      if (NamedDecl *d = dyn_cast<NamedDecl>(decl)) {
-        if (d->getName() == "rtld_global_ro") {
-          llvm::outs() << "debug me \n";
-        }
-      }
       if (Has_Balanced_Ifdef(decl_source)) {
         Out << decl_source;
       } else {
