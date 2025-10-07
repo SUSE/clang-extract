@@ -191,7 +191,29 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
         }
       }
     } else {
-      Out << decl_source;
+      /* Check if the output string has a balanced number of ifdefs.  This is
+         required because of the following construct from glibc:
+
+          #ifdef !SHARED
+          #else
+          struct rtld_global_ro {
+          #endif
+
+         In case we want to print rtld_global_ro, PrettyPrint will get the text
+         from struct rtld_global_ro and below, which would only include the
+         #endif, and not the #ifdef.  In case its not balanced we fallback to
+         AST dumping.  */
+      if (NamedDecl *d = dyn_cast<NamedDecl>(decl)) {
+        if (d->getName() == "rtld_global_ro") {
+          llvm::outs() << "debug me \n";
+        }
+      }
+      if (Has_Balanced_Ifdef(decl_source)) {
+        Out << decl_source;
+      } else {
+        /* In case its not balanced, fallback to AST dump.  */
+        decl->print(Out, LangOpts);
+      }
     }
   } else {
     /* Else, we fallback to AST Dumping.  */

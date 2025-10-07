@@ -1,7 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=function -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail } Tests fails because we currently can't track that the endif
-   comes from #ifdef AAA.  */
-
 
 //#define AA
 
