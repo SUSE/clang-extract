@@ -91,3 +91,6 @@ class FileHandling
 
   static enum FileType Get_File_Type(int fd);
 };
+
+/** Get basename of a string.  Works like the gnu version.  */
+const char *get_basename(const char *filename);

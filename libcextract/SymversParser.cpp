@@ -21,6 +21,8 @@
 #include <sstream>
 #include <libgen.h>
 
+#include "NonLLVMMisc.hh"
+
 Symvers::Symvers(const std::string &path)
     : Parser(path)
 {
@@ -64,7 +66,7 @@ void Symvers::Parse()
     std::getline(ss, sym_mod, '\t');
 
     // Only get the name of the module, instead of the path to it
-    Symbol sym(sym_name, basename(sym_mod.data()));
+    Symbol sym(sym_name, get_basename(sym_mod.data()));
     Insert_Symbols_Into_Hash(sym);
   }
 }
