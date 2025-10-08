@@ -20,7 +20,9 @@
 #include <string.h>
 #include <errno.h>
 #include <stdexcept>
+#ifndef _WIN32
 #include <wordexp.h>
+#endif
 
 class Parser
 {
@@ -32,6 +34,7 @@ public:
 
   Parser(const char *path)
   {
+#ifndef _WIN32
     /* Expand shell characters like '~' in paths.  */
     wordexp_t exp_result;
     wordexp(path, &exp_result, 0);
@@ -41,6 +44,10 @@ public:
 
     /* Release expansion object.  */
     wordfree(&exp_result);
+#else
+    /* wordexp is not available on Windows, use path as-is */
+    parser_path = std::string(path);
+#endif
   }
 
   // Some parsers work on files
