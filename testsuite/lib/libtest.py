@@ -406,7 +406,7 @@ class UnitTest:
         return r
 
     def check(self, tool, ce_output_path):
-        self.log.print("terminal output of inline:")
+        self.log.print("terminal output of " + os.path.basename(tool.args[0]) + ":")
         self.log.print(tool.stdout.decode())
 
         should_xfail = self.extract_should_xfail()
