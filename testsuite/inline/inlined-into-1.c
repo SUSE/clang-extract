@@ -6,7 +6,7 @@ static inline int g(void)
   return 42;
 }
 
-static __attribute__((noipa)) h(void)
+static __attribute__((noipa)) __attribute__((noinline)) h(void)
 {
   return g();
 }
