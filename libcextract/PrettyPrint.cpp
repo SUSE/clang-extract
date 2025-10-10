@@ -403,7 +403,6 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
     Therefore we must check for the attributes of this declaration and compute
     the furthest location.  */
 
-    AttrVec &attrvec = decl->getAttrs();
     bool has_attr = false;
     SourceManager &SM = AST->getSourceManager();
 
@@ -416,14 +415,18 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
       }
     }
 
-    for (size_t i = 0; i < attrvec.size(); i++) {
-      const Attr *attr = attrvec[i];
-      SourceLocation loc = attr->getRange().getEnd();
-      loc = SM.getExpansionLoc(loc);
+    /* Get atttributes vector if it exists.  */
+    if(decl->hasAttrs()) {
+      AttrVec &attrvec = decl->getAttrs();
+      for (size_t i = 0; i < attrvec.size(); i++) {
+        const Attr *attr = attrvec[i];
+        SourceLocation loc = attr->getRange().getEnd();
+        loc = SM.getExpansionLoc(loc);
 
-      if (loc.isValid() && Is_Before(furthest, loc)) {
-        furthest = loc;
-        has_attr = true;
+        if (loc.isValid() && Is_Before(furthest, loc)) {
+          furthest = loc;
+          has_attr = true;
+        }
       }
     }
 
