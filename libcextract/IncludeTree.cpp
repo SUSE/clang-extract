@@ -72,8 +72,7 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
                                                   must_expand.end());
   MacroWalker mw(PP);
   bool already_seen_main = false;
-  SourceManager *SM = PrettyPrint::Get_Source_Manager();
-  OptionalFileEntryRef main = SM->getFileEntryRefForID(SM->getMainFileID());
+  OptionalFileEntryRef main = SM.getFileEntryRefForID(SM.getMainFileID());
 
   std::stack<IncludeNode *> stack;
   Root = new IncludeNode(this);
@@ -199,7 +198,7 @@ void IncludeTree::Build_Header_Map(void)
       if (warned == false) {
         const SourceRange &range = node->Get_Include_Spelling_Range();
         DiagsClass::Emit_Warn("project #include's the same file multiple times."
-                              " Only the first is registered.", range);
+                              " Only the first is registered.", range, SM);
         warned = true;
       }
     } else {
@@ -237,8 +236,7 @@ IncludeNode *IncludeTree::Get(const SourceLocation &loc)
 
   /* In case we could not find a FileRef, then try the ExpansionLoc.  */
   if (!fileref.has_value()) {
-    SourceManager *SM = PrettyPrint::Get_Source_Manager();
-    const SourceLocation &loc2 = SM->getExpansionLoc(loc);
+    const SourceLocation &loc2 = SM.getExpansionLoc(loc);
     fileref = PrettyPrint::Get_FileEntry(loc2);
   }
 
@@ -365,12 +363,11 @@ void IncludeTree::IncludeNode::Set_FileEntry(OptionalFileEntryRef file)
 
 SourceRange IncludeTree::IncludeNode::Get_File_Range(void)
 {
-  SourceManager *SM = PrettyPrint::Get_Source_Manager();
-
   SourceLocation start, end;
-  FileID fid = SM->getOrCreateFileID(*File, SrcMgr::CharacteristicKind());
-  start = SM->getLocForStartOfFile(fid);
-  end = SM->getLocForEndOfFile(fid);
+  SourceManager &SM = Tree.SM;
+  FileID fid = SM.getOrCreateFileID(*File, SrcMgr::CharacteristicKind());
+  start = SM.getLocForStartOfFile(fid);
+  end = SM.getLocForEndOfFile(fid);
 
   assert(start.isValid() && "Start of header is invalid.");
   assert(end.isValid() && "End of header is invalid.");
@@ -563,7 +560,7 @@ void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
     HeaderGuard = guard;
   } else {
     std::string message = "Attempt to redefine headerguard of " + Get_Filename().str();
-    DiagsClass::Emit_Warn(message, guard->getSourceRange());
+    DiagsClass::Emit_Warn(message, guard->getSourceRange(), Tree.SM);
   }
 }
 

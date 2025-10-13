@@ -384,9 +384,9 @@ void TextModifications::Solve(void)
         /* Intersection with the same priority. Issue an error -- we can't have this.  */
         DiagsClass::Emit_Error("Rewriter ranges with same priority intersects");
         DiagsClass::Emit_Note(" This one: (priority " + std::to_string(a.Priority) + ')',
-                              a.ToChange);
+                              a.ToChange, SM);
         DiagsClass::Emit_Note("with this: (priority " + std::to_string(b.Priority) + ')',
-                              b.ToChange);
+                              b.ToChange, SM);
         throw std::runtime_error("SymbolExternalizer can not continue.");
       }
     } else {

@@ -65,7 +65,7 @@ class DiagsClass
   DiagsClass(void);
 
   void EmitMessage(const StringRef message, DiagnosticsEngine::Level level,
-                   const SourceRange &range);
+                   const SourceRange &range, const SourceManager &SM);
 
   void EmitMessage(const StringRef message, DiagnosticsEngine::Level level);
 
@@ -98,9 +98,10 @@ class DiagsClass
 
   static inline void Emit_Message(const StringRef message,
                                   DiagnosticsEngine::Level level,
-                                  const SourceRange &range)
+                                  const SourceRange &range,
+                                  const SourceManager &sm)
   {
-    sDiag.EmitMessage(message, level, range);
+    sDiag.EmitMessage(message, level, range, sm);
   }
 
   static inline void Emit_Message(const StringRef message,
@@ -109,9 +110,11 @@ class DiagsClass
     sDiag.EmitMessage(message, level);
   }
 
-  static inline void Emit_Error(const StringRef message, const SourceRange &range)
+  static inline void Emit_Error(const StringRef message,
+                                const SourceRange &range,
+                                const SourceManager &sm)
   {
-    Emit_Message(message, DiagnosticsEngine::Level::Error, range);
+    Emit_Message(message, DiagnosticsEngine::Level::Error, range, sm);
   }
 
   static inline void Emit_Error(const StringRef message)
@@ -119,9 +122,11 @@ class DiagsClass
     Emit_Message(message, DiagnosticsEngine::Level::Error);
   }
 
-  static inline void Emit_Warn(const StringRef message, const SourceRange &range)
+  static inline void Emit_Warn(const StringRef message,
+                               const SourceRange &range,
+                               const SourceManager &sm)
   {
-    Emit_Message(message, DiagnosticsEngine::Level::Warning, range);
+    Emit_Message(message, DiagnosticsEngine::Level::Warning, range, sm);
   }
 
   static inline void Emit_Warn(const StringRef message)
@@ -129,9 +134,11 @@ class DiagsClass
     Emit_Message(message, DiagnosticsEngine::Level::Warning);
   }
 
-  static inline void Emit_Note(const StringRef message, const SourceRange &range)
+  static inline void Emit_Note(const StringRef message,
+                               const SourceRange &range,
+                               const SourceManager &sm)
   {
-    Emit_Message(message, DiagnosticsEngine::Level::Note, range);
+    Emit_Message(message, DiagnosticsEngine::Level::Note, range, sm);
   }
 
   static inline void Emit_Note(const StringRef message)

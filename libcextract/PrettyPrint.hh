@@ -87,11 +87,6 @@ class PrettyPrint
     AST = ast;
   }
 
-  static inline SourceManager *Get_Source_Manager(void)
-  {
-    return &AST->getSourceManager();
-  }
-
   static inline LangOptions &Get_Lang_Options(void)
   {
     return LangOpts;

@@ -32,20 +32,15 @@ DiagsClass::DiagsClass(void)
 {}
 
 /* Print error giving a piece of source code that caused the error.  */
-void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level, const SourceRange &range)
+void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level,
+                             const SourceRange &range, const SourceManager &sm)
 {
-  SourceManager *sm = PrettyPrint::Get_Source_Manager();
-  if (sm) {
-    CharSourceRange charsrc_range = CharSourceRange::getCharRange(range);
-    FullSourceLoc loc = FullSourceLoc(range.getBegin(), *sm);
+  CharSourceRange charsrc_range = CharSourceRange::getCharRange(range);
+  FullSourceLoc loc = FullSourceLoc(range.getBegin(), sm);
 
-    const std::string ce_message = Append_CE(message);
-    DiagsEngine.emitDiagnostic(loc, level, ce_message, charsrc_range, FixItHint(), nullptr);
-  } else {
-    EmitMessage(message, level);
-  }
+  const std::string ce_message = Append_CE(message);
+  DiagsEngine.emitDiagnostic(loc, level, ce_message, charsrc_range, FixItHint(), nullptr);
 }
-
 /* Print error without giving a piece of source code that caused the error.  */
 void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level level)
 {
