@@ -25,6 +25,9 @@ class IncludeExpansionPolicy
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path) = 0;
 
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path) = 0;
+
+
   virtual ~IncludeExpansionPolicy() = default;
 
   enum Policy {
@@ -36,9 +39,11 @@ class IncludeExpansionPolicy
     COMPILER,
   };
 
-  static IncludeExpansionPolicy *Get_Expansion_Policy(Policy policy);
   static std::unique_ptr<IncludeExpansionPolicy>
                 Get_Expansion_Policy_Unique(Policy policy);
+
+  /* Return if headers passed through -include must be expanded.  */
+  static bool Expand_Minus_Includes(Policy policy);
 
   static Policy Get_From_String(const char *string);
   inline static Policy Get_Overriding(const char *string, bool is_kernel)
@@ -66,6 +71,11 @@ class NoIncludeExpansionPolicy : public IncludeExpansionPolicy
     return false;
   }
 
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path)
+  {
+    return false;
+  }
+
 };
 
 class ExpandEverythingExpansionPolicy : public IncludeExpansionPolicy
@@ -75,6 +85,11 @@ class ExpandEverythingExpansionPolicy : public IncludeExpansionPolicy
   {
     return true;
   }
+
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path)
+  {
+    return false;
+  }
 };
 
 /** Expand any header according to kernel livepatching rules.  */
@@ -82,6 +97,11 @@ class KernelExpansionPolicy : public IncludeExpansionPolicy
 {
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path)
+  {
+    return false;
+  }
 };
 
 /** Expand any header that is not installed in the system.  */
@@ -89,6 +109,11 @@ class SystemExpansionPolicy : public IncludeExpansionPolicy
 {
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path)
+  {
+    return false;
+  }
 };
 
 /** Expand any header that is not compiler-specific.  */
@@ -96,4 +121,5 @@ class CompilerExpansionPolicy : public IncludeExpansionPolicy
 {
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path);
 };

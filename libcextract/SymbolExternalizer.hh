@@ -303,6 +303,9 @@ class SymbolExternalizer
   SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt,
                      bool allow_late_externalize, std::string patch_object,
                      const std::vector<std::string> &functions_to_extract,
+                     IncludeExpansionPolicy::Policy exp_policy,
+                     std::vector<std::string> const &must_expand,
+                     std::vector<std::string> const &must_not_expand,
                      bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
@@ -312,7 +315,8 @@ class SymbolExternalizer
       AllowLateExternalization(allow_late_externalize),
       PatchObject(patch_object),
       SymbolsMap({}),
-      ClosureVisitor(ast)
+      ClosureVisitor(ast),
+      IT(AST, exp_policy, must_expand, must_not_expand)
   {
     ClosureVisitor.Compute_Closure_Of_Symbols(functions_to_extract);
   }
@@ -438,4 +442,7 @@ class SymbolExternalizer
 
   /* ClosureVisitor to compute the closure.  */
   DeclClosureVisitor ClosureVisitor;
+
+  /* IncludeTree to verify if a certain header can be marked for expansion.   */
+  IncludeTree IT;
 };

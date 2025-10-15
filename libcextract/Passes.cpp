@@ -50,7 +50,8 @@ void Print_AST(ASTUnit *ast)
   */
 extern IntrusiveRefCntPtr<llvm::vfs::FileSystem> _Hack_VFS;
 
-static bool Build_ASTUnit(PassManager::Context *ctx, IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr)
+bool Build_ASTUnit(PassManager::Context *ctx,
+                   IntrusiveRefCntPtr<vfs::FileSystem> fs /*= nullptr*/)
 {
   ctx->AST.reset();
 
@@ -182,21 +183,50 @@ class BuildASTPass : public Pass
   /** Remove any undesired flags and insert new flags as necessary. */
   void Update_Clang_Args(PassManager::Context *ctx)
   {
-    bool keep_includes = ctx->KeepIncludes;
     std::vector<const char *> &clangargs = ctx->ClangArgs;
 
-    if (keep_includes == false) {
+    const SourceManager &sm = ctx->AST->getSourceManager();
+    const Preprocessor &pp = ctx->AST->getPreprocessor();
+    auto main_dir = ClangCompat::Get_Main_Directory_Arr(sm);
+    HeaderSearch &incsrch = pp.getHeaderSearchInfo();
+    SourceLocation mainfileloc = sm.getLocForStartOfFile(sm.getMainFileID());
+    std::unique_ptr<IncludeExpansionPolicy> IEP =
+          IncludeExpansionPolicy::Get_Expansion_Policy_Unique(ctx->IncExpansionPolicy);
+
+    if (IncludeExpansionPolicy::Expand_Minus_Includes(ctx->IncExpansionPolicy)) {
       /* Linux adds -include header.h flag which we need to remove, else
          the re-inclusion of this header when reparsing will overwrite our
          changes.  */
       for (auto it = clangargs.begin(); it != clangargs.end(); it++) {
         const char *elem = *it;
         if (!strcmp(elem, "-include")) {
-          clangargs.erase(it, it+2);
+          /* Check if we need to expand this header.  */
+          OptionalFileEntryRef ref = incsrch.LookupFile(*std::next(it),
+                                                        mainfileloc,
+                                                        false,
+                                                        nullptr,
+                                                        nullptr,
+                                                        main_dir,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr);
+          if (ref.has_value()) {
+            const FileEntryRef &entry = *ref;
+            const FileEntry &fentry = ref->getFileEntry();
 
-          /* Required because we removed two elements from the vector.  */
-          it--;
-          it--;
+            if (IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName())) {
+              /* We need to expand this as well.  Remove those arguments from the
+                 command line.  */
+              clangargs.erase(it, it+2);
+
+              /* Required because we removed two elements from the vector.  */
+              it--;
+              it--;
+            }
+          }
         }
       }
     }
@@ -408,7 +438,8 @@ class ClosurePass : public Pass
       llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
 
       /* Dump the IncludeTree.  */
-      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy, ctx->HeadersToExpand);
+      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy,
+                     ctx->HeadersToExpand, ctx->HeadersToNotExpand);
       out << "/** IncludeTree: \n\n";
       IT.Dump(out);
       out << "\n */\n";
@@ -490,6 +521,9 @@ class FunctionExternalizerPass : public Pass
                                       ctx->AllowLateExternalizations,
                                       ctx->PatchObject,
                                       ctx->FuncExtractNames,
+                                      ctx->IncExpansionPolicy,
+                                      ctx->HeadersToExpand,
+                                      ctx->HeadersToNotExpand,
                                       ctx->DumpPasses);
       if (ctx->RenameSymbols)
         /* The FuncExtractNames will be modified, as the function will be renamed.  */
@@ -534,7 +568,8 @@ class FunctionExternalizerPass : public Pass
       out << "*/\n";
 
       /* Dump the IncludeTree.  */
-      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy, ctx->HeadersToExpand);
+      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy,
+                     ctx->HeadersToExpand, ctx->HeadersToNotExpand);
       out << "/** IncludeTree: \n\n";
       IT.Dump(out);
       out << "\n */\n";

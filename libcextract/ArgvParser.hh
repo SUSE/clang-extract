@@ -59,6 +59,11 @@ class ArgvParser
     return HeadersToExpand;
   }
 
+  inline std::vector<std::string>& Get_Headers_To_Not_Expand(void)
+  {
+    return HeadersToNotExpand;
+  }
+
   inline std::string &Get_Output_File(void)
   {
     return OutputFile;
@@ -139,8 +144,6 @@ class ArgvParser
     return IgnoreClangErrors;
   }
 
-  const char *Get_Input_File(void);
-
   /** Print help usage message.  */
   void Print_Usage_Message(void);
 
@@ -153,6 +156,7 @@ class ArgvParser
   std::vector<std::string> FunctionsToExtract;
   std::vector<std::string> SymbolsToExternalize;
   std::vector<std::string> HeadersToExpand;
+  std::vector<std::string> HeadersToNotExpand;
   std::string OutputFile;
 
   bool IgnoreClangErrors;

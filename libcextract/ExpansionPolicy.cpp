@@ -21,12 +21,6 @@
 bool KernelExpansionPolicy::Must_Expand(const StringRef &absolute_path,
                                         const StringRef &relative_path)
 {
-  // absolute_path and relative_path are different when extracting code from a
-  // compiled kernel directory, so we need to check whether the include paths
-  // start from include paths.
-  if (absolute_path != relative_path)
-    return !relative_path.starts_with("./include");
-
   std::vector<std::string> include_paths = { "/include/", "/arch/" };
 
   for (auto &path : include_paths) {
@@ -73,6 +67,12 @@ bool CompilerExpansionPolicy::Must_Expand(const StringRef &absolute_path,
 
   /* Expand anything that doesn't match this.  */
   return true;
+}
+
+bool CompilerExpansionPolicy::Must_Not_Expand(const StringRef &absolute_path,
+                                              const StringRef &relative_path)
+{
+  return !Must_Expand(absolute_path, relative_path);
 }
 
 std::unique_ptr<IncludeExpansionPolicy> IncludeExpansionPolicy::Get_Expansion_Policy_Unique(
@@ -133,4 +133,23 @@ IncludeExpansionPolicy::Policy IncludeExpansionPolicy::Get_From_String(const cha
   }
 
   return IncludeExpansionPolicy::NOTHING;
+}
+
+
+/* Return true if headers passed through -include must be expanded.  */
+bool IncludeExpansionPolicy::Expand_Minus_Includes(IncludeExpansionPolicy::Policy policy)
+{
+  switch (policy) {
+    case INVALID:
+    case EVERYTHING:
+    case SYSTEM:
+    case COMPILER:
+      return true;
+      break;
+
+    case NOTHING:
+    case KERNEL:
+      return false;
+      break;
+  }
 }

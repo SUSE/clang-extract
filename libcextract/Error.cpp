@@ -28,7 +28,7 @@ DiagsClass DiagsClass::sDiag;
 DiagsClass::DiagsClass(void)
   : LangOpts(),
     DOpts(DiagnosticOptionsWithColor()),
-    DiagsEngine(llvm::outs(), LangOpts, DOpts.getDiagsOptsToEngine())
+    DiagsEngine(llvm::errs(), LangOpts, DOpts.getDiagsOptsToEngine())
 {}
 
 /* Print error giving a piece of source code that caused the error.  */
@@ -46,6 +46,6 @@ void DiagsClass::EmitMessage(const StringRef message, DiagnosticsEngine::Level l
 {
   bool colored = Is_Colored();
   const std::string ce_message = Append_CE(message);
-  TextDiagnostic::printDiagnosticLevel(llvm::outs(), level, colored);
-  TextDiagnostic::printDiagnosticMessage(llvm::outs(), false, ce_message, 0, 0, colored);
+  TextDiagnostic::printDiagnosticLevel(llvm::errs(), level, colored);
+  TextDiagnostic::printDiagnosticMessage(llvm::errs(), false, ce_message, 0, 0, colored);
 }

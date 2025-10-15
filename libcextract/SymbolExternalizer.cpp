@@ -681,6 +681,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
        because it may translate to the FileID that do not contain any changed
        buffer.  Hence we do our own thing here, which is look at our own
        FileEntry => FileID that we are sure to have modifications.  */
+    const FileEntry *fentry = it->first;
     FileID id = it->second.first;
     StringRef filename = it->second.second;
 
@@ -702,7 +703,22 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
 
       /* In case this is not the main file, we need to mark it for expansion.  */
       if (id != sm.getMainFileID()) {
-        includes_to_expand.push_back(filename.str());
+        IncludeNode *node = IT.Get(fentry);
+
+        /* Check we can mark the node for expansion.  Maybe the expansion rule
+           or the user requested that the header can not be expanded.  */
+        if (node->Can_Be_Expanded()) {
+          includes_to_expand.push_back(filename.str());
+        } else {
+          /* Issue an error.  */
+          std::string msg = "Necessary header " + filename.str() + " cannot be expanded "+
+                            "due to either user or ExpansionPolicy request.";
+          DiagsClass::Emit_Error(msg,
+                                 node->Get_InclusionDirective()->getSourceRange(),
+                                 AST->getSourceManager());
+          throw std::runtime_error("SymbolExternalizer is unable to continue");
+          return false;
+        }
       } else {
         main_file_inserted = true;
       }
