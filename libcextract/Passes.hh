@@ -58,6 +58,7 @@ class PassManager {
             AllowLateExternalizations(args.Get_Allow_Late_Externalization()),
             PatchObject(args.Get_PatchObject()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
+            HeadersToNotExpand(args.Get_Headers_To_Not_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
             Debuginfos(args.Get_Debuginfo_Path()),
             IpaclonesPath(args.Get_Ipaclones_Path()),
@@ -120,6 +121,9 @@ class PassManager {
 
         /** Which includes we must expand? */
         std::vector<std::string> HeadersToExpand;
+
+        /** Which includes we must NOT expand? */
+        std::vector<std::string> HeadersToNotExpand;
 
         /** The arguments that will be sent to clang when building the AST.  */
         std::vector<const char *> &ClangArgs;
@@ -189,3 +193,6 @@ class Pass {
     /** Name of current pass.  */
     const char *PassName;
 };
+
+bool Build_ASTUnit(PassManager::Context *ctx,
+                   IntrusiveRefCntPtr<vfs::FileSystem> fs = nullptr);

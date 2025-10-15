@@ -35,26 +35,56 @@ static bool In_Set(std::unordered_set<std::string> &set, const std::string &str,
   return false;
 }
 
+static bool In_Set(std::unordered_set<std::string> &set, const StringRef &str,
+                   bool remove_if_exists)
+{
+  return In_Set(set, str.str(), remove_if_exists);
+}
+
 /* ----- IncludeTree ------ */
 IncludeTree::IncludeTree(Preprocessor &pp,
                          SourceManager &sm,
                          IncludeExpansionPolicy::Policy p,
-                         std::vector<std::string> const &must_expand)
+                         std::vector<std::string> const &must_expand,
+                         std::vector<std::string> const &must_not_expand)
   : PP(pp),
     SM(sm),
     IEP(IncludeExpansionPolicy::Get_Expansion_Policy_Unique(p))
 {
-  Build_Header_Tree(must_expand);
-  Fix_Output_Attrs(Root);
+  /* First step: create the barebones IncludeTree structure.  If a node is
+     set to expansion, or not expansion, or can't be output because it is
+     unreachable from the main file, it is flagged here.  */
+  Build_Header_Tree(must_expand, must_not_expand);
+
+  /* Second step: propagate the ShouldBeExpanded flag upwards on the tree,
+     which means sweeping through the tree post-order transversal to
+     propagate that flag upward.  */
+  Set_Expansion_Attrs(Root);
+
+  /* Third step: now set and propagate the "ShouldBeOutput flag downards the
+     tree, iterating it using pre-order transversal.  In the case a header
+     attempts to be set to be output but it would violate the
+     ShouldNotBeOutput flag, then it set the node for expansion and try
+     to set its children for output.  */
+  Set_Output_Attrs();
+
+  /* Forth step: for headers that must NOT be expanded, we cut it from the
+     tree, which means we cancel out the 'expansion' flag even if the user
+     requested.  In case the header cannot be set to output, we error out.  */
+  Cut_Non_Expandable_Trees(Root, false);
+
+  /* Create a hash of FileEntry => IncludeNode for fast lookup.  */
   Build_Header_Map();
 }
 
 IncludeTree::~IncludeTree(void)
 {
   delete Root;
+  Root = nullptr;
 }
 
-void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
+void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand,
+                                    std::vector<std::string> const &must_not_expand)
 {
   /* Construct the IncludeTree. The algorithm works as follows:
 
@@ -68,8 +98,12 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
        because the includes are parsed in a DFS fashion, hence the stack.
     4. Add the found include as a child and update its parent.  */
 
+
   std::unordered_set<std::string> must_expand_set(must_expand.begin(),
                                                   must_expand.end());
+  std::unordered_set<std::string> must_not_expand_set(must_not_expand.begin(),
+                                                      must_not_expand.end());
+
   MacroWalker mw(PP);
   bool already_seen_main = false;
   OptionalFileEntryRef main = SM.getFileEntryRefForID(SM.getMainFileID());
@@ -119,34 +153,60 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand)
         current = stack.top();
       }
 
-      bool expand = In_Set(must_expand_set, id->getFileName().str(), /*remove=*/true) ||
-                    In_Set(must_expand_set, id->getFile()->getName().str(),
-                           /*remove=*/true);
+      /* Check if the user or SymbolExternalizer requested a specific header to be
+         expanded.  */
+      bool expand = In_Set(must_expand_set, id->getFileName(), /*remove=*/true) ||
+                    In_Set(must_expand_set, id->getFile()->getName(), /*remove=*/true);
 
       /* Starting from LLVM-18 and in some platforms (s390x), the behaviour of
        * FileEntry::getName() changed. Now it returns the full path of the file
        * rather than the relative path to it, so here we account it for now onwards.
        */
       expand |= In_Set(must_expand_set,
-                       id->getFile()->getFileEntry().tryGetRealPathName().str(),
+                       id->getFile()->getFileEntry().tryGetRealPathName(),
                        /*remove=*/true);
 
-      bool output = already_seen_main && current->Should_Be_Expanded()
-                                      && !expand;
+      /* Check if the policy will request this header to be expanded.  */
+      bool policy_expand = Run_Must_Expand_Policy(id);
+
+      bool not_expand = In_Set(must_not_expand_set, id->getFileName(), false) ||
+                        In_Set(must_not_expand_set, id->getFile()->getName(), false) ||
+                        In_Set(must_not_expand_set,
+                               id->getFile()->getFileEntry().tryGetRealPathName(), false);
+
+      /* Now check what the Must_Not_Expand policy will say.  If we have a conflict
+         with what the user or SymbolExternalizer is saying, we cannot continue.  */
+      bool policy_not_expand = Run_Must_Not_Expand_Policy(id);
+
+      /* Check if its sane.  If the user (or SymbolExternalizer) requested that
+         a must-not-expand header to be expanded, then error out.  */
+      if (expand && policy_not_expand) {
+        std::string message = "Unable to expand header " + id->getFileName().str() +
+        ": denied by ExpansionPolicy.";
+        DiagsClass::Emit_Error(message, id->getSourceRange(), SM);
+        throw std::runtime_error("IncludeTree is unable to continue");
+        return;
+      }
+
+      if (expand && not_expand) {
+        std::string message = "Unable to expand header " + id->getFileName().str() +
+        ": denied by -DCE_NOT_EXPAND_INCLUDES.";
+        DiagsClass::Emit_Error(message, id->getSourceRange(), SM);
+        throw std::runtime_error("IncludeTree is unable to continue");
+        return;
+      }
+
+      bool can_be_output = Is_Reachable_From_Main(id);
       bool is_from_minus_include = !already_seen_main;
 
       /* Add child to tree.  */
-      IncludeNode *child = new IncludeNode(this,
-                                           id,
-                                           output,
-                                           expand,
-                                           is_from_minus_include);
+      IncludeNode *child = new IncludeNode(this, id, is_from_minus_include,
+                                           false, expand | policy_expand,
+                                           !can_be_output,
+                                           not_expand | policy_not_expand);
+
       current->Add_Child(child);
       child->Set_Parent(current);
-
-      /* In the case it was marked for expansion, then update parent nodes.  */
-      if (expand)
-        child->Mark_For_Expansion();
 
       stack.push(child);
     } else if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
@@ -217,16 +277,83 @@ void IncludeTree::Build_Header_Map(void)
   }
 }
 
-void IncludeTree::Fix_Output_Attrs(IncludeNode *node)
+void IncludeTree::Set_Expansion_Attrs(IncludeNode *node)
 {
-  if (node->ShouldBeOutput) {
-    node->Mark_For_Output();
+  /* Because we need to propagate the ShouldBeExpanded upwards in the tree,
+     we iterate on it using post-order transversal.  */
+  for (IncludeNode *child : node->Childs) {
+    Set_Expansion_Attrs(child);
   }
 
-  if (node->ShouldBeOutput || node->ShouldBeExpanded) {
-    for (IncludeNode *child : node->Childs) {
-      Fix_Output_Attrs(child);
+  /* We must not touch root.  */
+  if (node->Is_Root())
+    return;
+
+  if (node->ShouldBeExpanded) {
+    IncludeNode *parent = node->Get_Parent();
+    parent->ShouldBeExpanded = true;
+    parent->ShouldBeOutput = false;
+  }
+}
+
+void IncludeTree::Set_Output_Attrs(void)
+{
+  /* Because we need to propagate the ShouldBeOutput downwards in the tree,
+     we iterate on it using pre-order transversal by the aid of an stack.  */
+  std::stack<IncludeNode *> stack;
+  stack.push(Root);
+  while (!stack.empty()) {
+    IncludeNode *node = stack.top(); stack.pop();
+    IncludeNode *parent = node->Get_Parent();
+
+    /* In case the parent is set to be expanded, we must output this
+       include.  */
+    if (parent && parent->ShouldBeExpanded && !node->ShouldBeExpanded) {
+      if (!node->Is_From_Minus_Include() || !parent->Is_Root()) {
+        /* In the case this node can not be output, we need set it to
+           expansion and try later for its children.  */
+        if (node->ShouldNotBeOutput) {
+          node->ShouldBeExpanded = true;
+        } else {
+          node->ShouldBeOutput = true;
+        }
+      }
     }
+
+    /* Add children to the stack.  */
+    for (IncludeNode *child : node->Childs) {
+      stack.push(child);
+    }
+  }
+}
+
+void IncludeTree::Cut_Non_Expandable_Trees(IncludeNode *node, bool cutting)
+{
+  /* Because we need to propagate the ShouldBeOuput downwards in the tree,
+     we iterate on it using pre-order transversal recursively.  */
+
+  /* If we are already cutting it from the tree.  */
+  if (cutting) {
+    node->ShouldBeOutput = false;
+    node->ShouldBeExpanded = false;
+  } else if (node->ShouldNotBeExpanded) {
+    /* We need to start cutting it from the tree.  */
+    node->ShouldBeOutput = true;
+    node->ShouldBeExpanded = false;
+
+    if (node->ShouldNotBeOutput) {
+      std::string message = "Unable to not expand header " +
+                            node->ID->getFileName().str() +
+                            ": header is not reachable from main file.";
+      DiagsClass::Emit_Error(message, node->ID->getSourceRange(), SM);
+      throw std::runtime_error("IncludeTree is unable to continue");
+    }
+  }
+
+  /* Propagate downards.  */
+  bool cut = cutting || node->ShouldNotBeExpanded;
+  for (IncludeNode *child : node->Childs) {
+    Cut_Non_Expandable_Trees(child, cut);
   }
 }
 
@@ -241,12 +368,52 @@ IncludeNode *IncludeTree::Get(const SourceLocation &loc)
   }
 
   if (fileref.has_value()) {
-    const FileEntry *file = &fileref->getFileEntry();
-    return Map[file];
+    return Get(&fileref->getFileEntry());
   }
 
   /* Well, the declaration seems fuzzy, so return that we don't have a file.  */
   return nullptr;
+}
+
+IncludeNode *IncludeTree::Get(const FileEntry *file)
+{
+  return Map[file];
+}
+
+bool IncludeTree::Is_Reachable_From_Main(InclusionDirective *ID)
+{
+  HeaderSearch &incsrch = PP.getHeaderSearchInfo();
+
+  /* Get main file location.  We will check if the include is reachable from
+     the main file.  */
+  FileID main_file = SM.getMainFileID();
+  SourceLocation mainfileloc = SM.getLocForStartOfFile(main_file);
+
+  auto main_dir = ClangCompat::Get_Main_Directory_Arr(SM);
+
+  /* If we mark a file for output, this include must be reachable from the
+     main file, otherwise the generated file won't be able to find certain
+     includes.  */
+  OptionalFileEntryRef ref = incsrch.LookupFile(ID->getFileName(),
+                                        mainfileloc,
+                                        !ID->wasInQuotes(),
+                                        nullptr,
+                                        nullptr,
+                                        main_dir,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr,
+                                        nullptr);
+
+  if (ref.has_value()) {
+    /* File is reachable.  */
+    return true;
+  } else {
+    /* File not reachable.  */
+    return false;
+  }
 }
 
 void IncludeTree::Dump(llvm::raw_ostream &out)
@@ -263,14 +430,17 @@ void IncludeTree::Dump(void)
 
 IncludeTree::IncludeNode::IncludeNode(IncludeTree *tree,
                                       InclusionDirective *include,
+                                      bool is_from_minus_include,
                                       bool output, bool expand,
-                                      bool is_from_minus_include)
+                                      bool not_output, bool not_expand)
   : Tree(*tree),
     ID(include),
     File(ID->getFile()),
     HeaderGuard(nullptr),
     ShouldBeOutput(output),
     ShouldBeExpanded(expand),
+    ShouldNotBeOutput(not_output),
+    ShouldNotBeExpanded(not_expand),
     IsFromMinusInclude(is_from_minus_include),
     Parent(nullptr)
 {
@@ -282,6 +452,8 @@ IncludeTree::IncludeNode::IncludeNode(IncludeTree *tree)
     HeaderGuard(nullptr),
     ShouldBeOutput(false),
     ShouldBeExpanded(true),
+    ShouldNotBeOutput(false),
+    ShouldNotBeExpanded(false),
     IsFromMinusInclude(false),
     Parent(nullptr)
 {
@@ -450,67 +622,17 @@ IncludeNode *IncludeTree::Get(const InclusionDirective *directive)
   return IncMap[directive];
 }
 
-bool IncludeNode::Has_Parent_Marked_For_Output(void)
+bool IncludeTree::Run_Expansion_Policy(InclusionDirective *ID,
+                                       SourceLocation inloc, PolicyRule p)
 {
-  IncludeNode *node = this;
-
-  do {
-    if (node->Should_Be_Output()) {
-      return true;
-    }
-    node = node->Get_Parent();
-  } while (node != nullptr);
-
-  return false;
-}
-
-void IncludeNode::Mark_For_Expansion(void)
-{
-  IncludeNode *node = this;
-
-  do {
-    /* Mark childs for output.  */
-    for (IncludeNode *child : node->Childs) {
-      if (child->Should_Be_Expanded() == false && !child->Is_From_Minus_Include()) {
-        child->ShouldBeExpanded = false;
-        child->Mark_For_Output();
-      }
-    }
-
-    /* Mark parent nodes to be expanded.  */
-    if (node->ShouldBeExpanded == false) {
-      node->ShouldBeExpanded = true;
-      node->ShouldBeOutput = false;
-    }
-
-    node = node->Get_Parent();
-  } while (node != nullptr);
-}
-
-bool IncludeNode::Is_Reachable_From_Main(void)
-{
-  const Preprocessor &pp = Tree.PP;
-  const SourceManager &sm = Tree.SM;
-
-  if (Is_Root()) {
-    /* Root is always reachable: is the main itself.  */
-    return true;
-  }
-
-  HeaderSearch &incsrch = pp.getHeaderSearchInfo();
-
-  /* Get main file location.  We will check if the include is reachable from
-     the main file.  */
-  FileID main_file = sm.getMainFileID();
-  SourceLocation mainfileloc = sm.getLocForStartOfFile(main_file);
-
-  auto main_dir = ClangCompat::Get_Main_Directory_Arr(sm);
+  auto main_dir = ClangCompat::Get_Main_Directory_Arr(SM);
+  HeaderSearch &incsrch = PP.getHeaderSearchInfo();
 
   /* If we mark a file for output, this include must be reachable from the
      main file, otherwise the generated file won't be able to find certain
      includes.  */
   OptionalFileEntryRef ref = incsrch.LookupFile(ID->getFileName(),
-                                        mainfileloc,
+                                        inloc,
                                         !ID->wasInQuotes(),
                                         nullptr,
                                         nullptr,
@@ -525,33 +647,38 @@ bool IncludeNode::Is_Reachable_From_Main(void)
   if (ref.has_value()) {
     const FileEntryRef &entry = *ref;
     const FileEntry &fentry = ref->getFileEntry();
-    if (Tree.IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName())) {
-      /* Lie telling it is unreachable, which would force an expansion.  */
-      return false;
-    }
-    /* File is reachable.  */
-    return true;
-  } else {
-    /* File not reachable.  */
-    return false;
+    if (p == PolicyRule::MUST_EXPAND) {
+      return IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName());
+    } else if (p == PolicyRule::MUST_NOT_EXPAND) {
+      return IEP->Must_Not_Expand(fentry.tryGetRealPathName(), entry.getName());
+    } 
   }
+
+  return false;
 }
 
-void IncludeNode::Mark_For_Output(void)
+bool IncludeNode::Has_Parent_Marked_For_Output(void)
+{
+  IncludeNode *node = this;
+
+  do {
+    if (node->Should_Be_Output()) {
+      return true;
+    }
+    node = node->Get_Parent();
+  } while (node != nullptr);
+
+  return false;
+}
+
+bool IncludeNode::Is_Reachable_From_Main(void)
 {
   if (Is_Root()) {
-    /* Root does not have an InclusionDirective.  */
-    assert(ShouldBeOutput == false && "Root has output true.");
-    return;
+    /* Root is always reachable: is the main itself.  */
+    return true;
   }
 
-  if (Is_Reachable_From_Main()) {
-    /* File is reachable.  We can safely set this file to output and be done.  */
-    ShouldBeOutput = true;
-  } else {
-    /* File not reachable.  We must expand this.  */
-    Mark_For_Expansion();
-  }
+  return Tree.Is_Reachable_From_Main(ID);
 }
 
 void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
@@ -564,10 +691,24 @@ void IncludeNode::Set_HeaderGuard(MacroDefinitionRecord *guard)
   }
 }
 
+bool IncludeTree::IncludeNode::Can_Be_Expanded(void)
+{
+  IncludeNode *node = this;
+  while (node) {
+    if (node->ShouldNotBeExpanded) {
+      return false;
+    }
+    node = node->Get_Parent();
+  }
+
+  return true;
+}
+
 void IncludeTree::IncludeNode::Dump_Single_Node(llvm::raw_ostream &out)
 {
   out << File->getName() << " Expand: " << ShouldBeExpanded <<
-         " Output: " << ShouldBeOutput << " -include: " <<
+         " Output: " << ShouldBeOutput << " NotExpand: " << ShouldNotBeExpanded <<
+         " NotOutput: " << ShouldNotBeOutput << " -include: " <<
          IsFromMinusInclude << '\n';
 }
 

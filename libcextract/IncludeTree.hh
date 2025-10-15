@@ -28,6 +28,7 @@
 #include <clang/Tooling/Tooling.h>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 
 using namespace clang;
@@ -54,8 +55,9 @@ class IncludeTree
         PreprocessingDirective history.  Set if header must be marked to `output`
         or `expanded` when printed.  */
     IncludeNode(IncludeTree *tree, InclusionDirective *include,
-                bool output = true, bool expand = false,
-                bool is_from_minus_inclue = false);
+                bool is_from_minus_inclue = false,
+                bool output = false, bool expand = false,
+                bool not_output = false, bool not_expand = false);
 
     /** Build an IncludeNode to a null file, which is not #include'd
         anywhere but is the root of everything.  */
@@ -119,16 +121,24 @@ class IncludeTree
       return ShouldBeExpanded;
     }
 
+    inline bool Should_Not_Be_Expand(void)
+    {
+      return ShouldNotBeExpanded;
+    }
+
+    inline bool Should_Not_Be_Output(void)
+    {
+      return ShouldNotBeOutput;
+    }
+
     inline MacroDefinitionRecord *Get_HeaderGuard(void)
     {
       return HeaderGuard;
     }
 
+    /** Check if this node is reachable from the main file, i.e., including it
+        in the program would not result in a file not found error.  */
     bool Is_Reachable_From_Main(void);
-
-    void Mark_For_Expansion(void);
-
-    void Mark_For_Output(void);
 
     /** Check if this node or any of its parents was marked for output.  */
     bool Has_Parent_Marked_For_Output(void);
@@ -137,6 +147,9 @@ class IncludeTree
     {
       return this == Tree.Root;
     }
+
+    /** Check if the node can be marked for expansion.  */
+    bool Can_Be_Expanded(void);
 
     /** Dump, for debugging reasons.  */
     void Dump_Single_Node(llvm::raw_ostream &out);
@@ -173,6 +186,8 @@ class IncludeTree
 
     bool ShouldBeOutput : 1;
     bool ShouldBeExpanded : 1;
+    bool ShouldNotBeOutput : 1;
+    bool ShouldNotBeExpanded : 1;
     bool IsFromMinusInclude : 1;
 
     /** Who included me?  */
@@ -187,12 +202,15 @@ class IncludeTree
   /** Create the include tree from the Preprocessor history.  */
   IncludeTree(Preprocessor &pp, SourceManager &sm,
               IncludeExpansionPolicy::Policy p = IncludeExpansionPolicy::Policy::NOTHING,
-              std::vector<std::string> const &must_expand = {});
+              std::vector<std::string> const &must_expand = {},
+              std::vector<std::string> const &must_not_expand = {});
 
   IncludeTree(ASTUnit *ast,
               IncludeExpansionPolicy::Policy p = IncludeExpansionPolicy::Policy::NOTHING,
-              std::vector<std::string> const &must_expand = {})
-    : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), p, must_expand)
+              std::vector<std::string> const &must_expand = {},
+              std::vector<std::string> const &must_not_expand = {})
+    : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), p,
+                  must_expand, must_not_expand)
   {
   }
 
@@ -211,6 +229,9 @@ class IncludeTree
   /** Get from InclusionDirective.  */
   IncludeNode *Get(const InclusionDirective *);
 
+  /** Get from FileEntry.  */
+  IncludeNode *Get(const FileEntry *);
+
   /** Dump for debugging purposes.  */
   void Dump(llvm::raw_ostream &out);
   void Dump(void);
@@ -218,14 +239,46 @@ class IncludeTree
   private:
 
   /** Actually builds the header tree.  */
-  void Build_Header_Tree(std::vector<std::string> const &must_expand);
-
+  void Build_Header_Tree(std::vector<std::string> const &must_expand,
+                         std::vector<std::string> const &must_not_expand);
   /** Build mapping from header path to IncludeNode.  */
   void Build_Header_Map(void);
 
-  /** Fix the case where the IncludeNode can not be marked to output and needs
-      to be expanded because it is not reachable from the main file.  */
-  void Fix_Output_Attrs(IncludeNode *node);
+  /** Set the ShouldBeExpanded flag after the barebones of the tree is built.  */
+  void Set_Expansion_Attrs(IncludeNode *node);
+
+  /** Set the ShouldBeOutput flag after the barebones of the tree is built
+      and the ShouldBeOutput flag is correctly set.  */
+  void Set_Output_Attrs(void);
+
+  void Cut_Non_Expandable_Trees(IncludeNode *, bool cutting);
+
+  enum PolicyRule {
+    MUST_EXPAND,
+    MUST_NOT_EXPAND,
+  };
+
+  /** Run the IncludeExpansionPolicy to the include to figure out if it needs
+      to be expanded or not.  */
+  bool Run_Expansion_Policy(InclusionDirective *ID, SourceLocation incloc, PolicyRule p);
+
+  /** Run the Must_Expand rule of IncludeExpansionPolicy to the include to
+      figure out if it needs to be expanded or not.  */
+  inline bool Run_Must_Expand_Policy(InclusionDirective *ID)
+  {
+    return Run_Expansion_Policy(ID, ID->getSourceRange().getBegin(), MUST_EXPAND);
+  }
+
+  /** Run the Must_Not_Expand rule of IncludeExpansionPolicy to the include to
+      figure out if it can be expanded or not.  */
+  inline bool Run_Must_Not_Expand_Policy(InclusionDirective *ID)
+  {
+    return Run_Expansion_Policy(ID, ID->getSourceRange().getBegin(), MUST_NOT_EXPAND);
+  }
+
+  /** Check if this node is reachable from the main file, i.e., including it
+      in the program would not result in a file not found error.  */
+  bool Is_Reachable_From_Main(InclusionDirective *id);
 
   /** Root of the tree.  */
   IncludeNode *Root;

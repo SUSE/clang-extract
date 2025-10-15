@@ -61,6 +61,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     FunctionsToExtract(),
     SymbolsToExternalize(),
     HeadersToExpand(),
+    HeadersToNotExpand(),
     OutputFile(),
     IgnoreClangErrors(false),
     DisableExternalization(false),
@@ -156,6 +157,8 @@ void ArgvParser::Print_Usage_Message(void)
 "                           nothing, everything, kernel, system and compiler.\n"
 "  -DCE_EXPAND_INCLUDES=<args>\n"
 "                           Force expansion of the headers provided in <args>.\n"
+"  -DCE_NOT_EXPAND_INCLUDES=<args>\n"
+"                           Force the following headers to NOT be expanded.\n"
 "  -DCE_RENAME_SYMBOLS      Allow renaming of extracted symbols.\n"
 "  -DCE_DEBUGINFO_PATH=<arg>\n"
 "                           Path to the compiled (ELF) object of the desired program to\n"
@@ -252,6 +255,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_EXPAND_INCLUDES=", str)) {
     HeadersToExpand = Extract_Args(str);
+
+    return true;
+  }
+  if (prefix("-DCE_NOT_EXPAND_INCLUDES=", str)) {
+    HeadersToNotExpand = Extract_Args(str);
 
     return true;
   }
