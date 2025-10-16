@@ -193,39 +193,49 @@ class BuildASTPass : public Pass
     std::unique_ptr<IncludeExpansionPolicy> IEP =
           IncludeExpansionPolicy::Get_Expansion_Policy_Unique(ctx->IncExpansionPolicy);
 
-    if (IncludeExpansionPolicy::Expand_Minus_Includes(ctx->IncExpansionPolicy)) {
+    if (!ctx->KeepIncludes ||
+        IncludeExpansionPolicy::Expand_Minus_Includes(ctx->IncExpansionPolicy)) {
       /* Linux adds -include header.h flag which we need to remove, else
          the re-inclusion of this header when reparsing will overwrite our
          changes.  */
       for (auto it = clangargs.begin(); it != clangargs.end(); it++) {
         const char *elem = *it;
         if (!strcmp(elem, "-include")) {
-          /* Check if we need to expand this header.  */
-          OptionalFileEntryRef ref = incsrch.LookupFile(*std::next(it),
-                                                        mainfileloc,
-                                                        false,
-                                                        nullptr,
-                                                        nullptr,
-                                                        main_dir,
-                                                        nullptr,
-                                                        nullptr,
-                                                        nullptr,
-                                                        nullptr,
-                                                        nullptr,
-                                                        nullptr);
-          if (ref.has_value()) {
-            const FileEntryRef &entry = *ref;
-            const FileEntry &fentry = ref->getFileEntry();
+          if (ctx->KeepIncludes) {
+            /* Check if we need to expand this header.  */
+            OptionalFileEntryRef ref = incsrch.LookupFile(*std::next(it),
+                                                          mainfileloc,
+                                                          false,
+                                                          nullptr,
+                                                          nullptr,
+                                                          main_dir,
+                                                          nullptr,
+                                                          nullptr,
+                                                          nullptr,
+                                                          nullptr,
+                                                          nullptr,
+                                                          nullptr);
+            if (ref.has_value()) {
+              const FileEntryRef &entry = *ref;
+              const FileEntry &fentry = ref->getFileEntry();
 
-            if (IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName())) {
-              /* We need to expand this as well.  Remove those arguments from the
-                 command line.  */
-              clangargs.erase(it, it+2);
+              if (IEP->Must_Expand(fentry.tryGetRealPathName(), entry.getName())) {
+                /* We need to expand this as well.  Remove those arguments from the
+                   command line.  */
+                clangargs.erase(it, it+2);
 
-              /* Required because we removed two elements from the vector.  */
-              it--;
-              it--;
+                /* Required because we removed two elements from the vector.  */
+                it--;
+                it--;
+              }
             }
+          } else {
+            /* We need to expand all of them, KeepIncludes was not passed.  */
+            clangargs.erase(it, it+2);
+
+            /* Required because we removed two elements from the vector.  */
+            it--;
+            it--;
           }
         }
       }

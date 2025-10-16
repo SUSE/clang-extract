@@ -26,6 +26,32 @@
 
 #define Out (*Out)
 
+/* Workarround LLVM bug #162126 (CE bug #146)*/
+static void Attr_Order_Fix(Decl *decl)
+{
+  /* This only seems to affect variables, if its not the case then quickly
+     return.  */
+  VarDecl *vdecl = dyn_cast<VarDecl>(decl);
+  if (vdecl == nullptr)
+    return;
+
+  if (decl->hasAttrs()) {
+    const SourceManager &SM = decl->getASTContext().getSourceManager();
+    AttrVec &Attrs = decl->getAttrs();
+
+    /* Clang always seems to insert the `asm` label last, but lets just swap
+       with the first one.  */
+    for (unsigned i = 0; i < Attrs.size(); ++i) {
+      if (isa<AsmLabelAttr>(Attrs[i])) {
+        auto temp = Attrs[i];
+        Attrs[i] = Attrs[0];
+        Attrs[0] = temp;
+        break;
+      }
+    }
+  }
+}
+
 void PrettyPrint::Print_Decl(Decl *decl, bool keep_includes)
 {
   /* When handling C code, we need to check if given declaration is a function
@@ -165,6 +191,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
           tagdecl->getDefinition()->print(Out, PPolicy);
           Out << " " << typedecl->getName();
         } else {
+          Attr_Order_Fix(decl);
           decl->print(Out, PPolicy);
         }
       } else {
@@ -184,6 +211,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
             Out << "#undef noinline\n";
           }
         }
+        Attr_Order_Fix(decl);
         decl->print(Out, LangOpts);
         if (noinline_info) {
           /* Redeclare the macro to the previous value.  */
@@ -207,11 +235,13 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
         Out << decl_source;
       } else {
         /* In case its not balanced, fallback to AST dump.  */
+        Attr_Order_Fix(decl);
         decl->print(Out, LangOpts);
       }
     }
   } else {
     /* Else, we fallback to AST Dumping.  */
+    Attr_Order_Fix(decl);
     decl->print(Out, LangOpts);
   }
 }
