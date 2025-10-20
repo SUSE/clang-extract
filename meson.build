@@ -53,7 +53,7 @@ gcc_install_dir = ''
 build_dir_absolute_path = meson.build_root()
 simple_program_file = configure_file(output: 'simple_program.c', input: 'simple_program.c.in', copy: true )
 
-gcc_output = run_command(gcc.full_path(), '-v', '-o', build_dir_absolute_path / 'simple_program.out',
+gcc_output = run_command(gcc.full_path(), '-fno-PIC', '-v', '-o', build_dir_absolute_path / 'simple_program.out',
                          build_dir_absolute_path / 'simple_program.c', check: true).stderr().strip().split('\n')
 foreach line : gcc_output
   if line.contains('crtbegin.o')
