@@ -54,6 +54,8 @@ static const char *UnsupportedGCCArgs[] = {
   "-Wimplicit-fallthrough=",
   "-Wendif-labels",
   "-Wmissing-selector-name",
+  "-Wfree-labels",
+  "-Wmissing-parameter-name",
 };
 
 ArgvParser::ArgvParser(int argc, char **argv)
