@@ -36,7 +36,6 @@ static void Attr_Order_Fix(Decl *decl)
     return;
 
   if (decl->hasAttrs()) {
-    const SourceManager &SM = decl->getASTContext().getSourceManager();
     AttrVec &Attrs = decl->getAttrs();
 
     /* Clang always seems to insert the `asm` label last, but lets just swap
