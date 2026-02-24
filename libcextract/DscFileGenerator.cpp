@@ -92,6 +92,29 @@ void DscFileGenerator::Global_Functions(void)
   }
 }
 
+static bool Is_TLS(VarDecl *decl)
+{
+  return decl->getTLSKind() == VarDecl::TLS_None ? false : true;
+}
+
+static bool Is_TLS(const DeclContext::lookup_result &decls)
+{
+  bool is_tls = false;
+
+  for (auto it = decls.begin(); it != decls.end(); ++it) {
+    if (VarDecl *vdecl = dyn_cast<VarDecl>(*it)) {
+      is_tls |= Is_TLS(vdecl);
+    }
+  }
+
+  return is_tls;
+}
+
+static std::string Get_TLS_Token(bool predicate)
+{
+  return predicate == true ? "%" : "";
+}
+
 void DscFileGenerator::Local_Symbols(void)
 {
   TranslationUnitDecl *tu = AST->getASTContext().getTranslationUnitDecl();
@@ -102,9 +125,11 @@ void DscFileGenerator::Local_Symbols(void)
       DeclContext::lookup_result decls = tu->lookup(
                                           DeclarationName(&idtbl.get(entry.NewName)));
       if (decls.empty()) {
-        throw std::runtime_error("Unable to find symbol " + entry.NewName + " in the AST");
+        throw std::runtime_error("Unable to find symbol " + entry.NewName +
+				 " in the AST");
       }
-      Out << "\n#" << entry.OldName << ":" << entry.NewName;
+      Out << "\n#" << Get_TLS_Token(Is_TLS(decls)) << entry.OldName << ":" <<
+	     entry.NewName;
       std::string mod = IA.Get_Symbol_Module(entry.OldName);
       if (!mod.empty())
         Out << ":" << mod;

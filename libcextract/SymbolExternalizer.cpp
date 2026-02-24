@@ -646,6 +646,12 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
     ret->addAttr(UsedAttr::Create(astctx));
   }
 
+  /* In case the original Decl has TLS storage, we must copy it to the new
+     variable as well.  */
+  if (VarDecl *vdecl = dyn_cast<VarDecl>(decl)) {
+    ret->setTSCSpec(vdecl->getTSCSpec());
+  }
+
   /* return node.  */
   return ret;
 }
