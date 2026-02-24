@@ -112,3 +112,10 @@ bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
 
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
 bool Has_Balanced_Ifdef(const StringRef &string);
+
+
+/** Check if the VarDecl is declared as TLS.  */
+static inline bool Is_TLS(VarDecl *decl)
+{
+  return decl->getTLSKind() == VarDecl::TLS_None ? false : true;
+}

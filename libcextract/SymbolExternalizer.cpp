@@ -650,6 +650,18 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
      variable as well.  */
   if (VarDecl *vdecl = dyn_cast<VarDecl>(decl)) {
     ret->setTSCSpec(vdecl->getTSCSpec());
+
+    /* Libpulp support TLS through some ugly hacking.  Warn the user about it
+       for now.  */
+    if (Is_TLS(vdecl)) {
+      std::string msg = "Externalization of TLS variable " +
+                        vdecl->getName().str() +
+                        " requires human intervention to call __tls_get_addr";
+
+
+      DiagsClass::Emit_Warn(msg, vdecl->getSourceRange(),
+                            AST->getSourceManager());
+    }
   }
 
   /* return node.  */

@@ -92,11 +92,6 @@ void DscFileGenerator::Global_Functions(void)
   }
 }
 
-static bool Is_TLS(VarDecl *decl)
-{
-  return decl->getTLSKind() == VarDecl::TLS_None ? false : true;
-}
-
 static bool Is_TLS(const DeclContext::lookup_result &decls)
 {
   bool is_tls = false;
