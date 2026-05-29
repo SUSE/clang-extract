@@ -237,8 +237,6 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
       const DeducedTemplateSpecializationType *type);
 
   /* ----------- Other C++ stuff ----------- */
-  bool TraverseNestedNameSpecifier(NestedNameSpecifier *nns);
-
   bool TraverseCXXBaseSpecifier(const CXXBaseSpecifier base);
 
   /* ------ Helper Functions ------ */
