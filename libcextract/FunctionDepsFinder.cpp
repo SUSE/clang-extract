@@ -95,7 +95,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
     if (TypedefDecl *decl = dyn_cast<TypedefDecl>(*it)) {
       SourceRange range = decl->getSourceRange();
 
-      const clang::Type *type = decl->getTypeForDecl();
+      const clang::Type *type = (static_cast<TypeDecl *>(decl))->getTypeForDecl();
       if (type) {
         /* We must be careful with pointers, the user can define things like:
          *

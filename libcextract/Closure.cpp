@@ -61,7 +61,7 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
       continue;
     }
 
-    const std::string &decl_name = decl->getName().str();
+    const std::string &decl_name = decl->getNameAsString();
     /* If the symbol name is in the set...   */
     if (setof_names.find(decl_name) != setof_names.end()) {
       /* Mark that name as matched.  */
@@ -375,10 +375,6 @@ bool DeclClosureVisitor::VisitClassTemplateSpecializationDecl(
 bool DeclClosureVisitor::VisitDeclRefExpr(DeclRefExpr *expr)
 {
   TRY_TO(TraverseDecl(expr->getDecl()));
-  /* For C++ we also need to analyze the name specifier.  */
-  if (NestedNameSpecifier *nns = expr->getQualifier()) {
-    TRY_TO(TraverseNestedNameSpecifier(nns));
-  }
 
   /* Analyze the decl it references to.  */
   return TraverseDecl(expr->getDecl());
@@ -473,28 +469,6 @@ bool DeclClosureVisitor::VisitDeducedTemplateSpecializationType(
 }
 
 /* ----------- Other C++ stuff ----------- */
-
-bool DeclClosureVisitor::TraverseNestedNameSpecifier(NestedNameSpecifier *nns)
-{
-  switch (nns->getKind()) {
-    case NestedNameSpecifier::Namespace:
-      /* Do not traverse to avoid adding unecessary childs.  */
-      TRY_TO(VisitNamespaceDecl(nns->getAsNamespace()));
-      break;
-    case NestedNameSpecifier::NamespaceAlias:
-      TRY_TO(TraverseDecl(nns->getAsNamespaceAlias()));
-      break;
-
-    case NestedNameSpecifier::Super:
-      /* Something regarding MSVC, but lets put this here.  */
-      TRY_TO(TraverseDecl(nns->getAsRecordDecl()));
-      break;
-
-    default:
-      break;
-  }
-  return RecursiveASTVisitor::TraverseNestedNameSpecifier(nns);
-}
 
 bool DeclClosureVisitor::TraverseCXXBaseSpecifier(const CXXBaseSpecifier base)
 {
