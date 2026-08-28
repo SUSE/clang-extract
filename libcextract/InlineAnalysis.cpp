@@ -530,3 +530,103 @@ std::string InlineAnalysis::Get_Symbol_Module(std::string sym)
 
   return {};
 }
+
+#include "LLVMMisc.hh"
+#include "PrettyPrint.hh"
+
+using namespace clang;
+using namespace llvm;
+
+void InlineAnalysis::Update_With_Source_Code_Info(ASTUnit *ast)
+{
+  /* If we don't have the IPA clones then there is no point in updating its
+     information.  */
+  if (Ipa == nullptr)
+    return;
+
+  /* Get the lookup table.  */
+  TranslationUnitDecl *tu = ast->getASTContext().getTranslationUnitDecl();
+  DeclarationNameTable &decltbl = ast->getASTContext().DeclarationNames;
+  IdentifierTable &idtbl = ast->getPreprocessor().getIdentifierTable();
+
+  /* Build Callgraph.  */
+  CallGraph *cg = Build_CallGraph_From_AST(ast);
+  CallGraphNode *root = cg->getRoot();
+
+  /* Clang callgraph doesn't have information about callers, so...  */
+  DenseMap<CallGraphNode *, SmallVector<CallGraphNode *, 4>> callers;
+  for (auto it = cg->begin(); it != cg->end(); ++it) {
+    CallGraphNode *caller = it->second.get();
+
+    /* Ignore the virtual root object.  */
+    if (caller == root)
+      continue;
+
+    for (const auto &call_record : caller->callees()) {
+      CallGraphNode *callee = call_record.Callee;
+      callers[callee].push_back(caller);
+    }
+  }
+
+  /* We are potentially going to remove nodes.  Lets mark them to be removed
+     to avoid having to handle issues with the unordered_set iterator.  */
+  SmallVector<IpaCloneNode *, 8> to_remove;
+
+  /* Iterate on each node in the IPA clones graph.  This is not DFS!  */
+  for (auto it = Ipa->begin(); it != Ipa->end(); ++it) {
+    const std::string &name = it->first;
+    IpaCloneNode *node = &(it->second);
+
+    /* Strip away any postfix in the name that could have been a result of GCC
+       modifying the symbol.  */
+    std::string name_without_dot = name.substr(0, name.find('.'));
+
+    if (name == name_without_dot) {
+      /* This is not a custom function created by GCC, hence the IPA
+         clones info should be correct.  */
+
+      continue;
+    }
+
+    /* Get decls matching the name in the IpaClone node.  */
+    DeclContext::lookup_result decls = tu->lookup(decltbl.getIdentifier(
+                                                  &idtbl.get(name_without_dot)));
+
+    /* Iterate on them.  */
+    if (decls.empty()) {
+      throw std::runtime_error("Unable to find symbol " + name +
+                               " in the AST, but is in provided .ipaclone!");
+    }
+
+    /* Get original IPA clone node without the GCC quirks in its name.  */
+    IpaCloneNode *node_without_dot = Ipa->Get_Node(name_without_dot);
+
+    /* Merge this node with the original node.  */
+    Ipa->Merge_Nodes(node_without_dot, node);
+    to_remove.push_back(node);
+
+    for (NamedDecl *decl : decls) {
+      CallGraphNode *callee = cg->getNode(decl);
+
+      /* Update the IpaClones graph with this information.  */
+      for (CallGraphNode *caller : callers[callee]) {
+        NamedDecl *decl = dyn_cast<NamedDecl>(caller->getDecl());
+
+        assert(decl && "Decl in callgraph without a name?");
+
+        IpaCloneNode *ipa_caller = Ipa->Get_Or_Create_Node(decl->getNameAsString());
+        IpaCloneNode *ipa_callee = node_without_dot;
+
+        ipa_callee->InlinedInto.insert(ipa_caller);
+        ipa_caller->Inlines.insert(ipa_callee);
+      }
+    }
+  }
+
+  /* Remove nodes marked to be removed.  */
+  for (IpaCloneNode *node : to_remove)
+    Ipa->Remove_Node(node);
+
+  /* Destroy our callgraph.  */
+  delete cg;
+}

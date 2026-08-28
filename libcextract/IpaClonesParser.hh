@@ -105,6 +105,9 @@ class IpaClones : public Parser
     return Get_Or_Create_Node(std::string(name));
   }
 
+  /** Merge node `from` to `to`, releasing `from` in the process.  */
+  void Merge_Nodes(IpaCloneNode *to, IpaCloneNode *from);
+
   /** Iterate through the set of all nodes.  */
   inline std::unordered_map<std::string, IpaCloneNode>::iterator begin()
   {
@@ -113,6 +116,11 @@ class IpaClones : public Parser
   inline std::unordered_map<std::string, IpaCloneNode>::iterator end()
   {
     return Nodes.end();
+  }
+
+  inline void Remove_Node(IpaCloneNode *node)
+  {
+    Nodes.erase(node->Name);
   }
 
   void Dump(void);

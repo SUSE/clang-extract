@@ -32,6 +32,8 @@
 #include <vector>
 #include <stdio.h>
 
+#include <clang/Frontend/ASTUnit.h>
+
 struct IpaCloneNode;
 
 enum ExternalizationType {
@@ -61,6 +63,10 @@ class InlineAnalysis
   {}
 
   ~InlineAnalysis(void);
+
+  /* Update the IPA clones callgraph with more information that is only
+     available if we provide the source code.  */
+  void Update_With_Source_Code_Info(clang::ASTUnit *ast);
 
   /** Get a set of all functions that are inlined into `asm_name`.  */
   std::set<std::string> Get_Inline_Closure_Of_Symbol(const std::string &asm_name);

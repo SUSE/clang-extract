@@ -252,6 +252,9 @@ class BuildASTPass : public Pass
     if (!Build_ASTUnit(ctx))
       return false;
 
+    /* Update the InlineAnalysis object with the source code information.  */
+    ctx->IA.Update_With_Source_Code_Info(ctx->AST.get());
+
     /* Remove any unwanted arguments from command line.  */
     Update_Clang_Args(ctx);
 

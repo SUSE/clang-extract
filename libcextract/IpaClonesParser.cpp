@@ -166,6 +166,27 @@ IpaCloneNode *IpaClones::Get_Or_Create_Node(const std::string &name)
   return &Nodes[name];
 }
 
+void IpaClones::Merge_Nodes(IpaCloneNode *to, IpaCloneNode *from)
+{
+  /* Rewire the backedges of nodes that are forward adjacent from `from`.  */
+  for (IpaCloneNode *node : from->InlinedInto) {
+    node->Inlines.erase(from);
+    node->Inlines.insert(to);
+  }
+  for (IpaCloneNode *node : from->Inlines) {
+    node->InlinedInto.erase(from);
+    node->InlinedInto.insert(to);
+  }
+
+  /* Unite the sets.  */
+  to->InlinedInto.insert(from->InlinedInto.begin(), from->InlinedInto.end());
+  to->Inlines.insert(from->Inlines.begin(), from->Inlines.end());
+
+  /* Make sure we aren't self referencing.  */
+  to->InlinedInto.erase(to);
+  to->Inlines.erase(to);
+}
+
 void IpaClones::Parse(const char *path)
 {
   FILE *file = fopen(path, "r");
