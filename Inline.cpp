@@ -19,6 +19,10 @@
 #include <stdio.h>
 #include <vector>
 #include <string>
+#include <iostream>
+#include <fstream>
+
+#include <clang/Tooling/Tooling.h>
 
 enum MODE {
   LIST_ALL,
@@ -40,6 +44,7 @@ const char *Output_Path = nullptr;
 static const char *Elf_Path = nullptr;
 static const char *Ipa_Path = nullptr;
 static const char *Symvers_Path = nullptr;
+static const char *Source_Path = nullptr;
 
 static std::vector<std::string> Symbols_To_Analyze;
 
@@ -55,6 +60,7 @@ static void Print_Usage(void)
 "     -csv                     Output as a .csv table format,\n"
 "     -where-is-inlined        Find where <SYMBOLS> got inlined,\n"
 "     -compute-closure         Find symbols that got inlined into <SYMBOLS>,\n"
+"     -source    <PATH>        Input source file in <PATH>."
 "     -o         <PATH>        Output to file in <PATH>.\n"
   );
   exit(0);
@@ -88,6 +94,10 @@ static void Parse(int argc, char *argv[])
         continue;
       }
 
+      if (strcmp(argv[i], "-source") == 0) {
+        Source_Path = argv[++i];
+        continue;
+      }
     }
 
     if (strcmp(argv[i], "-graphviz") == 0) {
@@ -204,6 +214,15 @@ int main(int argc, char *argv[])
   try {
 
     InlineAnalysis ia(Elf_Path, Ipa_Path, Symvers_Path, false);
+
+    /* If we have source code then load it now.  */
+    if (Source_Path && ia.Have_IPA()) {
+      std::stringstream buffer;
+      buffer << std::ifstream(Source_Path).rdbuf();
+
+      ia.Update_With_Source_Code_Info(
+        clang::tooling::buildASTFromCode(buffer.str(), Source_Path).get());
+    }
 
     if (Mode == LIST_ALL) {
       std::set<std::string> set = ia.Get_All_Symbols();

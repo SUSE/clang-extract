@@ -116,7 +116,7 @@ executable('ce-inline', 'Inline.cpp',
   install : true,
   link_args : ['--gcc-install-dir=' + gcc_install_dir],
   link_with : libcextract_static,
-  dependencies : [elf_dep, zlib_dep, zstd_dep]
+  dependencies : [elf_dep, zlib_dep, zstd_dep, clang_dep]
 )
 
 executable('ce-includetree', 'TreeDump.cpp',

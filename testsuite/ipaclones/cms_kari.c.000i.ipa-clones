@@ -1,0 +1,16 @@
+Callgraph clone;cms_kek_cipher;1479;crypto/cms/cms_kari.c;186;12;cms_kek_cipher.isra.0;1527;crypto/cms/cms_kari.c;186;12;isra
+Callgraph clone;cms_kari_create_ephemeral_key;1481;crypto/cms/cms_kari.c;264;12;cms_kari_create_ephemeral_key.isra.1;1528;crypto/cms/cms_kari.c;264;12;isra
+Callgraph clone;cms_wrap_init;1483;crypto/cms/cms_kari.c;339;12;cms_wrap_init.isra.2;1529;crypto/cms/cms_kari.c;339;12;isra
+Callgraph clone;sk_CMS_RecipientEncryptedKey_push;1361;include/openssl/cms.h;34;1;cms_RecipientInfo_kari_init;1482;crypto/cms/cms_kari.c;294;5;inlining to
+Callgraph removal;sk_CMS_RecipientEncryptedKey_push;1361;include/openssl/cms.h;34;1
+Callgraph clone;sk_CMS_RecipientEncryptedKey_num;1351;include/openssl/cms.h;34;1;cms_RecipientInfo_kari_encrypt;1484;crypto/cms/cms_kari.c;373;5;inlining to
+Callgraph clone;sk_CMS_RecipientEncryptedKey_value;1352;include/openssl/cms.h;34;1;cms_RecipientInfo_kari_encrypt;1484;crypto/cms/cms_kari.c;373;5;inlining to
+Callgraph removal;sk_CMS_RecipientEncryptedKey_value;1352;include/openssl/cms.h;34;1
+Callgraph removal;sk_CMS_RecipientEncryptedKey_num;1351;include/openssl/cms.h;34;1
+Callgraph removal;cms_wrap_init;1483;crypto/cms/cms_kari.c;339;12
+Callgraph removal;cms_kari_create_ephemeral_key;1481;crypto/cms/cms_kari.c;264;12
+Callgraph removal;cms_kek_cipher;1479;crypto/cms/cms_kari.c;186;12
+Callgraph clone;cms_wrap_init.isra.2;1529;crypto/cms/cms_kari.c;339;12;cms_RecipientInfo_kari_encrypt;1484;crypto/cms/cms_kari.c;373;5;inlining to
+Callgraph clone;cms_kari_create_ephemeral_key.isra.1;1528;crypto/cms/cms_kari.c;264;12;cms_RecipientInfo_kari_init;1482;crypto/cms/cms_kari.c;294;5;inlining to
+Callgraph removal;cms_kari_create_ephemeral_key.isra.1;1528;crypto/cms/cms_kari.c;264;12
+Callgraph removal;cms_wrap_init.isra.2;1529;crypto/cms/cms_kari.c;339;12
