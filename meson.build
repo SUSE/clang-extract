@@ -23,8 +23,11 @@ project('clang-extract', 'cpp',
 
 add_project_arguments(
   [
+    '-Wall',
+    '-Wextra',
     '-Wno-unused-parameter',
-    '-Wno-vla-extension'
+    '-Wno-vla-extension',
+    '-Wno-vla-cxx-extension',
   ], language: 'cpp'
 )
 

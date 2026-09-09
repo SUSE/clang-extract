@@ -241,7 +241,6 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand,
 
 void IncludeTree::Build_Header_Map(void)
 {
-  static bool warned = false;
   std::stack<IncludeNode *> stack;
 
   stack.push(Root);
@@ -255,12 +254,6 @@ void IncludeTree::Build_Header_Map(void)
     if (Map.find(fentry) != Map.end()) {
       /* FIXME: Find a way to correcly map the FileEntry to the node instead of
          discarding future appearances.  */
-      if (warned == false) {
-        const SourceRange &range = node->Get_Include_Spelling_Range();
-        DiagsClass::Emit_Warn("project #include's the same file multiple times."
-                              " Only the first is registered.", range, SM);
-        warned = true;
-      }
     } else {
       Map[fentry] = node;
     }

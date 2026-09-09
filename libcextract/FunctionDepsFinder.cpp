@@ -26,7 +26,8 @@ FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
     : AST(ctx->AST.get()),
       IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand, ctx->HeadersToNotExpand),
       KeepIncludes(ctx->KeepIncludes),
-      Visitor(AST)
+      Visitor(AST),
+      CompilerMode(ctx->CCPath)
 {
 }
 
@@ -39,7 +40,9 @@ bool FunctionDependencyFinder::Find_Functions_Required(
   /* Find which names did not match any declaration name.  */
   for (const std::string &funcname : funcnames) {
     if (matched_names.find(funcname) == matched_names.end()) {
-      DiagsClass::Emit_Error("Requested symbol not found: " + funcname);
+      /* Only emit an error when we are not in compiler mode.  */
+      if (!CompilerMode)
+        DiagsClass::Emit_Error("Requested symbol not found: " + funcname);
       return false;
     }
   }

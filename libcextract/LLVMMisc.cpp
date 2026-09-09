@@ -16,6 +16,7 @@
 
 #include "LLVMMisc.hh"
 #include "NonLLVMMisc.hh"
+#include "Error.hh"
 
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl)
@@ -129,6 +130,19 @@ DeclaratorDecl *Get_With_Body(DeclaratorDecl *decl)
 
   if (VarDecl *vdecl = dyn_cast<VarDecl>(decl)) {
     return vdecl->getDefinition();
+  }
+
+  return nullptr;
+}
+
+Decl *Get_With_Body(Decl *decl)
+{
+  if (DeclaratorDecl *ddecl = dyn_cast<DeclaratorDecl>(decl)) {
+    return Get_With_Body(ddecl);
+  }
+
+  if (TagDecl *tdecl = dyn_cast<TagDecl>(decl)) {
+    return tdecl->getDefinition();
   }
 
   return nullptr;

@@ -90,4 +90,8 @@ class FunctionDependencyFinder
     /* Visitor that sweeps through the AST.  Kept as pointer to avoid declaring
        the DeclClosureVisitor class into this .h to speedup build time.  */
     DeclClosureVisitor Visitor;
+
+    /** Flag if we are in compiler mode.  In that case, not finding a symbol
+        should indeed abort the compilation but we must swallow it.  */
+    bool CompilerMode;
 };

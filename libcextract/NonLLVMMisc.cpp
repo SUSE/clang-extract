@@ -25,7 +25,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <assert.h>
 
+#include <filesystem>
 #include <iostream>
 
 /** @brief Handle some quirks of getline.  */
@@ -57,6 +60,96 @@ bool Is_Directory(const char *path)
   } else {
     return S_ISDIR(s.st_mode);
   }
+}
+
+/** Simulates the behaviour of `mkdir -p`.  That means, if you pass a path to
+    `path`, it will create a chain of directories to it.  */
+int mkdir_p(const char *path, mode_t mode)
+{
+    char tmp[PATH_MAX];
+    size_t len;
+
+    if (path == NULL || *path == '\0') {
+        errno = EINVAL;
+        return -1;
+    }
+
+    len = strlen(path);
+
+    if (len >= sizeof(tmp)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    memcpy(tmp, path, len + 1);
+
+    /* Remove trailing slashes, except for "/" itself. */
+    while (len > 1 && tmp[len - 1] == '/') {
+        tmp[--len] = '\0';
+    }
+
+    /*
+     * Walk through the path:
+     *
+     *   /a/b/c
+     *   ^   ^
+     *   |   |
+     *   mkdir /a
+     *       mkdir /a/b
+     *           mkdir /a/b/c
+     */
+    for (char *p = tmp + 1; *p != '\0'; ++p) {
+        if (*p != '/')
+            continue;
+
+        *p = '\0';
+
+        if (mkdir(tmp, mode) == -1 && errno != EEXIST) {
+            return -1;
+        }
+
+        *p = '/';
+    }
+
+    /* Create the final component. */
+    if (mkdir(tmp, mode) == -1 && errno != EEXIST) {
+        return -1;
+    }
+
+    /*
+     * EEXIST isn't enough: the existing object could be a regular
+     * file rather than a directory.
+     */
+    struct stat st;
+
+    if (stat(tmp, &st) == -1)
+        return -1;
+
+    if (!S_ISDIR(st.st_mode)) {
+        errno = ENOTDIR;
+        return -1;
+    }
+
+    return 0;
+}
+
+int Ensure_Path_Exists(const std::string &path)
+{
+  char buffer[PATH_MAX] = "";
+  int m = path.length();
+
+  if (m >= PATH_MAX) {
+    return ENAMETOOLONG;
+  }
+
+  memcpy(buffer, path.c_str(), m);
+  char *slash = strrchr(buffer, '/');
+  if (slash) {
+    *slash = '\0';
+    return mkdir_p(buffer, 0755);
+  }
+  /* It should be the current path, so its fine.  */
+  return 0;
 }
 
 std::vector<std::string> Extract_Args(const char *str)
@@ -151,4 +244,13 @@ const char *get_basename(const char *path)
     base = backslash;
 #endif
   return base ? base+1 : path;
+}
+
+/** Get the relative path from aboslute path.  */
+std::string Get_Relative_Path(const std::string &path)
+{
+  char cwd[PATH_MAX];
+  assert(getcwd(cwd, sizeof(cwd)) != nullptr);
+
+  return std::filesystem::relative(path, cwd);
 }

@@ -21,6 +21,8 @@
 #include "ExpansionPolicy.hh"
 #include "clang/Frontend/ASTUnit.h"
 
+#include <exception>
+
 using namespace clang;
 
 class Pass;
@@ -46,9 +48,11 @@ class PassManager {
       public:
         Context(ArgvParser &args)
           : FuncExtractNames(args.Get_Functions_To_Extract()),
+            TriggerOnFullBody(args.Get_Trigger_On_Full_Body()),
             Externalize(args.Get_Symbols_To_Externalize()),
             NotExternalize(args.Get_Symbols_To_Not_Externalize()),
             OutputFile(args.Get_Output_File()),
+            OutputBasedir(args.Get_Output_Basedir()),
             IgnoreClangErrors(args.Get_Ignore_Clang_Errors()),
             ExternalizationDisabled(args.Is_Externalization_Disabled()),
             KeepIncludes(args.Should_Keep_Includes()),
@@ -61,7 +65,9 @@ class PassManager {
             HeadersToExpand(args.Get_Headers_To_Expand()),
             HeadersToNotExpand(args.Get_Headers_To_Not_Expand()),
             ClangArgs(args.Get_Args_To_Clang()),
+            CCArgs(args.Get_Args_To_CC()),
             Debuginfos(args.Get_Debuginfo_Path()),
+            CCPath(args.Get_Given_Path_To_CC()),
             IpaclonesPath(args.Get_Ipaclones_Path()),
             SymversPath(args.Get_Symvers_Path()),
             DscOutputPath(args.Get_Dsc_Output_Path()),
@@ -87,6 +93,10 @@ class PassManager {
         /** List of functions to extract.  */
         std::vector<std::string> &FuncExtractNames;
 
+        /** List of symbols that will trigger the extraction if their full body
+            is seen.  */
+        std::vector<std::string> &TriggerOnFullBody;
+
         /** List of functions to externalize.  */
         std::vector<std::string> &Externalize;
 
@@ -95,6 +105,9 @@ class PassManager {
 
         /** The final output file name.  */
         std::string &OutputFile;
+
+        /** The directory in which the output file must be written to.  */
+        std::string &OutputBasedir;
 
         /** Should we ignore compilation errors from clang?  */
         bool IgnoreClangErrors;
@@ -132,8 +145,14 @@ class PassManager {
         /** The arguments that will be sent to clang when building the AST.  */
         std::vector<const char *> &ClangArgs;
 
+        /** The arguments that will be sent to the CC.  */
+        std::vector<const char *> &CCArgs;
+
         /* Path to Debuginfo, if exists.  */
         std::vector<std::string> &Debuginfos;
+
+        /** Path to the CC compiler, if provided.  */
+        const char *CCPath;
 
         /* Path to Ipaclones, if exists.  */
         const char *IpaclonesPath;
@@ -175,6 +194,13 @@ class PassManager {
 
 class Pass {
   public:
+    /** Run_Pass return value.  */
+    enum PassRetType {
+      PASS_OK = 0,
+      PASS_ERROR = 1,
+      PASS_ABORT_COMPILATION = 99,
+    };
+
     /** Default destructor.  */
     virtual ~Pass() {};
 
@@ -183,7 +209,7 @@ class Pass {
     virtual bool Gate(PassManager::Context *) = 0;
 
     /** What should be done in the pass.  Must be implemented by child class.  */
-    virtual bool Run_Pass(PassManager::Context *) = 0;
+    virtual PassRetType Run_Pass(PassManager::Context *) = 0;
 
     /** Dump the pass result to a file.  Must be implemented by child class.  */
     virtual void Dump_Result(PassManager::Context *) = 0;

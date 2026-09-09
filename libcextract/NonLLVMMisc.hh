@@ -45,6 +45,14 @@ inline bool prefix(const char *a, const char *b)
   return !strncmp(a, b, strlen(a));
 }
 
+/** Check if suffix is a suffix of s.  */
+inline bool suffix(const char *suffix, const char *s)
+{
+  size_t n = strlen(s);
+  size_t m = strlen(suffix);
+  return n >= m && strcmp(s + n - m, suffix) == 0;
+}
+
 /** Check if a string is null or empty.  */
 inline bool is_null_or_empty(const char *str)
 {
@@ -89,6 +97,12 @@ char *getline_easy(FILE *file);
 /** Check if given path is a directory.  */
 bool Is_Directory(const char *path);
 
+/** Simulates the behaviour of `mkdir -p`.  That means, if you pass a path to
+    `path`, it will create a chain of directories to it.  */
+int mkdir_p(const char *path, mode_t mode);
+
+int Ensure_Path_Exists(const std::string &);
+
 /** Extract arguments that are specified after the '=' sign separated by ','.  */
 std::vector<std::string> Extract_Args(const char *str);
 
@@ -116,3 +130,6 @@ class FileHandling
 
 /** Get basename of a string.  Works like the gnu version.  */
 const char *get_basename(const char *filename);
+
+/** Get the relative path from aboslute path.  */
+std::string Get_Relative_Path(const std::string &path);

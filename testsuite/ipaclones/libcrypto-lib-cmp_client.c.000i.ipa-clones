@@ -1,0 +1,46 @@
+Callgraph clone;ossl_check_const_OSSL_CMP_CERTRESPONSE_sk_type;782;include/openssl/cmp.h;380;1;unprotected_exception;867;crypto/cmp/cmp_client.c;31;12;inlining to
+Callgraph clone;ossl_check_const_ASN1_UTF8STRING_sk_type;88;include/openssl/asn1.h;763;1;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;inlining to
+Callgraph clone;ossl_check_ASN1_UTF8STRING_sk_type;89;include/openssl/asn1.h;763;1;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;inlining to
+Callgraph clone;ossl_check_ASN1_UTF8STRING_type;87;include/openssl/asn1.h;763;1;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;inlining to
+Callgraph clone;ossl_check_const_ASN1_UTF8STRING_sk_type;88;include/openssl/asn1.h;763;1;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;inlining to
+Callgraph removal;ossl_check_const_ASN1_UTF8STRING_sk_type;88;include/openssl/asn1.h;763;1
+Callgraph removal;ossl_check_ASN1_UTF8STRING_sk_type;89;include/openssl/asn1.h;763;1
+Callgraph removal;ossl_check_ASN1_UTF8STRING_type;87;include/openssl/asn1.h;763;1
+Callgraph clone;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;save_statusInfo.part.0;972;crypto/cmp/cmp_client.c;88;12;part
+Callgraph clone;ossl_check_X509_sk_type;460;include/openssl/x509.h;78;1;OSSL_CMP_certConf_cb;877;crypto/cmp/cmp_client.c;581;5;inlining to
+Callgraph clone;ossl_check_const_X509_sk_type;459;include/openssl/x509.h;78;1;OSSL_CMP_certConf_cb;877;crypto/cmp/cmp_client.c;581;5;inlining to
+Callgraph clone;ossl_check_X509_sk_type;460;include/openssl/x509.h;78;1;OSSL_CMP_certConf_cb;877;crypto/cmp/cmp_client.c;581;5;inlining to
+Callgraph removal;ossl_check_X509_sk_type;460;include/openssl/x509.h;78;1
+Callgraph removal;ossl_check_const_X509_sk_type;459;include/openssl/x509.h;78;1
+Callgraph clone;initial_certreq;879;crypto/cmp/cmp_client.c;802;12;initial_certreq.part.0;974;crypto/cmp/cmp_client.c;802;12;part
+Callgraph clone;sk_OSSL_CMP_POLLREP_num;842;crypto/cmp/cmp_local.h;500;1;poll_for_response;871;crypto/cmp/cmp_client.c;282;12;inlining to
+Callgraph removal;sk_OSSL_CMP_POLLREP_num;842;crypto/cmp/cmp_local.h;500;1
+Callgraph clone;send_receive_also_delayed;873;crypto/cmp/cmp_client.c;419;12;send_receive_also_delayed.part.0;975;crypto/cmp/cmp_client.c;419;12;part
+Callgraph clone;ossl_check_const_OSSL_CMP_CERTRESPONSE_sk_type;782;include/openssl/cmp.h;380;1;cert_response;878;crypto/cmp/cmp_client.c;654;12;inlining to
+Callgraph removal;ossl_check_const_OSSL_CMP_CERTRESPONSE_sk_type;782;include/openssl/cmp.h;380;1
+Callgraph clone;ossl_check_const_X509_CRL_sk_type;471;include/openssl/x509.h;130;1;OSSL_CMP_exec_RR_ses;882;crypto/cmp/cmp_client.c;897;5;inlining to
+Callgraph clone;ossl_check_const_OSSL_CRMF_CERTID_sk_type;746;include/openssl/crmf.h;121;1;OSSL_CMP_exec_RR_ses;882;crypto/cmp/cmp_client.c;897;5;inlining to
+Callgraph clone;sk_OSSL_CMP_REVDETAILS_value;793;crypto/cmp/cmp_local.h;361;1;OSSL_CMP_exec_RR_ses;882;crypto/cmp/cmp_client.c;897;5;inlining to
+Callgraph clone;ossl_check_const_OSSL_CRMF_CERTID_sk_type;746;include/openssl/crmf.h;121;1;OSSL_CMP_exec_RR_ses;882;crypto/cmp/cmp_client.c;897;5;inlining to
+Callgraph clone;ossl_check_const_OSSL_CMP_PKISI_sk_type;770;include/openssl/cmp.h;322;1;OSSL_CMP_exec_RR_ses;882;crypto/cmp/cmp_client.c;897;5;inlining to
+Callgraph removal;ossl_check_const_OSSL_CMP_PKISI_sk_type;770;include/openssl/cmp.h;322;1
+Callgraph removal;ossl_check_const_OSSL_CRMF_CERTID_sk_type;746;include/openssl/crmf.h;121;1
+Callgraph removal;sk_OSSL_CMP_REVDETAILS_value;793;crypto/cmp/cmp_local.h;361;1
+Callgraph removal;ossl_check_const_X509_CRL_sk_type;471;include/openssl/x509.h;130;1
+Callgraph clone;initial_certreq;879;crypto/cmp/cmp_client.c;802;12;initial_certreq.constprop.0;977;crypto/cmp/cmp_client.c;802;12;constprop
+Callgraph clone;poll_for_response;871;crypto/cmp/cmp_client.c;282;12;poll_for_response.constprop.0;978;crypto/cmp/cmp_client.c;282;12;constprop
+Callgraph clone;cert_response;878;crypto/cmp/cmp_client.c;654;12;cert_response.isra.0;979;crypto/cmp/cmp_client.c;654;12;isra
+Callgraph clone;initial_certreq.constprop.0;977;crypto/cmp/cmp_client.c;802;12;OSSL_CMP_exec_certreq;881;crypto/cmp/cmp_client.c;867;7;inlining to
+Callgraph clone;initial_certreq.part.0;974;crypto/cmp/cmp_client.c;802;12;initial_certreq.constprop.0;977;crypto/cmp/cmp_client.c;802;12;inlining to
+Callgraph clone;initial_certreq.part.0;974;crypto/cmp/cmp_client.c;802;12;OSSL_CMP_exec_certreq;881;crypto/cmp/cmp_client.c;867;7;inlining to
+Callgraph clone;initial_certreq.constprop.0;977;crypto/cmp/cmp_client.c;802;12;OSSL_CMP_try_certreq;880;crypto/cmp/cmp_client.c;823;5;inlining to
+Callgraph clone;save_statusInfo.part.0;972;crypto/cmp/cmp_client.c;88;12;save_statusInfo;868;crypto/cmp/cmp_client.c;88;12;inlining to
+Callgraph clone;send_receive_also_delayed.part.0;975;crypto/cmp/cmp_client.c;419;12;send_receive_also_delayed;873;crypto/cmp/cmp_client.c;419;12;inlining to
+Callgraph clone;save_senderNonce_if_waiting;872;crypto/cmp/cmp_client.c;399;12;OSSL_CMP_exec_certreq;881;crypto/cmp/cmp_client.c;867;7;inlining to
+Callgraph clone;save_senderNonce_if_waiting;872;crypto/cmp/cmp_client.c;399;12;send_receive_also_delayed;873;crypto/cmp/cmp_client.c;419;12;inlining to
+Callgraph clone;save_senderNonce_if_waiting;872;crypto/cmp/cmp_client.c;399;12;OSSL_CMP_try_certreq;880;crypto/cmp/cmp_client.c;823;5;inlining to
+Callgraph removal;save_statusInfo.part.0;972;crypto/cmp/cmp_client.c;88;12
+Callgraph removal;send_receive_also_delayed.part.0;975;crypto/cmp/cmp_client.c;419;12
+Callgraph removal;initial_certreq.constprop.0;977;crypto/cmp/cmp_client.c;802;12
+Callgraph removal;save_senderNonce_if_waiting;872;crypto/cmp/cmp_client.c;399;12
+Callgraph removal;initial_certreq.part.0;974;crypto/cmp/cmp_client.c;802;12

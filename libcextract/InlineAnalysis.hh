@@ -64,6 +64,10 @@ class InlineAnalysis
 
   ~InlineAnalysis(void);
 
+  /* Load the IPA Clones in case it wasn't loaded already.  Used in CC mode
+     when the IPA clones dump is yet to be generated.  */
+  void Load_Ipaclones(const char *path);
+
   /* Update the IPA clones callgraph with more information that is only
      available if we provide the source code.  */
   void Update_With_Source_Code_Info(clang::ASTUnit *ast);

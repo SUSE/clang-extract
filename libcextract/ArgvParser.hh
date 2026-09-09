@@ -44,9 +44,24 @@ class ArgvParser
     return ArgsToClang;
   }
 
+  inline std::vector<const char *>& Get_Args_To_CC(void)
+  {
+    return ArgsToCC;
+  }
+
+  inline const std::vector<const char *>& Get_Args_To_CC(void) const
+  {
+    return ArgsToCC;
+  }
+
   inline std::vector<std::string>& Get_Functions_To_Extract(void)
   {
     return FunctionsToExtract;
+  }
+
+  inline std::vector<std::string>& Get_Trigger_On_Full_Body(void)
+  {
+    return FullBodySymbols;
   }
 
   inline std::vector<std::string>& Get_Symbols_To_Externalize(void)
@@ -149,21 +164,40 @@ class ArgvParser
     return IgnoreClangErrors;
   }
 
+  inline const char *Get_Given_Path_To_CC(void)
+  {
+    return CCPath;
+  }
+
+  inline std::string &Get_Output_Basedir(void)
+  {
+    return OutputBasedir;
+  }
+
   /** Print help usage message.  */
   void Print_Usage_Message(void);
 
   private:
   bool Handle_Clang_Extract_Arg(const char *str);
+  bool Is_Unsupported_GCC_Arg(const char *str);
   void Insert_Required_Parameters(void);
 
+  /** List of arguments that will be passed to clang's libtooling.  */
   std::vector<const char *> ArgsToClang;
 
+  /** List of arguments that will be passed to -DCE_CC.  */
+  std::vector<const char *> ArgsToCC;
+
   std::vector<std::string> FunctionsToExtract;
+  std::vector<std::string> FullBodySymbols;
   std::vector<std::string> SymbolsToExternalize;
   std::vector<std::string> SymbolsToNotExternalize;
   std::vector<std::string> HeadersToExpand;
   std::vector<std::string> HeadersToNotExpand;
   std::string OutputFile;
+
+  /** The directory in which the output file must be written to.  */
+  std::string OutputBasedir;
 
   bool IgnoreClangErrors;
   bool DisableExternalization;
@@ -189,4 +223,7 @@ class ArgvParser
   const char *IncExpansionPolicy;
 
   const char *OutputFunctionPrototypeHeader;
+
+  /* Path to given C compiler.  */
+  const char *CCPath;
 };

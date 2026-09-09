@@ -259,7 +259,7 @@ void IpaClones::Parse(const char *path)
         if (strcmp(cleaned_callee_name, cleaned_caller_name) == 0) {
           continue;
         }
-      } else if (!strcmp(happened, "isra")) {
+      } else if (!strcmp(happened, "isra") || !strcmp(happened, "part") || !strcmp(happened, "constprop")) {
         cleaned_caller_name = clone_asm_name;
         cleaned_callee_name = original_asm_name;
       }
@@ -294,6 +294,151 @@ void IpaClones::Dump(void)
     }
     std::cout << '\n';
   }
+}
+
+/** Look at the arguments provided to CC and figure out where the IPA-clones
+    were dumped.  */
+std::pair<const char *, const char *>
+IpaClones::Find_Dump_File(const std::vector<const char *> &ccargs)
+{
+  bool fdump_ipa_clones = false;
+
+  const char *dumpdir = nullptr;
+  const char *output_file = nullptr;
+  const char *input_file = nullptr;
+
+  static char buffer[PATH_MAX];
+  int buffer_len = 0;
+  buffer[0] = '\0';
+  buffer[PATH_MAX-1] = '\0';
+
+  int n = ccargs.size();
+
+  /* ccargs may be ended with the NULL pointer.  Check if this is the case.  */
+  if (ccargs[n-1] == NULL) {
+    n--;
+  }
+
+  for (int i = 0; i < n; i++) {
+    if (i + 1 < n) {
+      if (!strcmp("-dumpdir", ccargs[i])) {
+        dumpdir = ccargs[++i];
+      }
+      else if (!strcmp("-o", ccargs[i])) {
+        output_file = ccargs[++i];
+      }
+    }
+
+    if (prefix("-dumpdir=", ccargs[i])) {
+      dumpdir = Extract_Single_Arg_C(ccargs[i]);
+    }
+    else if (!strcmp("-fdump-ipa-clones", ccargs[i])) {
+      fdump_ipa_clones = true;
+    }
+    else if (prefix("-o", ccargs[i])) {
+      output_file = &ccargs[i][2];
+    }
+    else if (suffix(".c", ccargs[i])   ||
+             suffix(".C", ccargs[i])   ||
+             suffix(".cc", ccargs[i])  ||
+             suffix(".CC", ccargs[i])  ||
+             suffix(".cpp", ccargs[i]) ||
+             suffix(".CPP", ccargs[i]) ||
+             suffix(".cxx", ccargs[i]) ||
+             suffix(".CXX", ccargs[i])) {
+      input_file = ccargs[i];
+    }
+  }
+
+  /* If we couldn't get a meaningful input file that potentially means we have
+     been called in linker mode.  */
+  if (input_file == nullptr) {
+    return std::pair(nullptr, nullptr);
+  }
+
+  /* If -fdump-ipa-clones is not seen anywhere, simply return false.  */
+  if (fdump_ipa_clones == false)
+    return std::pair(nullptr, input_file);
+
+  /* If dumpdir wasn't specified, the output is relative to the output file
+     and the source filename.  */
+  if (dumpdir == nullptr) {
+    if (output_file) {
+      const char *slash = strrchr(output_file, '/');
+      if (slash) {
+        size_t path_len = (size_t)(slash - output_file) + 1;
+        memcpy(buffer, output_file, path_len);
+
+        /* Make sure we have the null character.  */
+        buffer[path_len] = '\0';
+        buffer_len = path_len;
+
+      } else {
+        strcpy(buffer, "./");
+        buffer_len = 2;
+      }
+
+      dumpdir = buffer;
+    } else {
+      /* There is no output file specified, hence its the same directory as the
+         input file.  */
+
+      const char *slash = strrchr(input_file, '/');
+      if (slash) {
+        size_t path_len = (size_t)(slash - input_file) + 1;
+        memcpy(buffer, input_file, path_len);
+
+        /* Make sure we have the null character.  */
+        buffer[path_len] = '\0';
+        buffer_len = path_len;
+
+      } else {
+        strcpy(buffer, "./");
+        buffer_len = 2;
+      }
+
+      dumpdir = buffer;
+    }
+  }
+
+  /* Now that we have a dumpdir if it have not been provided, construct the
+     ipa-clone file.  */
+  if (dumpdir != buffer) {
+    int len = strlen(dumpdir);
+    memcpy(buffer, dumpdir, len+1);
+    buffer_len = len;
+  }
+
+  const char *ext = strrchr(input_file, '.');
+  int ext_len = strlen(ext);
+
+  /* So guess what? altough the clones have the same extension as the source
+     file, gcc actually crafts it from the output file, which forces us to do
+     this sort of ugly hacking.  */
+  const char *basefile = get_basename(output_file ? output_file : input_file);
+  int basefile_len = strlen(basefile);
+
+  memcpy(&buffer[buffer_len], basefile, basefile_len);
+  buffer_len += basefile_len;
+
+  /* Hack the correct extension.  */
+  char *p = &buffer[buffer_len];
+  while (*p != '.') {
+    buffer_len--;
+    --p;
+  }
+
+  memcpy(p, ext, ext_len+1);
+  buffer_len += ext_len;
+
+  memcpy(&buffer[buffer_len], ".000i.ipa-clones", ARRAY_LENGTH(".000i.ipa-clones"));
+  buffer_len += ARRAY_LENGTH(".000i.ipa-clones") - 1;
+
+  /* Check if we didn't destroy the null character at the end of the array.  */
+  assert(buffer[PATH_MAX-1] == '\0' && "Broken string");
+  puts(buffer);
+
+  return std::pair(buffer, input_file);
 }
 
 void IpaClones::Dump_Graphviz(const char *filename)

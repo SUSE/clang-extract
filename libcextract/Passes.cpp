@@ -27,11 +27,13 @@
 #include "Error.hh"
 #include "HeaderGenerate.hh"
 #include "LLVMMisc.hh"
+#include "LaunchProcess.hh"
 
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
 
 #include <iostream>
+#include <filesystem>
 
 using namespace llvm;
 using namespace clang;
@@ -159,13 +161,79 @@ static std::string Get_Output_From_Input_File(std::string &input)
 
 static std::string Get_Output_Path(PassManager::Context *ctx)
 {
-  std::string output_path = ctx->OutputFile;
-  if (output_path == "") {
-    output_path = Get_Output_From_Input_File(ctx->InputPath);
+  std::string output_path;
+
+  if (ctx->OutputBasedir != "") {
+    output_path = ctx->OutputBasedir;
+    if (output_path[output_path.length()-1] != '/') {
+      output_path += "/";
+    }
+  }
+
+  if (ctx->OutputFile == "") {
+    output_path += Get_Output_From_Input_File(ctx->InputPath);
+  } else {
+    output_path += ctx->OutputFile;
   }
 
   return output_path;
 }
+
+/** LaunchCCPass: Call external compiler provided by user to generate
+ *  assembly/object code during Make.
+ *
+ * This pass lets clang-extract behave like an ordinary compiler, letting it
+ * to be called by make without problems.
+ */
+class LaunchCCPass : public Pass
+{
+  public:
+  LaunchCCPass()
+  {
+    PassName = "LaunchCCPass";
+  }
+
+  virtual bool Gate(PassManager::Context *ctx)
+  {
+    return ctx->CCPath;
+  }
+
+  virtual PassRetType Run_Pass(PassManager::Context *ctx)
+  {
+    int ret = launch_and_wait_process(ctx->CCPath, ctx->CCArgs, true);
+
+    if (ret != 0)
+      return PASS_ERROR;
+
+  /** Check if GCC was invoked in linker mode, that means it will collect the
+      many .o files generated into a single executable.  We don't want to run
+      clang-extract in those cases.  */
+
+    /* If we have `-fdump-ipa-clones`, try to figure out where it was dumped so
+       we can load it.  */
+    std::pair<const char *, const char *> info = IpaClones::Find_Dump_File(ctx->CCArgs);
+    const char *dump_file = info.first;
+    const char *input_file = info.second;
+
+    if (input_file == nullptr) {
+      /* That potentially means we are not processing any C/C++ source file.
+         Abort extraction.  */
+      return PASS_ABORT_COMPILATION;
+    }
+
+    /* We found a ipa-dump file.  In case the user didn't specify an .ipaclone
+       file to load, then store it for the InlinedSymbolsFinder pass to load.  */
+    if (dump_file && ctx->IpaclonesPath == NULL) {
+      ctx->IpaclonesPath = dump_file;
+    }
+
+    return PASS_OK;
+  }
+
+  virtual void Dump_Result(PassManager::Context *)
+  {
+  }
+};
 
 /** BuildASTPass: Built the AST object and store it into the Context object.
  *
@@ -247,10 +315,34 @@ class BuildASTPass : public Pass
     return true;
   }
 
-  virtual bool Run_Pass(PassManager::Context *ctx)
+  virtual PassRetType Run_Pass(PassManager::Context *ctx)
   {
     if (!Build_ASTUnit(ctx))
-      return false;
+      return PASS_ERROR;
+
+    /* Check if we fulfill the conditions to proceed with code extraction, or
+       if we can simply abort the extraction process.  */
+
+    /* Get the lookup table.  */
+    TranslationUnitDecl *tu = ctx->AST->getASTContext().getTranslationUnitDecl();
+    DeclarationNameTable &decltbl = ctx->AST->getASTContext().DeclarationNames;
+    IdentifierTable &idtbl = ctx->AST->getPreprocessor().getIdentifierTable();
+    for (const std::string &name : ctx->TriggerOnFullBody) {
+      DeclContext::lookup_result decls = tu->lookup(decltbl.getIdentifier(
+                                                    &idtbl.get(name)));
+
+      for (NamedDecl *decl : decls) {
+        /* Do we NOT have a full definition for it?  */
+        if (Get_With_Body(decl) == nullptr) {
+          /* File do not match the required trigger parameter.  */
+          if (!ctx->CCPath) {
+            DiagsClass::Emit_Error("Full body of " +
+                                   decl->getNameAsString() + " not found\n");
+          }
+          return PASS_ABORT_COMPILATION;
+        }
+      }
+    }
 
     /* Update the InlineAnalysis object with the source code information.  */
     ctx->IA.Update_With_Source_Code_Info(ctx->AST.get());
@@ -259,10 +351,10 @@ class BuildASTPass : public Pass
     Update_Clang_Args(ctx);
 
     /* Get the input file path.  */
-    ctx->InputPath = Get_Input_File(ctx->AST.get()).str();
+    ctx->InputPath = Get_Input_File(ctx->AST.get());
 
     const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
-    return !de.hasErrorOccurred();
+    return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
   }
 
   virtual void Dump_Result(PassManager::Context *ctx)
@@ -283,7 +375,7 @@ class BuildASTPass : public Pass
     out.close();
   }
 
-  StringRef Get_Input_File(ASTUnit *ast)
+  std::string Get_Input_File(ASTUnit *ast)
   {
     SourceManager &sm = ast->getSourceManager();
 
@@ -295,7 +387,8 @@ class BuildASTPass : public Pass
 
     StringRef path = sm.getFileManager().getCanonicalName(main_file);
 
-    return path;
+    /* We may be interested in the relative path.  */
+    return Get_Relative_Path(path.str());
   }
 };
 
@@ -320,9 +413,15 @@ class InlinedSymbolsFinder : public Pass
       return ctx->IA.Have_IPA();
     }
 
-    virtual bool Run_Pass(PassManager::Context *ctx)
+    virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       InlineAnalysis &IA = ctx->IA;
+
+      /* If we don't have IPA loaded but we have an IPA file, try to load it now.  */
+      if (!IA.Have_IPA() && ctx->IpaclonesPath) {
+        IA.Load_Ipaclones(ctx->IpaclonesPath);
+      }
+
       std::set<std::string> set = IA.Get_Where_Symbols_Is_Inlined(ctx->FuncExtractNames);
 
       /* Add something for the poor debugging user.  */
@@ -339,7 +438,7 @@ class InlinedSymbolsFinder : public Pass
 
       /* Remove any duplicate that may have entered into the vector.  */
       Remove_Duplicates(ctx->FuncExtractNames);
-      return true;
+      return Pass::PASS_OK;
     }
 
     virtual void Dump_Result(PassManager::Context *ctx)
@@ -381,7 +480,7 @@ class ClosurePass : public Pass
              ctx->FuncExtractNames.size() > 0;
     }
 
-    virtual bool Run_Pass(PassManager::Context *ctx)
+    virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       ctx->CodeOutput = std::string();
       raw_string_ostream code_stream(ctx->CodeOutput);
@@ -391,7 +490,8 @@ class ClosurePass : public Pass
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf(ctx);
       if (fdf.Run_Analysis(ctx->FuncExtractNames) == false) {
-        return false;
+        /* We should silently abort if we didn't find the names in CC mode.  */
+        return (ctx->CCPath) ? PASS_ABORT_COMPILATION : PASS_ERROR;
       }
       fdf.Print();
 
@@ -408,23 +508,24 @@ class ClosurePass : public Pass
          #includes went through.  */
       if (ctx->KeepIncludes) {
         if (!Build_ASTUnit(ctx, ctx->OFS)) {
-          return false;
+          return PASS_ERROR;
         }
       } else {
         if (!Build_ASTUnit(ctx, ctx->MFS)) {
-          return false;
+          return PASS_ERROR;
         }
       }
 
       /* If there was an error on building the AST here, don't continue.  */
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       if (ctx->IgnoreClangErrors == false && de.hasErrorOccurred()) {
-        return false;
+        return PASS_ERROR;
       }
 
       /* Set output stream to a file if we set to print to a file.  */
       if (PrintToFile) {
         std::string output_path = Get_Output_Path(ctx);
+        Ensure_Path_Exists(output_path);
         PrettyPrint::Set_Output_To(output_path);
       } else {
         ctx->CodeOutput = std::string();
@@ -434,7 +535,7 @@ class ClosurePass : public Pass
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf2(ctx);
       if (fdf2.Run_Analysis(ctx->FuncExtractNames) == false) {
-        return false;
+        return PASS_ERROR;
       }
       fdf2.Print();
 
@@ -442,7 +543,7 @@ class ClosurePass : public Pass
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
 
       const DiagnosticsEngine &de2 = ctx->AST->getDiagnostics();
-      return !de2.hasErrorOccurred();
+      return de2.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
     }
 
     virtual void Dump_Result(PassManager::Context *ctx)
@@ -484,7 +585,7 @@ class FunctionExternalizeFinderPass : public Pass
       return !ctx->ExternalizationDisabled && ctx->Externalize.size() == 0;
     }
 
-    virtual bool Run_Pass(PassManager::Context *ctx)
+    virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       /* Find which symbols must be externalized.  */
       FunctionExternalizeFinder fef(ctx->AST.get(),
@@ -494,7 +595,7 @@ class FunctionExternalizeFinderPass : public Pass
           ctx->IA);
       ctx->Externalize = fef.Get_To_Externalize();
 
-      return true;
+      return PASS_OK;
     }
 
     virtual void Dump_Result(PassManager::Context *ctx)
@@ -527,7 +628,7 @@ class FunctionExternalizerPass : public Pass
       return ctx->Externalize.size() > 0 || ctx->RenameSymbols;
     }
 
-    virtual bool Run_Pass(PassManager::Context *ctx)
+    virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       /* Issue externalization.  */
       SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA, ctx->Ibt,
@@ -567,7 +668,7 @@ class FunctionExternalizerPass : public Pass
       PrettyPrint::Set_AST(ctx->AST.get());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
-      return !de.hasErrorOccurred();
+      return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
     }
 
     virtual void Dump_Result(PassManager::Context *ctx)
@@ -615,14 +716,14 @@ class GenerateDscPass : public Pass
       return !is_null_or_empty(ctx->DscOutputPath);
     }
 
-    virtual bool Run_Pass(PassManager::Context *ctx)
+    virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       DscFileGenerator DscGen(ctx->DscOutputPath,
                               ctx->AST.get(),
                               ctx->FuncExtractNames,
                               ctx->NamesLog,
                               ctx->IA);
-      return true;
+      return PASS_OK;
 
     }
 
@@ -663,7 +764,7 @@ public:
     return false;
   }
 
-  virtual bool Run_Pass(PassManager::Context *ctx)
+  virtual PassRetType Run_Pass(PassManager::Context *ctx)
   {
     PrettyPrint::Print_Raw(
                 "#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
@@ -700,7 +801,7 @@ public:
       }
     }
 
-    return true;
+    return PASS_OK;
   }
 
   virtual void Dump_Result(PassManager::Context *ctx)
@@ -723,7 +824,7 @@ class HeaderGenerationPass : public Pass
     return ctx->OutputFunctionPrototypeHeader;
   }
 
-  virtual bool Run_Pass(PassManager::Context *ctx)
+  virtual PassRetType Run_Pass(PassManager::Context *ctx)
   {
     std::error_code ec;
     llvm::raw_fd_ostream out(ctx->OutputFunctionPrototypeHeader, ec);
@@ -733,7 +834,7 @@ class HeaderGenerationPass : public Pass
     HGen.Print();
 
     PrettyPrint::Set_Output_Ostream(nullptr);
-    return true;
+    return PASS_OK;
   }
 
   virtual void Dump_Result(PassManager::Context *ctx)
@@ -746,6 +847,7 @@ PassManager::PassManager()
 {
   /* Declare the pass list.  Passes will run in this order.  */
   Passes = {
+    new LaunchCCPass(),
     new BuildASTPass(),
     new InlinedSymbolsFinder(),
     new ClosurePass(/*PrintToFile=*/false),
@@ -768,6 +870,8 @@ PassManager::~PassManager()
 
 int PassManager::Run_Passes(ArgvParser &args)
 {
+  using PassRetType = Pass::PassRetType;
+
   /* Build context object to avoid using global variables.  */
   try {
     Context ctx(args);
@@ -776,19 +880,26 @@ int PassManager::Run_Passes(ArgvParser &args)
     for (Pass *pass : Passes) {
       ctx.PassNum++;
       if (pass->Gate(&ctx)) {
-        bool pass_success = pass->Run_Pass(&ctx);
+        Pass::PassRetType pass_success = pass->Run_Pass(&ctx);
 
         if (ctx.DumpPasses) {
           pass->Dump_Result(&ctx);
         }
 
-        if (ctx.IgnoreClangErrors == false && pass_success == false) {
+        /* FIXME: Should passes errors be ignored when IgnoreClangErrors is
+           enabled?  */
+        if (ctx.IgnoreClangErrors == false && pass_success == PassRetType::PASS_ERROR) {
           std::cerr << '\n' << "Error on pass: " << pass->PassName << '\n';
           return -1;
         }
+
+        if (pass_success == PassRetType::PASS_ABORT_COMPILATION) {
+          return 0;
+        }
       }
     }
-  } catch (std::runtime_error &err) {
+  }
+  catch (std::runtime_error &err) {
     DiagsClass::Emit_Error(err.what());
     return -1;
   }

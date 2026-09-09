@@ -60,12 +60,15 @@ static const char *UnsupportedGCCArgs[] = {
 
 ArgvParser::ArgvParser(int argc, char **argv)
   : ArgsToClang(),
+    ArgsToCC(),
     FunctionsToExtract(),
+    FullBodySymbols(),
     SymbolsToExternalize(),
     SymbolsToNotExternalize(),
     HeadersToExpand(),
     HeadersToNotExpand(),
     OutputFile(),
+    OutputBasedir(),
     IgnoreClangErrors(false),
     DisableExternalization(false),
     WithIncludes(false),
@@ -80,12 +83,30 @@ ArgvParser::ArgvParser(int argc, char **argv)
     SymversPath(nullptr),
     DescOutputPath(nullptr),
     IncExpansionPolicy(nullptr),
-    OutputFunctionPrototypeHeader(nullptr)
+    OutputFunctionPrototypeHeader(nullptr),
+    CCPath(nullptr)
 {
   for (int i = 0; i < argc; i++) {
-    if (!Handle_Clang_Extract_Arg(argv[i])) {
+
+    /* Arguments to clang-extract are handled here and not passed to libtooling
+       or CC.  */
+    if (Handle_Clang_Extract_Arg(argv[i]))
+      continue;
+
+    /* If it is not an argument for clang-extract, then append it as a compiler
+       argument.  */
+    ArgsToCC.push_back(argv[i]);
+
+    /* Remove '-c' to silence a warning that the flag '-c' is unused in
+       libtooling.  */
+    if (!Is_Unsupported_GCC_Arg(argv[i]) && strcmp(argv[i], "-c") != 0) {
+      /* In case clang doesn't support an argument from GCC, then ignore it.
+         Generally this is not a problem because we use clang for
+         source-to-source translations, and usually the flags not supported are
+         assembly-related.  */
       ArgsToClang.push_back(argv[i]);
     }
+
   }
 
   Insert_Required_Parameters();
@@ -119,6 +140,41 @@ ArgvParser::ArgvParser(int argc, char **argv)
     }
   }
 
+  /* Enforce that when we are in CC mode that we have a valid OutputBasedir.  */
+  if (CCPath != nullptr) {
+    if (OutputBasedir == "") {
+      std::string msg = "-DCE_OUTPUT_BASEDIR is mandatory when -DCE_CC is enabled.";
+      DiagsClass::Emit_Error(msg);
+      exit(1);
+    }
+    if (!OutputBasedir.starts_with("/")) {
+      std::string msg = "-DCE_OUTPUT_BASEDIR must be a full path when -DCE_CC is enabled.";
+      DiagsClass::Emit_Error(msg);
+      exit(1);
+    }
+  }
+
+  /* When launching an external process, the array of commands must end with
+     NULL.  */
+  ArgsToCC.push_back(NULL);
+
+  /* Make sure the first argument to the CC is the CCPath, just like we would
+     call it in shell.  */
+  if (CCPath) {
+    ArgsToCC[0] = CCPath;
+  }
+}
+
+bool ArgvParser::Is_Unsupported_GCC_Arg(const char *str)
+{
+  /* Ignore gcc arguments that are not known to clang */
+  for (unsigned long i = 0; i < ARRAY_LENGTH(UnsupportedGCCArgs); i++) {
+    if (prefix(UnsupportedGCCArgs[i], str)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void ArgvParser::Insert_Required_Parameters(void)
@@ -137,12 +193,11 @@ void ArgvParser::Insert_Required_Parameters(void)
                                // extracted function, so disable warnings
                                // related to it.
     "-Wno-unused-function", // May happen when trying to extract a static function.
-    "-Wno-unused-variable", // Passes may instroduce unused variables later removed.
+    "-Wno-unused-variable", // Passes may introduce unused variables later removed.
     "-fno-builtin", // clang interposes some glibc functions and then it fails to find the declaration of them.
     "-Wno-duplicate-decl-specifier", // Disabled due to kernel issues. See more
                                      // at https://github.com/ClangBuiltLinux/linux/issues/2013
                                      // and https://github.com/llvm/llvm-project/issues/93449
-    "-Wno-unused-command-line-argument" // Disable warnings stating that '-c' is ignored.
   };
 
   for (const char *arg : priv_args) {
@@ -163,6 +218,10 @@ void ArgvParser::Print_Usage_Message(void)
 "  -D__KERNEL__             Indicate that we are processing a Linux sourcefile.\n"
 "  -DCE_EXTRACT_FUNCTIONS=<args>\n"
 "                           Extract the functions specified in the <args> list.\n"
+"  -DCE_TRIGGER_ON_FULL_BODY=<args>\n"
+"                           The extraction process will only be triggered if the\n"
+"                           following symbols in <args> must be extracted with their\n"
+"                           full body.\n"
 "  -DCE_EXPORT_SYMBOLS=<args>\n"
 "                           Force externalization of symbols specified in the <args> list\n"
 "  -DCE_NOT_EXPORT_SYMBOLS=<args>\n"
@@ -194,6 +253,10 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER=<arg>\n"
 "                           Outputs a header file with a foward declaration of all\n"
 "                           functions. This header is not self-compilable.\n"
+"  -DCE_CC=<path>           Use the C compiler in path to generate ordinary output.\n"
+"  -DCE_OUTPUT_BASEDIR=<DIR>\n"
+"                           Use <DIR> as the base directory to output. Must be a full\n"
+"                           path when -DCE_CC is enabled.\n"
 "  -DCE_LATE_EXTERNALIZE    Enable late externalization (declare externalized variables\n"
 "                           later than the original).  May reduce code output when\n"
 "                           -DCE_KEEP_INCLUDES is enabled\n"
@@ -213,13 +276,6 @@ void ArgvParser::Print_Usage_Message(void)
 
 bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 {
-  /* Ignore gcc arguments that are not known to clang */
-  for (unsigned long i = 0; i < ARRAY_LENGTH(UnsupportedGCCArgs); i++) {
-    if (prefix(UnsupportedGCCArgs[i], str)) {
-      return true;
-    }
-  }
-
   if (!strncmp("-D__KERNEL__", str, 12)) {
     Kernel = true;
     return false;
@@ -241,6 +297,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
 
   if (prefix("-DCE_EXTRACT_FUNCTIONS=", str)) {
     FunctionsToExtract = Extract_Args(str);
+
+    return true;
+  }
+  if (prefix("-DCE_TRIGGER_ON_FULL_BODY=", str)) {
+    FullBodySymbols = Extract_Args(str);
 
     return true;
   }
@@ -310,6 +371,16 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER=", str)) {
     OutputFunctionPrototypeHeader = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (prefix("-DCE_CC=", str)) {
+    CCPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (prefix("-DCE_OUTPUT_BASEDIR=", str)) {
+    OutputBasedir = Extract_Single_Arg_C(str);
 
     return true;
   }

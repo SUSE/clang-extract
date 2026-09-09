@@ -46,7 +46,7 @@ InlineAnalysis::InlineAnalysis(const std::vector<std::string> &elfs_path,
     }
 
     if (ipaclones_path) {
-      Ipa = new IpaClones(ipaclones_path);
+      Load_Ipaclones(ipaclones_path);
     }
 
     if (symvers_path) {
@@ -73,6 +73,12 @@ InlineAnalysis::~InlineAnalysis(void)
     delete Ipa;
   if (Symv)
     delete Symv;
+}
+
+void InlineAnalysis::Load_Ipaclones(const char *path)
+{
+  assert(Ipa == nullptr);
+  Ipa = new IpaClones(path);
 }
 
 static int Action_Add_Node2(void *s, IpaCloneNode *n1, IpaCloneNode *n2)
@@ -566,7 +572,7 @@ void InlineAnalysis::Update_With_Source_Code_Info(ASTUnit *ast)
 
   /* We are potentially going to remove nodes.  Lets mark them to be removed
      to avoid having to handle issues with the unordered_set iterator.  */
-  SmallVector<IpaCloneNode *, 8> to_remove;
+  std::set<IpaCloneNode *> to_remove;
 
   /* Iterate on each node in the IPA clones graph.  This is not DFS!  */
   for (auto it = Ipa->begin(); it != Ipa->end(); ++it) {
@@ -590,8 +596,9 @@ void InlineAnalysis::Update_With_Source_Code_Info(ASTUnit *ast)
 
     /* Iterate on them.  */
     if (decls.empty()) {
-      throw std::runtime_error("Unable to find symbol " + name +
-                               " in the AST, but is in provided .ipaclone!");
+      delete cg;
+      throw std::runtime_error("Unable to find symbol " + name_without_dot +
+                               " in the AST, but is provided in .ipaclone!");
     }
 
     /* Get original IPA clone node without the GCC quirks in its name.  */
@@ -599,7 +606,7 @@ void InlineAnalysis::Update_With_Source_Code_Info(ASTUnit *ast)
 
     /* Merge this node with the original node.  */
     Ipa->Merge_Nodes(node_without_dot, node);
-    to_remove.push_back(node);
+    to_remove.insert(node);
 
     for (NamedDecl *decl : decls) {
       CallGraphNode *callee = cg->getNode(decl);

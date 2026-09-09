@@ -129,6 +129,12 @@ class IpaClones : public Parser
   void Dump(void);
   void Dump_Graphviz(const char *filename);
 
+  /** Given the C compiler arguments in `ccargs`, figure out the name of the 
+      generated IPA dump file.  First argument is the found dump file, second
+      is the found input file.  */
+  static std::pair<const char *, const char *>
+  Find_Dump_File(const std::vector<const char *> &ccargs);
+
   private:
 
   void Open_Recursive(const char *path);

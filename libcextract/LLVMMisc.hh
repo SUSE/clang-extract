@@ -79,6 +79,7 @@ Decl         *Get_Bodyless_Or_Itself(Decl *decl);
 
 /** Get version of declarator with body.  */
 DeclaratorDecl *Get_With_Body(DeclaratorDecl *decl);
+Decl           *Get_With_Body(Decl *decl);
 
 /** Get version of declarator with body or itself.  */
 DeclaratorDecl *Get_With_Body_Or_Itself(DeclaratorDecl *decl);
