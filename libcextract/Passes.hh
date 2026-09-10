@@ -161,7 +161,7 @@ class PassManager {
         const char *SymversPath;
 
         /* Path to libpulp .dsc file for output.  */
-        const char *DscOutputPath;
+        std::string DscOutputPath;
 
         /* Output path to a file containing foward declarations of all functions.  */
         const char *OutputFunctionPrototypeHeader;

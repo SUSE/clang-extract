@@ -227,6 +227,12 @@ class LaunchCCPass : public Pass
       ctx->IpaclonesPath = dump_file;
     }
 
+    /* In case the user specified that the DSC file to be dumped but haven't
+       provided a path to it, do it now.  */
+    if (ctx->DscOutputPath == "") {
+      ctx->DscOutputPath = ctx->OutputBasedir + '/' + input_file + ".dsc";
+    }
+
     return PASS_OK;
   }
 
@@ -498,8 +504,6 @@ class ClosurePass : public Pass
       /* Add the temporary string with code to the filesystem.  */
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
 
-      //Print_AST(ctx->AST.get());
-
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  In case we
          must keep the includes, pass the overlayFS instead of the memoryFS
@@ -713,11 +717,20 @@ class GenerateDscPass : public Pass
 
     virtual bool Gate(PassManager::Context *ctx)
     {
-      return !is_null_or_empty(ctx->DscOutputPath);
+      return ctx->DscOutputPath != "<NONE>";
     }
 
     virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
+      /* In case no name was specified for the libpulp .dsc file, hack one now.  */
+      if (ctx->DscOutputPath == "") {
+        ctx->DscOutputPath = Get_Output_Path(ctx) + ".dsc";
+        llvm::outs() << ctx->DscOutputPath <<'\n';
+      }
+
+      /* If path doesn't exist, create it now.  */
+      Ensure_Path_Exists(ctx->DscOutputPath);
+
       DscFileGenerator DscGen(ctx->DscOutputPath,
                               ctx->AST.get(),
                               ctx->FuncExtractNames,
