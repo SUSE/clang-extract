@@ -81,7 +81,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     Debuginfos(),
     IpaclonesPath(nullptr),
     SymversPath(nullptr),
-    DescOutputPath(nullptr),
+    DescOutputPath("<NONE>"),
     IncExpansionPolicy(nullptr),
     OutputFunctionPrototypeHeader(nullptr),
     CCPath(nullptr)
@@ -361,6 +361,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (prefix("-DCE_SYMVERS_PATH=", str)) {
     SymversPath = Extract_Single_Arg_C(str);
+
+    return true;
+  }
+  if (!strcmp("-DCE_DSC_OUTPUT", str)) {
+    DescOutputPath = "";
 
     return true;
   }
