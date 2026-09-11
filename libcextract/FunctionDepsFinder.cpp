@@ -27,7 +27,8 @@ FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
       IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand, ctx->HeadersToNotExpand),
       KeepIncludes(ctx->KeepIncludes),
       Visitor(AST),
-      CompilerMode(ctx->CCPath)
+      CompilerMode(ctx->CCPath),
+      NoDuplicatedIncludes(ctx->NoDuplicatedIncludes)
 {
 }
 
@@ -53,7 +54,7 @@ bool FunctionDependencyFinder::Find_Functions_Required(
 void FunctionDependencyFinder::Print(void)
 {
   ClosureSet &closure = Visitor.Get_Closure();
-  RecursivePrint(AST, closure.Get_Set(), IT, KeepIncludes).Print();
+  RecursivePrint(AST, closure.Get_Set(), IT, KeepIncludes, NoDuplicatedIncludes).Print();
 }
 
 void FunctionDependencyFinder::Remove_Redundant_Decls(void)

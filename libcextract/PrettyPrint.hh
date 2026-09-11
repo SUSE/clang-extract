@@ -181,7 +181,8 @@ class RecursivePrint
   RecursivePrint(ASTUnit *ast,
                  std::unordered_set<Decl *> &deps,
                  IncludeTree &it,
-                 bool keep_includes);
+                 bool keep_includes,
+                 bool no_duplicated_includes = false);
 
   /* Print output to `Out`.  */
   void Print(void);
@@ -201,7 +202,7 @@ class RecursivePrint
 
   /** Remove decls and macros that are already covered by includes that are
       marked for output.  */
-  void Analyze_Includes(void);
+  void Analyze_Includes(bool no_duplicated_includes);
 
   /** Check if a given declaration was already marked as dependency.  */
   inline bool Is_Decl_Marked(Decl *decl)

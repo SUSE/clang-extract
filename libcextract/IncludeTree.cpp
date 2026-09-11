@@ -587,6 +587,35 @@ std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Non_Expand_Includes
   return std::unique_ptr<std::vector<IncludeNode *>>{vec};
 }
 
+std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Output_Includes(void)
+{
+  auto vec = new std::vector<IncludeNode *>();
+  std::stack<IncludeNode *> stack;
+
+  stack.push(Root);
+  while (!stack.empty()) {
+    IncludeNode *node = stack.top();
+    stack.pop();
+
+    bool should_output = node->Should_Be_Output();
+    bool should_expand = node->Should_Be_Expanded();
+
+    assert(!(should_output && should_expand) &&
+           "Include can can not be expanded and outputed at the same time!");
+
+    if (should_output) {
+      vec->push_back(node);
+    } else {
+      int n = node->Get_Num_Childs();
+      while (n > 0) {
+        stack.push(node->Get_Child(--n));
+      }
+    }
+  }
+
+  return std::unique_ptr<std::vector<IncludeNode *>>{vec};
+}
+
 std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Includes(void)
 {
   auto vec = new std::vector<IncludeNode *>();
@@ -613,6 +642,68 @@ std::unique_ptr<std::vector<IncludeNode *>> IncludeTree::Get_Includes(void)
 IncludeNode *IncludeTree::Get(const InclusionDirective *directive)
 {
   return IncMap[directive];
+}
+
+bool IncludeTree::Mark_Duplicated_Includes(bool headers_are_unique)
+{
+  const auto includes = *Get_Output_Includes();
+  bool changed = false;
+  int n = (int) includes.size();
+
+  for (int i = 0; i < n; i++) {
+    IncludeNode *current = includes[i];
+    OptionalFileEntryRef fileref = current->ID->getFile();
+
+    if (!fileref.has_value()) {
+      continue;
+    }
+
+    IncludeNode *parent = Get(&fileref->getFileEntry());
+    if (!parent || parent == current)
+      continue;
+
+    if ((parent->HeaderGuard || headers_are_unique)
+        && !parent->IsFromMinusInclude && parent->Has_Parent_Marked_For_Output()) {
+      current->ShouldBeOutput = false;
+      changed = true;
+      continue;
+    }
+
+    /* If we assume that all headers includes can be unique, we can skip the
+       peephole analysis later.  */
+    if (headers_are_unique)
+      continue;
+
+    /* Do some sort of peephole analysis on the includes.  It may happen that
+       some headers that are DESIGNED to be included multiple times end up being
+       included immediatelly one after another.  This is clearly not necessary
+       and we can remove them.  */
+    IncludeNode *previous = nullptr;
+    for (int j = i-1; j >= 0; j--) {
+      if (includes[j]->ShouldBeOutput) {
+        previous = includes[j];
+      }
+    }
+
+
+    if (previous && current->Is_Same_File(previous)) {
+      /* Make sure they are one line after another.  */
+      SourceLocation prev = previous->ID->getSourceRange().getBegin();
+      SourceLocation curr = current->ID->getSourceRange().getBegin();
+
+      SourceManager &sm = PP.getSourceManager();
+      PresumedLoc pprev = sm.getPresumedLoc(prev);
+      PresumedLoc pcurr = sm.getPresumedLoc(curr);
+
+      if (pcurr.getLine() == pprev.getLine() + 1 && pcurr.getFileID() == pprev.getFileID()) {
+        /* We have successfully found that this include is useless.  */
+        current->ShouldBeOutput = false;
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
 }
 
 bool IncludeTree::Run_Expansion_Policy(InclusionDirective *ID,
@@ -695,6 +786,19 @@ bool IncludeTree::IncludeNode::Can_Be_Expanded(void)
   }
 
   return true;
+}
+
+bool IncludeTree::IncludeNode::Has_Output_Parent_Or_Self(void)
+{
+  IncludeNode *node = this;
+  while (node) {
+    if (node->ShouldBeExpanded) {
+      return true;
+    }
+    node = node->Get_Parent();
+  }
+
+  return false;
 }
 
 void IncludeTree::IncludeNode::Dump_Single_Node(llvm::raw_ostream &out)

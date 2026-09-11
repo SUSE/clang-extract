@@ -76,6 +76,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     RenameSymbols(false),
     Kernel(false),
     Ibt(false),
+    NoDuplicatedIncludes(false),
     AllowLateExternalization(false),
     PatchObject(""),
     Debuginfos(),
@@ -260,6 +261,9 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_LATE_EXTERNALIZE    Enable late externalization (declare externalized variables\n"
 "                           later than the original).  May reduce code output when\n"
 "                           -DCE_KEEP_INCLUDES is enabled\n"
+"  -DCE_NO_DUPLICATED_INCLUDES\n"
+"                           Treat all duplicated includes as superflous and therefore\n"
+"                           can be removed."
 "  -DCE_IGNORE_CLANG_ERRORS Ignore clang compilation errors in a hope that code is\n"
 "                           generated even if it won't compile.\n"
 "\n";
@@ -402,6 +406,10 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   if (!strcmp("-DCE_IGNORE_CLANG_ERRORS", str)) {
     IgnoreClangErrors = true;
 
+    return true;
+  }
+  if (!strcmp("-DCE_NO_DUPLICATED_INCLUDES", str)) {
+    NoDuplicatedIncludes = true;
     return true;
   }
 

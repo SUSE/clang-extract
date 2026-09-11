@@ -725,7 +725,6 @@ class GenerateDscPass : public Pass
       /* In case no name was specified for the libpulp .dsc file, hack one now.  */
       if (ctx->DscOutputPath == "") {
         ctx->DscOutputPath = Get_Output_Path(ctx) + ".dsc";
-        llvm::outs() << ctx->DscOutputPath <<'\n';
       }
 
       /* If path doesn't exist, create it now.  */

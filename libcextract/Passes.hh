@@ -61,6 +61,7 @@ class PassManager {
             Kernel(args.Is_Kernel()),
             Ibt(args.Has_Ibt()),
             AllowLateExternalizations(args.Get_Allow_Late_Externalization()),
+            NoDuplicatedIncludes(args.Get_No_Duplicated_Includes()),
             PatchObject(args.Get_PatchObject()),
             HeadersToExpand(args.Get_Headers_To_Expand()),
             HeadersToNotExpand(args.Get_Headers_To_Not_Expand()),
@@ -132,6 +133,9 @@ class PassManager {
 
         /** If we can late externalize variables.  */
         bool AllowLateExternalizations;
+
+        /** If we can treat all duplicated includes as superflous.  */
+        bool NoDuplicatedIncludes;
 
         /** Object that will be patched. */
         std::string PatchObject;
