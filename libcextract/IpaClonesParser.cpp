@@ -436,8 +436,6 @@ IpaClones::Find_Dump_File(const std::vector<const char *> &ccargs)
 
   /* Check if we didn't destroy the null character at the end of the array.  */
   assert(buffer[PATH_MAX-1] == '\0' && "Broken string");
-  puts(buffer);
-
   return std::pair(buffer, input_file);
 }
 

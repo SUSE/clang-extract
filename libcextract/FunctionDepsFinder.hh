@@ -94,4 +94,7 @@ class FunctionDependencyFinder
     /** Flag if we are in compiler mode.  In that case, not finding a symbol
         should indeed abort the compilation but we must swallow it.  */
     bool CompilerMode;
+    
+    /** Flag if we allow the output to treat all duplicated includes as superfluous.  */
+    bool NoDuplicatedIncludes;
 };

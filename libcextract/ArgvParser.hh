@@ -174,6 +174,11 @@ class ArgvParser
     return OutputBasedir;
   }
 
+  inline bool Get_No_Duplicated_Includes(void)
+  {
+    return NoDuplicatedIncludes;
+  }
+
   /** Print help usage message.  */
   void Print_Usage_Message(void);
 
@@ -207,6 +212,9 @@ class ArgvParser
   bool Kernel;
   /* If the file was compiled with IBT support */
   bool Ibt;
+
+  /** Assume that duplicated includes are always superfluous.  */
+  bool NoDuplicatedIncludes;
 
   /* If set, then clang-extract may write the externalized decl later than the
      original code.  */

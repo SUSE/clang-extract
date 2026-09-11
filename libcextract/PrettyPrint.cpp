@@ -552,7 +552,8 @@ ASTUnit *PrettyPrint::AST;
 RecursivePrint::RecursivePrint(ASTUnit *ast,
                                std::unordered_set<Decl *> &deps,
                                IncludeTree &it,
-                               bool keep_includes)
+                               bool keep_includes,
+                               bool no_duplicated_includes)
   : AST(ast),
     ASTIterator(ast, /*skip_macros_in_decl=*/false),
     MW(ast->getPreprocessor()),
@@ -560,10 +561,10 @@ RecursivePrint::RecursivePrint(ASTUnit *ast,
     IT(it),
     KeepIncludes(keep_includes)
 {
-  Analyze_Includes();
+  Analyze_Includes(no_duplicated_includes);
 }
 
-void RecursivePrint::Analyze_Includes(void)
+void RecursivePrint::Analyze_Includes(bool no_duplicated_includes)
 {
   /* If we do not want to keep the includes then quickly return.  */
   if (KeepIncludes == false) {
@@ -596,6 +597,10 @@ void RecursivePrint::Analyze_Includes(void)
       }
     }
   }
+
+  IT.Mark_Duplicated_Includes(no_duplicated_includes);
+
+  /* Check for possible duplicated includes in the output.  */
 
   /* Remove any decls that are provided by an include that should be output.  */
   for (auto it = Decl_Deps.begin(); it != Decl_Deps.end();) {

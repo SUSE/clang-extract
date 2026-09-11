@@ -151,6 +151,9 @@ class IncludeTree
     /** Check if the node can be marked for expansion.  */
     bool Can_Be_Expanded(void);
 
+    /** Check if this node has an parent that will be output.  */
+    bool Has_Output_Parent_Or_Self(void);
+
     /** Dump, for debugging reasons.  */
     void Dump_Single_Node(llvm::raw_ostream &out);
     void Dump(llvm::raw_ostream &out, unsigned ident = 0);
@@ -220,6 +223,9 @@ class IncludeTree
   /** Get includes which is not marked to be expanded.  */
   std::unique_ptr<std::vector<IncludeNode *>> Get_Non_Expand_Includes(void);
 
+  /** Get includes which are marked as output.  */
+  std::unique_ptr<std::vector<IncludeNode *>> Get_Output_Includes(void);
+
   /** Get all includes.  */
   std::unique_ptr<std::vector<IncludeNode *>> Get_Includes(void);
 
@@ -231,6 +237,12 @@ class IncludeTree
 
   /** Get from FileEntry.  */
   IncludeNode *Get(const FileEntry *);
+
+  /** Mark duplicated includes.  If `headers_are_unique` is true, then it will
+      assume that duplicated inclusions of the same header is surperfluous and
+      can be removed, which is not true for some system headers and for a lot
+      of glibc headers.  Still, the code generated can be OK.  */
+  bool Mark_Duplicated_Includes(bool headers_are_unique = false);
 
   /** Dump for debugging purposes.  */
   void Dump(llvm::raw_ostream &out);
