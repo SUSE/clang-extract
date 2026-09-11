@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <unistd.h>
 
 /** Stringfy constant integer token in `s`.  */
 #define STRINGFY_VALUE(s) STRINGFY(s)
@@ -86,6 +87,16 @@ bool Remove_Elements_Present_In_2nd_Vector(std::vector<T>& v1, const std::vector
   }
 
   return ret;
+}
+
+inline bool File_Exists(const char *path)
+{
+  return access(path, F_OK) == 0;
+}
+
+inline bool File_Exists(const std::string &path)
+{
+  return File_Exists(path.c_str());
 }
 
 /** Get a single line from a file, removing its newline.

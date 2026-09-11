@@ -99,6 +99,7 @@ The following expansion policies are supported:
  - `kernel`: Special policy used by the kernel livepatching developers.
  - `system`: Keep all system headers installed in `/usr/include`, etc.
  - `compiler`: Keep all compiler-specific headers, such as `stdatomic.h`. Useful if you want to expand everything but still want to ensure compatibility with other compilers.
+ - `projecthack`: Keep all system headers, and also try to find the project-specific headers in the system folder.  May not be 100% reliable.
 
 You may want to use `clang-tidy` to cleanup the generated file afterwards to remove duplicated includes:
 ```
