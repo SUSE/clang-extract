@@ -75,6 +75,30 @@ bool CompilerExpansionPolicy::Must_Not_Expand(const StringRef &absolute_path,
   return !Must_Expand(absolute_path, relative_path);
 }
 
+bool ProjectHackExpansionPolicy::Must_Expand(const StringRef &absolute_path,
+                                        const StringRef &relative_path)
+{
+  /* Look for system headers by looking to specific prefixes.  */
+  const char *include_paths[] = { "/usr/", "/usr/include/", "/usr/lib64/",
+                                  "/usr/lib/", "/usr/local",
+                                  "/usr/local/include/", };
+  for (unsigned i = 0; i < ARRAY_LENGTH(include_paths); i++) {
+    std::string potential_file = std::string(include_paths[i]) + relative_path.str();
+
+    if (File_Exists(potential_file)) {
+      return false; // Do not expand.
+    }
+
+    /* Attempt the absolute path.  */
+    if (absolute_path.starts_with(include_paths[i])) {
+      return false; // Do not expand.
+    }
+  }
+
+  /* Expand anything that doesn't match this.  */
+  return true;
+}
+
 std::unique_ptr<IncludeExpansionPolicy> IncludeExpansionPolicy::Get_Expansion_Policy_Unique(
                                                         IncludeExpansionPolicy::Policy p)
 {
@@ -104,6 +128,11 @@ std::unique_ptr<IncludeExpansionPolicy> IncludeExpansionPolicy::Get_Expansion_Po
                 CompilerExpansionPolicy());
       break;
 
+    case Policy::PROJECTHACK:
+      return std::make_unique<ProjectHackExpansionPolicy>(
+                ProjectHackExpansionPolicy());
+      break;
+
     default:
       assert(false && "Invalid policy");
   }
@@ -124,6 +153,7 @@ IncludeExpansionPolicy::Policy IncludeExpansionPolicy::Get_From_String(const cha
     { "kernel",     IncludeExpansionPolicy::KERNEL     },
     { "system",     IncludeExpansionPolicy::SYSTEM     },
     { "compiler",   IncludeExpansionPolicy::COMPILER   },
+    { "projecthack",IncludeExpansionPolicy::PROJECTHACK},
   };
 
   for (unsigned long i = 0; i < ARRAY_LENGTH(policies); i++) {
@@ -144,6 +174,7 @@ bool IncludeExpansionPolicy::Expand_Minus_Includes(IncludeExpansionPolicy::Polic
     case EVERYTHING:
     case SYSTEM:
     case COMPILER:
+    case PROJECTHACK:
       return true;
       break;
 
@@ -152,4 +183,6 @@ bool IncludeExpansionPolicy::Expand_Minus_Includes(IncludeExpansionPolicy::Polic
       return false;
       break;
   }
+
+  __builtin_unreachable();
 }

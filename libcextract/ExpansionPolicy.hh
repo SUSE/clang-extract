@@ -37,6 +37,7 @@ class IncludeExpansionPolicy
     KERNEL,
     SYSTEM,
     COMPILER,
+    PROJECTHACK,
   };
 
   static std::unique_ptr<IncludeExpansionPolicy>
@@ -122,4 +123,20 @@ class CompilerExpansionPolicy : public IncludeExpansionPolicy
   public:
   virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
   virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+};
+
+/** Expand headers that can't be found installed in the system, also trying to
+    hack the project's include files attempting to find them installed in the
+    system.  For example, openssl have them installed on /usr/include/openssl,
+    but when compiling openssl it will be in the build folder.  This will try
+    to find the header in the system.  */
+class ProjectHackExpansionPolicy : public IncludeExpansionPolicy
+{
+  public:
+  virtual bool Must_Expand(const StringRef &absolute_path, const StringRef &relative_path);
+
+  virtual bool Must_Not_Expand(const StringRef &absolute_path, const StringRef &relative_path)
+  {
+    return false;
+  }
 };
