@@ -18,17 +18,17 @@
 #include "NonLLVMMisc.hh"
 
 DiagnosticOptionsWithColor::DiagnosticOptionsWithColor(void)
-  : DOpts(new DiagnosticOptions())
+  : DiagnosticOptions()
 {
-  DOpts->ShowColors = check_color_available();
+  ShowColors = check_color_available();
 }
 
 DiagsClass DiagsClass::sDiag;
 
 DiagsClass::DiagsClass(void)
   : LangOpts(),
-    DOpts(DiagnosticOptionsWithColor()),
-    DiagsEngine(llvm::errs(), LangOpts, DOpts.getDiagsOptsToEngine())
+    DOpts(new DiagnosticOptionsWithColor()),
+    DiagsEngine(llvm::errs(), LangOpts, DOpts->getDiagsOptsToEngine())
 {}
 
 /* Print error giving a piece of source code that caused the error.  */

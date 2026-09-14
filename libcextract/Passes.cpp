@@ -77,8 +77,7 @@ bool Build_ASTUnit(PassManager::Context *ctx,
 
   /* Built the ASTUnit from the passed command line and set its SourceManager
      to the PrettyPrint class.  */
-  auto diagopts = ClangCompat::createDiagnosticOptions();
-  diagopts->ShowColors = check_color_available();
+  auto diagopts = ClangCompat::createDiagnosticOptionsWithColor();
 
   Diags = ClangCompat::createDiagnostics(*_Hack_VFS, diagopts);
 
