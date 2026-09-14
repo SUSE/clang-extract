@@ -13,5 +13,5 @@ int f(void)
   return MACRO;
 }
 
-/* { dg-final { scan-tree-dump "#include \"header-4.h\"\n#define MACRO 2\n#include \"header-4.h\"" } } */
+/* { dg-final { scan-tree-dump "#include \"header-4.h\"\n/(\*\* clang-extract: .* \*\/\n)?#define MACRO 2(\n)+#include \"header-4.h\"|#include \"header-4.h\"\n#define MACRO 2(\n)+#include \"header-4.h\"" } } */
 /* { dg-final { scan-tree-dump "return MACRO;" } } */

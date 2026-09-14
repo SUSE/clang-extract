@@ -269,7 +269,7 @@ void PrettyPrint::Print_Stmt(Stmt *stmt)
 
 void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
 {
-  Out << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n";
+  Out << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n\n";
 }
 
 void PrettyPrint::Debug_Macro_Def(MacroDefinitionRecord *rec)
@@ -618,11 +618,43 @@ void RecursivePrint::Analyze_Includes(bool no_duplicated_includes)
   }
 }
 
+void RecursivePrint::Print_CE_Comment(Decl *decl)
+{
+  ASTContext &ctx = AST->getASTContext();
+  RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl);
+  Print_CE_Comment(decl->getBeginLoc(), comment);
+}
+
+void RecursivePrint::Print_CE_Comment([[maybe_unused]] MacroInfo *minfo)
+{
+  /* This feature is not supported in clang version < 23.  */
+#if CLANG_VERSION_MAJOR >= 23
+  ASTContext &ctx = AST->getASTContext();
+  RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, minfo);
+  Print_CE_Comment(minfo->getDefinitionLoc(), comment);
+#endif
+}
+
+void RecursivePrint::Print_CE_Comment(const SourceLocation &loc, RawComment *comment)
+{
+  SourceManager &sm = AST->getSourceManager();
+  if (loc.isValid()) {
+    if (!Have_Location_Comment(sm, comment)) {
+      std::string comment = Build_CE_Location_Comment(sm, loc);
+      PrettyPrint::Print_Raw(comment);
+    } else {
+      /* Just output what it had.  */
+      PrettyPrint::Print_RawComment(sm, comment);
+    }
+  }
+}
+
 void RecursivePrint::Print_Preprocessed(PreprocessedEntity *prep)
 {
   if (MacroDefinitionRecord *entity = dyn_cast<MacroDefinitionRecord>(prep)) {
     MacroInfo *info = MW.Get_Macro_Info(entity);
     if (Is_Macro_Marked(info) && !MW.Is_Builtin_Macro(info)) {
+      Print_CE_Comment(info);
       PrettyPrint::Print_Macro_Def(entity);
     }
 
@@ -663,19 +695,7 @@ void RecursivePrint::Print_Decl(Decl *decl)
     }
     (*PrettyPrint::Out) << "}\n";
   } else {
-
-    SourceManager &sm = AST->getSourceManager();
-    ASTContext &ctx = AST->getASTContext();
-    RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl);
-    if (decl->getBeginLoc().isValid()) {
-      if (!Have_Location_Comment(sm, comment)) {
-        std::string comment = Build_CE_Location_Comment(sm, decl->getBeginLoc());
-        PrettyPrint::Print_Raw(comment);
-      } else {
-        /* Just output what it had.  */
-        PrettyPrint::Print_RawComment(sm, comment);
-      }
-    }
+    Print_CE_Comment(decl);
     PrettyPrint::Print_Decl(decl, KeepIncludes);
   }
 }

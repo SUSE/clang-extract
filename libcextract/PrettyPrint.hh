@@ -200,6 +200,15 @@ class RecursivePrint
 
   protected:
 
+  /** Print a clang-extract comment that is on top of each declaration.  */
+  void Print_CE_Comment(Decl *decl);
+
+  /** Print a clang-extract comment that is on top of each macro.  */
+  void Print_CE_Comment(MacroInfo *minfo);
+
+  /** Print a clang-extract comment on location.  */
+  void Print_CE_Comment(const SourceLocation &loc, RawComment *comment);
+
   /** Remove decls and macros that are already covered by includes that are
       marked for output.  */
   void Analyze_Includes(bool no_duplicated_includes);
