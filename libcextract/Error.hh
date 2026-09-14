@@ -24,15 +24,10 @@
 using namespace clang;
 
 /* Creates a special DiagnosticOptions with forced ShowColors.  */
-class DiagnosticOptionsWithColor
+class DiagnosticOptionsWithColor : public DiagnosticOptions
 {
   public:
   DiagnosticOptionsWithColor(void);
-
-  inline DiagnosticOptions *Get_DiagnosticOptions(void)
-  {
-    return DOpts;
-  }
 
 /* Because clang changed the constructor of TextDiagnostics, we need this
    special method here that returns the correct type just for it according
@@ -40,22 +35,24 @@ class DiagnosticOptionsWithColor
 #if CLANG_VERSION_MAJOR >= 21
   inline DiagnosticOptions &getDiagsOptsToEngine(void)
   {
-    return *DOpts;
+    return *static_cast<DiagnosticOptions *>(this);
   }
 #else
   inline DiagnosticOptions *getDiagsOptsToEngine(void)
   {
-    return DOpts;
+    return this;
   }
 #endif
 
   inline bool Is_Colored(void)
   {
-    return DOpts->ShowColors;
+    return ShowColors;
   }
 
-  private:
-  DiagnosticOptions *DOpts;
+  inline void Set_Colored(bool color)
+  {
+    ShowColors = color;
+  }
 };
 
 /* Diagnostics class, used to wrap error and warning messages.  */
@@ -76,7 +73,14 @@ class DiagsClass
   }
 
   LangOptions LangOpts;
-  DiagnosticOptionsWithColor DOpts;
+
+  /** Work arround what seems to be a bug in LLVM-19.  For some reason delete
+    * will be called for DOpts because it inherits from DiagnosticOptions and
+    * then ASAN and Valgrind complains about a "free on non-malloc'ed memory"
+    * here.  Hence we declare it as a pointer and allocate in the constructor.
+    * Why this doesn't leak memory? Good question and I think no one knows.
+    */
+  DiagnosticOptionsWithColor *DOpts;
   TextDiagnostic DiagsEngine;
 
   protected:
@@ -93,7 +97,7 @@ class DiagsClass
 
   static inline bool Is_Colored(void)
   {
-    return Get_Instance().DOpts.Is_Colored();
+    return Get_Instance().DOpts->Is_Colored();
   }
 
   static inline void Emit_Message(const StringRef message,

@@ -17,6 +17,7 @@
 #include "LLVMMisc.hh"
 #include "NonLLVMMisc.hh"
 #include "Error.hh"
+#include "ClangCompat.hh"
 
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl)
@@ -266,7 +267,7 @@ std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &l
 std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl)
 {
   SourceManager &sm = ctx.getSourceManager();
-  RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
+  RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl);
   if (Have_Location_Comment(sm, comment)) {
     return comment->getRawText(sm).str();;
   } else {
@@ -277,7 +278,7 @@ std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl)
 /** Get the begin location of the Decl before its comment if it have one.  */
 SourceLocation Get_Begin_Loc_Of_Decl_Or_Comment(ASTContext &ctx, Decl *decl)
 {
-  if (RawComment *comment = ctx.getRawCommentForDeclNoCache(decl)) {
+  if (RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl)) {
     return comment->getBeginLoc();
   } else {
     return decl->getBeginLoc();

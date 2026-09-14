@@ -16,7 +16,8 @@
 
 #include <clang/Tooling/Tooling.h>
 #include <clang/Basic/Version.h>
-#include "clang/Frontend/CompilerInstance.h"
+#include <clang/Frontend/CompilerInstance.h>
+#include "Error.hh"
 
 #if CLANG_VERSION_MAJOR >= 22
 #include <clang/Driver/CreateInvocationFromArgs.h>
@@ -145,10 +146,40 @@ namespace ClangCompat
   {
     return std::make_shared<DiagnosticOptions>();
   }
+
+  static inline std::shared_ptr<DiagnosticOptions> createDiagnosticOptionsWithColor(void)
+  {
+    return std::make_shared<DiagnosticOptionsWithColor>();
+  }
 #else
   static inline DiagnosticOptions *createDiagnosticOptions(void)
   {
     return new DiagnosticOptions();
   }
+
+  static inline DiagnosticOptions *createDiagnosticOptionsWithColor(void)
+  {
+    return new DiagnosticOptionsWithColor();
+  }
 #endif
+
+  static inline RawComment *getRawCommentNoCache(ASTContext &ctx, Decl *decl)
+  {
+#if CLANG_VERSION_MAJOR >= 23
+    llvm::PointerUnion<const Decl *, const MacroInfo *> p = decl;
+    return ctx.getRawCommentNoCache(p);
+#else
+    return ctx.getRawCommentForDeclNoCache(decl);
+#endif
+  }
+
+  static inline RawComment *getRawCommentNoCache(ASTContext &ctx, MacroInfo *macro)
+  {
+#if CLANG_VERSION_MAJOR >= 23
+    llvm::PointerUnion<const Decl *, const MacroInfo *> p = macro;
+    return ctx.getRawCommentNoCache(p);
+#else // LLVM versions before 23 doesn't support comments on macros.
+    return nullptr;
+#endif
+  }
 }

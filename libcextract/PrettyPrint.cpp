@@ -666,7 +666,7 @@ void RecursivePrint::Print_Decl(Decl *decl)
 
     SourceManager &sm = AST->getSourceManager();
     ASTContext &ctx = AST->getASTContext();
-    RawComment *comment = ctx.getRawCommentForDeclNoCache(decl);
+    RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl);
     if (decl->getBeginLoc().isValid()) {
       if (!Have_Location_Comment(sm, comment)) {
         std::string comment = Build_CE_Location_Comment(sm, decl->getBeginLoc());
