@@ -148,7 +148,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
       DiagsClass::Emit_Error(msg);
       exit(1);
     }
-    if (!OutputBasedir.starts_with("/")) {
+    if (OutputBasedir[0] != '/') {
       std::string msg = "-DCE_OUTPUT_BASEDIR must be a full path when -DCE_CC is enabled.";
       DiagsClass::Emit_Error(msg);
       exit(1);

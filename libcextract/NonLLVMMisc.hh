@@ -141,6 +141,3 @@ class FileHandling
 
 /** Get basename of a string.  Works like the gnu version.  */
 const char *get_basename(const char *filename);
-
-/** Get the relative path from aboslute path.  */
-std::string Get_Relative_Path(const std::string &path);

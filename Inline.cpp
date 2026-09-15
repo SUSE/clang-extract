@@ -21,6 +21,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 #include <clang/Tooling/Tooling.h>
 

@@ -120,3 +120,6 @@ static inline bool Is_TLS(VarDecl *decl)
 {
   return decl->getTLSKind() == VarDecl::TLS_None ? false : true;
 }
+
+/** Get the relative path from aboslute path.  */
+std::string Get_Relative_Path(const StringRef &path);
