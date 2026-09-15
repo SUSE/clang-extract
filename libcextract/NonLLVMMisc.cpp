@@ -28,7 +28,6 @@
 #include <limits.h>
 #include <assert.h>
 
-#include <filesystem>
 #include <iostream>
 
 /** @brief Handle some quirks of getline.  */
@@ -244,13 +243,4 @@ const char *get_basename(const char *path)
     base = backslash;
 #endif
   return base ? base+1 : path;
-}
-
-/** Get the relative path from aboslute path.  */
-std::string Get_Relative_Path(const std::string &path)
-{
-  char cwd[PATH_MAX];
-  assert(getcwd(cwd, sizeof(cwd)) != nullptr);
-
-  return std::filesystem::relative(path, cwd);
 }

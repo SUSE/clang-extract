@@ -33,7 +33,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 
 #include <iostream>
-#include <filesystem>
 
 using namespace llvm;
 using namespace clang;
@@ -393,7 +392,7 @@ class BuildASTPass : public Pass
     StringRef path = sm.getFileManager().getCanonicalName(main_file);
 
     /* We may be interested in the relative path.  */
-    return Get_Relative_Path(path.str());
+    return Get_Relative_Path(path);
   }
 };
 

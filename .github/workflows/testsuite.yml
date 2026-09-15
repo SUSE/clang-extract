@@ -12,13 +12,66 @@ jobs:
 
     strategy:
       matrix:
-        opensuse: [tumbleweed]
-        compiler: [clang]
-        build-type: [debug, release]
-        version: [18, 19, 20, 21, 22, 23]
+        include:
+            # Debug builds for Tumbleweed.
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+            version: 18
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+            version: 20
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+            version: 21
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+            version: 22
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: debug
+            version: 23
+
+            # Release builds for Tumbleweed.
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+            version: 18
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+            version: 20
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+            version: 21
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+            version: 22
+          - opensuse: tumbleweed
+            compiler: clang
+            build-type: release
+            version: 23
+
+         # LLVM 17 on Leap 15.6
+          - opensuse: leap
+            opensuse-version: ":15.6"
+            compiler: clang
+            build-type: debug
+            version: 17
+          - opensuse: leap
+            opensuse-version: ":15.6"
+            compiler: clang
+            build-type: release
+            version: 17
+
 
     container:
-      image: opensuse/${{ matrix.opensuse }}
+      image: opensuse/${{ matrix.opensuse }}${{ matrix.opensuse-version }}
       options: --privileged
 
     steps:
@@ -29,9 +82,10 @@ jobs:
            libLLVM${{ matrix.version }}
            llvm${{ matrix.version }}
            llvm${{ matrix.version }}-devel
-           meson ninja clang-tools gcc findutils bash libelf-devel zlib-devel libzstd-devel
+           meson ninja clang-tools gcc findutils bash libelf-devel zlib-devel
+           libzstd-devel gzip
     - name: check llvm-ar
-      run: if [ /usr/bin/llvm-ar ]; then ln -s /usr/bin/llvm-ar-${{ matrix.version }} /usr/bin/llvm-ar; fi
+      run: if [ ! -x /usr/bin/llvm-ar ]; then ln -s /usr/bin/llvm-ar-${{ matrix.version }} /usr/bin/llvm-ar; fi
     - uses: actions/checkout@v2
     - name: meson
       run: meson setup build --buildtype=${{ matrix.build-type }} --native-file ce-native.ini

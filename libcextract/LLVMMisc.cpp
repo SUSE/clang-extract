@@ -19,6 +19,8 @@
 #include "Error.hh"
 #include "ClangCompat.hh"
 
+#include <llvm/Support/Path.h>
+
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl)
 {
@@ -380,4 +382,56 @@ bool Has_Balanced_Ifdef(const StringRef &string)
   }
 
   return balance == 0;
+}
+
+/** Get the relative path from aboslute path.  */
+std::string Get_Relative_Path(const StringRef &path)
+{
+  llvm::SmallString<PATH_MAX> cwd;
+  if (llvm::sys::fs::current_path(cwd))
+    return path.str();
+
+  llvm::SmallString<PATH_MAX> absolute_path(path);
+
+  if (!llvm::sys::path::is_absolute(absolute_path)) {
+    llvm::sys::fs::make_absolute(absolute_path);
+  }
+
+  /* Normalize "." and "..".  */
+  llvm::sys::path::remove_dots(absolute_path, /*remove_dot_dot=*/true);
+  llvm::sys::path::remove_dots(cwd, /*remove_dot_dot=*/true);
+
+  /* Split both paths into components.  */
+  llvm::SmallVector<llvm::StringRef, 64> from;
+  llvm::SmallVector<llvm::StringRef, 64> to;
+
+  for (auto I = llvm::sys::path::begin(cwd),
+      E = llvm::sys::path::end(cwd); I != E; ++I)
+    from.push_back(*I);
+
+  for (auto I = llvm::sys::path::begin(absolute_path),
+      E = llvm::sys::path::end(absolute_path); I != E; ++I)
+    to.push_back(*I);
+
+  /* Find the common prefix.  */
+  size_t common = 0;
+
+  while (common < from.size() && common < to.size() &&
+      from[common] == to[common])
+    ++common;
+
+  llvm::SmallString<PATH_MAX> result;
+
+  /* Go up from CWD to the common directory.  */
+  for (size_t i = common; i < from.size(); ++i)
+    llvm::sys::path::append(result, "..");
+
+  /* Then descend to the target.  */
+  for (size_t i = common; i < to.size(); ++i)
+    llvm::sys::path::append(result, to[i]);
+
+  if (result.empty())
+    return ".";
+
+  return result.str().str();
 }
