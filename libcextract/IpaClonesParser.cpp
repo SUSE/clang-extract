@@ -25,6 +25,26 @@
 #include <dirent.h>
 #include <limits.h>
 
+/** Workarround glibc __GI_ private symbols, which causes all sort of troubles
+    in clang.  
+
+    FIXME: clang doesn't register in its symbol table asm-aliased names created
+    by declarations like:
+
+    void *memcpy(void *, void *, unsigned long) asm("__GI_memcpy");
+
+    which creates a __GI_memcpy function in the assembly rather than memcpy.
+    A way to fix it would be sweep the AST for every DeclaratorDecl and look
+    for its asm attribute, then register those as aliases.  */
+static const char *Remove_Star_GI(const char *symbol)
+{
+  if (prefix("*__GI_", symbol)) {
+    return symbol + strlen("*__GI_");
+  }
+
+  return *symbol == '*' ? symbol + 1 : symbol;
+}
+
 /* GCC can either:
     - Change the call ABI of a function to either reduce the stack
       usage, remove instructions, or anything more complicated. The
@@ -41,6 +61,9 @@
       to issue a copy of it into the livepatch.  */
 static const char *Handle_GCC_Symbol_Quirks(char *symbol)
 {
+  /* Aliased symbols starts with '*'.  */
+  symbol = (char *) Remove_Star_GI(symbol);
+
   char *first_dot = strchr(symbol, '.');
   if (first_dot == nullptr) {
     return symbol;
@@ -260,8 +283,8 @@ void IpaClones::Parse(const char *path)
           continue;
         }
       } else if (!strcmp(happened, "isra") || !strcmp(happened, "part") || !strcmp(happened, "constprop")) {
-        cleaned_caller_name = clone_asm_name;
-        cleaned_callee_name = original_asm_name;
+        cleaned_caller_name = Remove_Star_GI(clone_asm_name);
+        cleaned_callee_name = Remove_Star_GI(original_asm_name);
       }
 
       if (cleaned_caller_name && cleaned_callee_name) {
@@ -273,7 +296,7 @@ void IpaClones::Parse(const char *path)
         caller->Inlines.insert(callee);
       }
     } else if (decision == IPA_REMOVE) {
-      IpaCloneNode *clone = Get_Or_Create_Node(original_asm_name);
+      IpaCloneNode *clone = Get_Or_Create_Node(Remove_Star_GI(original_asm_name));
       clone->Removed = true;
     }
   }
