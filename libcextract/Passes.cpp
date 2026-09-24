@@ -640,6 +640,7 @@ class FunctionExternalizerPass : public Pass
                                       ctx->IncExpansionPolicy,
                                       ctx->HeadersToExpand,
                                       ctx->HeadersToNotExpand,
+                                      ctx->ExternalizeWithMacros,
                                       ctx->DumpPasses);
 
       std::vector<std::string> to_externalize(ctx->Externalize);

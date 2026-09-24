@@ -178,6 +178,10 @@ class ArgvParser
   {
     return NoDuplicatedIncludes;
   }
+  inline bool Get_Externalize_With_Macro(void)
+  {
+    return ExternalizeWithMacro;
+  }
 
   /** Print help usage message.  */
   void Print_Usage_Message(void);
@@ -215,6 +219,10 @@ class ArgvParser
 
   /** Assume that duplicated includes are always superfluous.  */
   bool NoDuplicatedIncludes;
+
+  /** When externalizing, use a macro to reference the old symbol name to the
+      new 'klpe_*' one instead of rewrting every occurence of it.  */
+  bool ExternalizeWithMacro;
 
   /* If set, then clang-extract may write the externalized decl later than the
      original code.  */
