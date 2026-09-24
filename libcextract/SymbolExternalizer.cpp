@@ -251,7 +251,8 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
 
     /* We must be careful to ensure that the reference we got is actually
        written cleanly, e.g. it doesn't come from a macro expansion.  */
-    if (sym_name == PrettyPrint::Get_Source_Text(range) && sym->Needs_Sym_Rename()) {
+    if (!SE.ExternalizeWithMacros &&
+        sym_name == PrettyPrint::Get_Source_Text(range) && sym->Needs_Sym_Rename()) {
       /* Issue a text modification.  */
       SE.Replace_Text(range, sym->getUseName(), 100);
     }
@@ -791,6 +792,12 @@ SymbolExternalizer::Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpans
 
 void SymbolExternalizer::Rewrite_Macros(void)
 {
+  /* In case we can emit a macro to redirect the uses of the old symbol to the
+     new externalized one, then we don't need to rewrite any macro, and that
+     is kinda the point of it.  */
+  if (ExternalizeWithMacros)
+    return;
+
   PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
 
   for (PreprocessedEntity *entity : *rec) {
@@ -977,9 +984,19 @@ void SymbolExternalizer::Handle_IBT_Ext(SymbolUpdateStatus *sym)
   }
 }
 
+/** Remove redeclarations of the same Decl that appears after loc.  */
+void SymbolExternalizer::Remove_Redecls_After(Decl *decl)
+{
+  Decl *recent = decl->getMostRecentDecl();
+
+  while (recent && recent != decl) {
+    Remove_Text(recent->getSourceRange(), 1000);
+    recent = recent->getPreviousDecl();
+  }
+}
+
 void SymbolExternalizer::Late_Externalize(void)
 {
-  SymbolExternalizer &SE = *this;
   SourceManager &sm = AST->getSourceManager();
   ASTContext &astctx = AST->getASTContext();
   std::vector<SymbolUpdateStatus *> array;
@@ -1020,27 +1037,43 @@ void SymbolExternalizer::Late_Externalize(void)
     std::string sym_name = sym->OldDecl->getName().str();
     outstr << ";\n";
 
+    /* In case we can just emit a macro that references the new externalized
+       symbol instead of rewriting every usage, do it right now.*/
+    if (ExternalizeWithMacros) {
+      outstr << "\n/** clang-extract: due to " << sym_name << " externalization */\n"
+             << "#define " << sym_name << "\t" << sym->getUseName() << '\n';
+    }
+
     /* In case we successfully have a late insertion location, put the new decl
        there.  */
+    DeclaratorDecl *old_decl;
+
     if (sym->LateInsertLocation.isValid()) {
-      SE.Insert_Text(sym->LateInsertLocation, outstr.str());
+      Insert_Text(sym->LateInsertLocation, outstr.str());
 
       /* In case the symbol is in the main file already, we must delete it.  */
-      DeclaratorDecl *old_decl = Get_With_Body_Or_Itself(sym->OldDecl);
+      old_decl = Get_With_Body_Or_Itself(sym->OldDecl);
 
       SourceLocation loc = sm.getExpansionLoc(old_decl->getBeginLoc());
       if (sm.getFileID(loc) == sm.getMainFileID()) {
-        SE.Remove_Text(old_decl->getSourceRange(), 1000);
+        Remove_Text(old_decl->getSourceRange(), 1000);
       }
     } else {
       /* Fallback to the old method of rewriting the declaration.  */
-      SE.Replace_Text(sym->OldDecl->getSourceRange(), outstr.str(), 1000);
+      old_decl = sym->OldDecl;
+      Replace_Text(old_decl->getSourceRange(), outstr.str(), 1000);
 
       /* Emit a warning for debuging purposes for now.  */
       if (AllowLateExternalization) {
         std::string msg = "LateLocation of " + sym->OldDecl->getName().str() + " is invalid\n";
         DiagsClass::Emit_Warn(msg);
       }
+    }
+
+    /* In case we are emitting a macro, make sure there are no further
+       redeclarations of given symbol.  */
+    if (ExternalizeWithMacros) {
+      Remove_Redecls_After(old_decl);
     }
 
     /* Remember that we externalized it.  */

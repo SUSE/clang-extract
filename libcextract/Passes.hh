@@ -60,6 +60,7 @@ class PassManager {
             RenameSymbols(args.Should_Rename_Symbols()),
             Kernel(args.Is_Kernel()),
             Ibt(args.Has_Ibt()),
+            ExternalizeWithMacros(args.Get_Externalize_With_Macro()),
             AllowLateExternalizations(args.Get_Allow_Late_Externalization()),
             NoDuplicatedIncludes(args.Get_No_Duplicated_Includes()),
             PatchObject(args.Get_PatchObject()),
@@ -130,6 +131,10 @@ class PassManager {
 
         /** If the code was compiled with IBT support */
         bool Ibt;
+
+        /** When externalizing, use a macro to reference the old symbol name to the
+            new 'klpe_*' one instead of rewrting every occurence of it.  */
+        bool ExternalizeWithMacros;
 
         /** If we can late externalize variables.  */
         bool AllowLateExternalizations;

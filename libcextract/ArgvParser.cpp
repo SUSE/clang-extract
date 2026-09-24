@@ -77,6 +77,7 @@ ArgvParser::ArgvParser(int argc, char **argv)
     Kernel(false),
     Ibt(false),
     NoDuplicatedIncludes(false),
+    ExternalizeWithMacro(false),
     AllowLateExternalization(false),
     PatchObject(""),
     Debuginfos(),
@@ -240,6 +241,9 @@ void ArgvParser::Print_Usage_Message(void)
 "  -DCE_NOT_EXPAND_INCLUDES=<args>\n"
 "                           Force the following headers to NOT be expanded.\n"
 "  -DCE_RENAME_SYMBOLS      Allow renaming of extracted symbols.\n"
+"  -DCE_MACRO_EXTERNALIZATION\n"
+"                           Allow the externalizer to reference the externalized symbol\n"
+"                           using a macro instead of rewriting every occurence it.\n"
 "  -DCE_DEBUGINFO_PATH=<arg>\n"
 "                           Path to the compiled (ELF) object of the desired program to\n"
 "                           extract.  This is used to decide if externalization is\n"
@@ -395,6 +399,11 @@ bool ArgvParser::Handle_Clang_Extract_Arg(const char *str)
   }
   if (!strcmp("-DCE_RENAME_SYMBOLS", str)) {
     RenameSymbols = true;
+
+    return true;
+  }
+  if (!strcmp("-DCE_MACRO_EXTERNALIZATION", str)) {
+    ExternalizeWithMacro = true;
 
     return true;
   }

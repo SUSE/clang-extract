@@ -292,7 +292,7 @@ bool Have_Location_Comment(const SourceManager &sm, RawComment *comment)
 {
   if (comment) {
     StringRef text = comment->getRawText(sm);
-    if (prefix("/** clang-extract: from ", text.data())) {
+    if (prefix("/** clang-extract: ", text.data())) {
       return true;
     }
   }

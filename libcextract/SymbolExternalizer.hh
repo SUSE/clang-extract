@@ -306,12 +306,14 @@ class SymbolExternalizer
                      IncludeExpansionPolicy::Policy exp_policy,
                      std::vector<std::string> const &must_expand,
                      std::vector<std::string> const &must_not_expand,
+                     bool externalize_with_macro = false,
                      bool dump = false)
     : AST(ast),
       MW(ast->getPreprocessor()),
       TM(ast, dump),
       IA(ia),
       Ibt(ibt),
+      ExternalizeWithMacros(externalize_with_macro),
       AllowLateExternalization(allow_late_externalize),
       PatchObject(patch_object),
       SymbolsMap({}),
@@ -392,6 +394,9 @@ class SymbolExternalizer
       of the variable that is valid, so we can put our externalized symbol there.  */
   void Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array);
 
+  /** Remove redeclarations of the same Decl that appears after loc.  */
+  void Remove_Redecls_After(Decl *decl);
+
   /** Do the late externalize logic.  */
   void Late_Externalize(void);
 
@@ -430,6 +435,9 @@ class SymbolExternalizer
 
   /** Defines the method that a private symbol will be searched. */
   bool Ibt;
+
+  /** Use macros to avoid rewriting every use of a STRONG externalized symbol  */
+  bool ExternalizeWithMacros;
 
   /* True if we can write the externalized decl later than the original symbol.  */
   bool AllowLateExternalization;
