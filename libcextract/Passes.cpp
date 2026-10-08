@@ -86,7 +86,10 @@ bool Build_ASTUnit(PassManager::Context *ctx,
     Diags->setIgnoreAllWarnings(true);
   }
 
-  CInvok = ClangCompat::createInvocationFromCommandLine(ctx->ClangArgs, Diags);
+  /* Create invocation object.  */
+  clang::CreateInvocationOptions CIOpts;
+  CIOpts.Diags = Diags;
+  CInvok = clang::createInvocation(ctx->ClangArgs, std::move(CIOpts));
 
   /* Try no not crash if no input file is given.  */
   if (CInvok == nullptr) {
