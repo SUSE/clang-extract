@@ -33,16 +33,6 @@
 
 namespace ClangCompat
 {
-#if CLANG_VERSION_MAJOR >= 16
-/** Some functions changed its signature to expect std::nullopt when no option is given.*/
-# define ClangCompat_None std::nullopt
-/** Clang do not provide getPointer() for tokens anymore.  */
-# define ClangCompat_GetTokenPtr(token) (token).has_value() ? &(token).value() : nullptr
-#else
-# define ClangCompat_None clang::None
-# define ClangCompat_GetTokenPtr(token) (token).getPointer()
-#endif
-
 /** Starting from LLVM-21, ASTUnit::create requires one more parameter.  */
 #if CLANG_VERSION_MAJOR >= 21
 # define ClangCompat_ASTUP(CI, DO, D, CP, UFAV) CI, DO, D, CP, UFAV
@@ -53,29 +43,6 @@ namespace ClangCompat
 # define ClangCompat_ASTULFCIAP(CI, PCH, DO, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST) \
   CI, PCH, D, A, U, P, RFP, OLC, CD, PPANP, CCCR, UFAV, EAST
 #endif
-
-  static inline const clang::TypedefType *Get_Type_As_TypedefType(const clang::Type *type)
-  {
-#if CLANG_VERSION_MAJOR >= 16
-      /* Clang 16 upwards do not provide getAs<const TypedefType>.  */
-    return type->getAs<clang::TypedefType>();
-#else
-    return type->getAs<const clang::TypedefType>();
-#endif
-  }
-
-  static inline auto
-  createInvocationFromCommandLine(ArrayRef<const char *> Args, IntrusiveRefCntPtr<DiagnosticsEngine> Diags=IntrusiveRefCntPtr< DiagnosticsEngine >())
-  {
-#if CLANG_VERSION_MAJOR >= 15
-    /* Provide an implementation of createInvocationFromCommandLine for newer versions of clang.  */
-    clang::CreateInvocationOptions CIOpts;
-    CIOpts.Diags = Diags;
-    return clang::createInvocation(Args, std::move(CIOpts));
-#else
-    return clang::createInvocationFromCommandLine(Args, Diags);
-#endif
-  }
 
   static inline const clang::Type *getTypePtr(const QualType &qtype)
   {

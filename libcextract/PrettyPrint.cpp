@@ -470,16 +470,16 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
       /* Keep fetching tokens.  */
       while (true) {
         auto maybe_next_tok = Lexer::findNextToken(head, SM, LangOpts);
-        Token *tok = ClangCompat_GetTokenPtr(maybe_next_tok);
 
-        if (tok == nullptr) {
+        if (!maybe_next_tok.has_value()) {
           break;
         }
 
-        head = tok->getLastLoc();
+        const Token &tok = maybe_next_tok.value();
+        head = tok.getLastLoc();
 
         /* Stop when we find the ';' token.  */
-        if (tok->is(semicolon)) {
+        if (tok.is(semicolon)) {
           /* Found the ';', now go back a character to *not* include the ';'.  */
           furthest = head.getLocWithOffset(-1);
 
