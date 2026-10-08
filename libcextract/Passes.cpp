@@ -88,6 +88,12 @@ bool Build_ASTUnit(PassManager::Context *ctx,
 
   CInvok = ClangCompat::createInvocationFromCommandLine(ctx->ClangArgs, Diags);
 
+  /* Try no not crash if no input file is given.  */
+  if (CInvok == nullptr) {
+    _Hack_VFS = nullptr;
+    return false;
+  }
+
   PCHContainerOps = std::make_shared<PCHContainerOperations>();
 
 
