@@ -68,11 +68,20 @@ class UnitTest:
         last_slash = self.test_path.rfind('/')
         return self.test_path[:last_slash]
 
-    # Given a string, expand all tokens we find. Currently only the `$test_dir`
-    # token.
+    # Get the path to the installed libc.so.6.  Ask gcc for it so the system
+    # library search paths (e.g. /lib64, /lib/x86_64-linux-gnu) are honored.
+    def get_libc_so_path(self):
+        tool = subprocess.run(['/usr/bin/gcc', '-print-file-name=libc.so.6'],
+                              timeout=10, stdout=subprocess.PIPE)
+        return os.path.normpath(tool.stdout.decode().strip())
+
+    # Given a string, expand all tokens we find. Currently the `$test_dir` and
+    # `$libc_so` tokens.
     def expand_tokens_in_string(self, string):
         x = string
         x = x.replace("$test_dir", self.test_folder)
+        if "$libc_so" in x:
+            x = x.replace("$libc_so", self.get_libc_so_path())
         return x
 
     # Given a list of strings, expand all tokens we find. Currently only the `$test_dir`

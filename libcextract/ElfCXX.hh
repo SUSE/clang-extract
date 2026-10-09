@@ -37,6 +37,7 @@
 class ElfObject;
 class ElfSection;
 class ElfSymbol;
+class ElfVerdef;
 
 
 /** The symbol table in which this symbol was found.  */
@@ -135,6 +136,58 @@ class ElfSymbol
   GElf_Sym Symbol;
 };
 
+/** @brief ELF version definition.
+  *
+  * Wraps a GElf_Verdef entry of a .gnu.version_d section, which defines a
+  * symbol version (e.g. GLIBC_2.34, GLIBC_PRIVATE).  Entries form a chained
+  * list inside the section and can be walked with To_Next_Verdef.
+  */
+class ElfVerdef
+{
+  public:
+  /** Build the object pointing to the first verdef entry of `section`.  */
+  inline ElfVerdef(ElfSection &section);
+
+  /** Check if there is another verdef entry after this one.  */
+  inline bool Have_Next_Verdef(void)
+  {
+    return Verdef.vd_next != 0;
+  }
+
+  /** Advance to the next verdef entry.  Returns false if there is none.  */
+  inline bool To_Next_Verdef(void);
+
+  /** Get the version name (e.g. GLIBC_PRIVATE) of this entry.  */
+  const char *Get_Version_Name(void);
+
+  /** Get the version index, which is referenced by the .gnu.version entries.  */
+  inline unsigned Get_Ndx(void)
+  {
+    return Verdef.vd_ndx;
+  }
+
+  inline friend bool operator==(const ElfVerdef &a, const ElfVerdef &b)
+  {
+    return memcmp(&a.Verdef, &b.Verdef, sizeof(GElf_Verdef)) == 0;
+  }
+
+  inline friend bool operator!=(const ElfVerdef &a, const ElfVerdef &b)
+  {
+    return memcmp(&a.Verdef, &b.Verdef, sizeof(GElf_Verdef)) != 0;
+  }
+
+  private:
+
+  /** The .gnu.version_d section this entry belongs to.  */
+  ElfSection &Section;
+
+  /** Byte offset of this entry within the section data.  */
+  size_t Offset;
+
+  /** The verdef entry read from libelf.  */
+  GElf_Verdef Verdef;
+};
+
 /** @brief ELF section.
   *
   * An ELF executable may contain multiple section (.plt, .symtab, .dynamic, ...)
@@ -147,6 +200,7 @@ class ElfSection
   public:
   inline ElfSection(ElfObject &eo, Elf_Scn *section)
     : ElfObj(eo),
+      Data(nullptr),
       Section(section)
   {
     /** Get Section Header from the Section.  */
@@ -156,7 +210,10 @@ class ElfSection
   /** Get Section Data.  */
   inline Elf_Data *Get_Data(void)
   {
-    return elf_getdata(Section, nullptr);
+    if (Data == nullptr)
+      Data = elf_getdata(Section, nullptr);
+
+    return Data;
   }
 
   /** Get the next section.  */
@@ -177,8 +234,20 @@ class ElfSection
     return SectionHeader.sh_type;
   }
 
+  /** Get the section header link (e.g. the string table index).  */
+  inline ElfW(Word) Get_Link(void)
+  {
+    return SectionHeader.sh_link;
+  }
+
   /** Get name of this section.  */
   const char *Get_Name(void);
+
+  /** Get Elf Object for this Section.  */
+  inline ElfObject &Get_Elf_Object(void)
+  {
+    return ElfObj;
+  }
 
   /** Get the number of symbols in this section, if it is a symbol table.  */
   inline size_t Get_Num_Symbols(void)
@@ -212,16 +281,107 @@ class ElfSection
     return a.Section != b.Section;
   }
 
-  private:
+  /** Iterator over the version definitions (Elf_Verdef) of a SHT_GNU_verdef
+      section.  */
+  struct VerdefIterator
+  {
+    public:
+    /** Iterator pointing to the first version definition of `section`.  */
+    VerdefIterator(ElfSection &section)
+      : AtEnd(false), Verdef(section)
+    {
+    }
+
+    /** End-of-list sentinel iterator.  The pointer argument is only used to
+        distinguish this constructor from the one above.  */
+    VerdefIterator(ElfSection &section, void *)
+      : AtEnd(true), Verdef(section)
+    {
+      /* Create invalid object.  */
+      memset(&Verdef, 0, sizeof(Verdef));
+    }
+
+    /** Doing `*it` should access the Elf_Verdef object.  */
+    ElfVerdef &operator*()
+    {
+      return Verdef;
+    }
+
+    /** Doing `*it` should access the Elf_Verdef object (const version).  */
+    const ElfVerdef &operator*() const
+    {
+      return Verdef;
+    }
+
+    /** Prefix iterator (++it).  Becomes the end iterator once there are no
+        more version definitions.  */
+    VerdefIterator &operator++(void)
+    {
+      AtEnd = !Verdef.To_Next_Verdef();
+      return *this;
+    }
+
+#if 0
+    inline friend bool operator==(const VerdefIterator &a, const VerdefIterator &b)
+    {
+      return a.Verdef == b.Verdef;
+    }
+#endif
+
+    /** Only the end state is compared, which is enough for comparing against
+        verdef_end() in loops.  */
+    inline friend bool operator!=(const VerdefIterator &a, const VerdefIterator &b)
+    {
+      return a.AtEnd != b.AtEnd;
+    }
+
+    /** True if the iterator is past the last version definition.  */
+    bool AtEnd;
+
+    /** Current version definition.  */
+    ElfVerdef Verdef;
+  };
+
+  /** First element of the Section list.  */
+  VerdefIterator verdef_begin(void)
+  {
+    return VerdefIterator(*this);
+  }
+
+  /** Invalid element of the Section list.  */
+  VerdefIterator verdef_end(void)
+  {
+    return VerdefIterator(*this, nullptr);
+  }
+
+  protected:
   /** Reference to the ELF object (file).  */
   ElfObject &ElfObj;
 
   /** Header of this section.  */
   GElf_Shdr SectionHeader;
 
+  /** Cached Elf_Data object.  */
+  Elf_Data *Data;
+
   /** Section object from libelf.  */
   Elf_Scn *Section;
 };
+
+inline ElfVerdef::ElfVerdef(ElfSection &section)
+  : Section(section), Offset(0)
+{
+  gelf_getverdef(Section.Get_Data(), Offset, &Verdef);
+}
+
+inline bool ElfVerdef::To_Next_Verdef(void)
+{
+  if (!Have_Next_Verdef())
+    return false;
+
+  Offset += Verdef.vd_next;
+  return gelf_getverdef(Section.Get_Data(), Offset, &Verdef) != nullptr;
+}
 
 /** @brief ELF object.
   *
@@ -249,6 +409,16 @@ class ElfObject : public Parser
 
   Elf *decompress_gz(void);
   Elf *decompress_zstd(void);
+
+  /** Map from symbol version index to version name.  */
+  typedef std::unordered_map<unsigned, std::string> VersionNameHash;
+
+  /** Build a map from symbol version index to version name.  */
+  VersionNameHash Get_Version_Names(void);
+
+  /** Get the data of the symbol version section (SHT_GNU_versym), or nullptr
+      if the object has no symbol versioning.  */
+  Elf_Data *Get_Versym_Data(void);
 
   /** Iterator class for ELF sections.  With this one can use C++ iterators
     * to iterate through all sections of the ELF file.  Like this:
@@ -350,6 +520,7 @@ class ElfSymbolCache
   ElfSymbolCache(void)
     : DynsymMap(),
       SymtabMap(),
+      VersionNames(),
       Mod(""),
       DebuginfoPath(""),
       ObjectPath("")
@@ -403,15 +574,29 @@ class ElfSymbolCache
   void Dump_Cache(void);
 
   private:
-  /** The hash.  */
+
+  /** The hashes.  */
   typedef std::unordered_map<std::string, unsigned char> SymbolTableHash;
+  typedef ElfObject::VersionNameHash VersionNameHash;
+
   void Insert_Symbols_Into_Hash(SymbolTableHash &map, ElfSection &section);
+
+  /** Insert the symbols of the .dynsym section.  Symbols with a private
+      version (e.g. GLIBC_PRIVATE) can't be referenced directly by other
+      objects, hence they are inserted into the symtab map instead.  */
+  void Insert_Dynsym_Symbols(ElfObject &eo, ElfSection &dynsym);
+
+  /** Check if the symbol at `index` in the dynsym has a private version.  */
+  bool Is_Private_Symbol(Elf_Data *versym_data, size_t index);
 
   /** Hash symbols from dynsym into their value.  */
   SymbolTableHash DynsymMap;
 
   /** Hash symbols from symtab into their value.  */
   SymbolTableHash SymtabMap;
+
+  /** Hash from symbol version index to version name of the dynsym.  */
+  VersionNameHash VersionNames;
 
   /** Kernel module name, if .modinfo section is present. */
   std::string Mod;
