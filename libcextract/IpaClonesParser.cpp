@@ -24,9 +24,10 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <limits.h>
+#include <errno.h>
 
 /** Workarround glibc __GI_ private symbols, which causes all sort of troubles
-    in clang.  
+    in clang.
 
     FIXME: clang doesn't register in its symbol table asm-aliased names created
     by declarations like:
@@ -136,14 +137,24 @@ void IpaClones::Open_Recursive(const char *path)
     const char *extension = strrchr(file, '.');
     if (extension && strcmp(extension, ".ipa-clones") == 0) {
       strcpy(buffer_after_slash, file);
-      Parse(buffer);
+      try {
+        Parse(buffer);
+      } catch (...) {
+        closedir(directory);
+        throw;
+      }
       continue;
     }
 
     /* If path is a directory, then analyze it recursively.  */
     strcpy(buffer_after_slash, file);
     if (Is_Directory(buffer)) {
-      Open_Recursive(buffer);
+      try {
+        Open_Recursive(buffer);
+      } catch (...) {
+        closedir(directory);
+        throw;
+      }
     }
   }
   closedir(directory);
@@ -151,7 +162,7 @@ void IpaClones::Open_Recursive(const char *path)
 
 const char *IpaClones::LexingState::Lex(void)
 {
-  char *str = strtok(CurrentStateString, ";");
+  char *str = strtok_r(CurrentStateString, ";", &SavePtr);
 
   /* Passing the nullptr to strtok on next iteration results in it calling
      strtok into the correct offset of the original pointer.  For more info,
@@ -160,8 +171,48 @@ const char *IpaClones::LexingState::Lex(void)
   return str;
 }
 
+const char *IpaClones::LexingState::Next_String(void)
+{
+  const char *str = Lex();
+  if (str == nullptr) {
+    throw std::runtime_error(std::string(FilePath) + ":" +
+          std::to_string(LineNum) + ":" + std::to_string(ColNum) + ":" +
+          " expected word, got an empty string");
+  }
+
+  ColNum += strlen(str);
+  return str;
+}
+
+long IpaClones::LexingState::Next_Number(void)
+{
+  const char *str = Lex();
+  if (str == nullptr) {
+    throw std::runtime_error(std::string(FilePath) + ":" +
+          std::to_string(LineNum) + ":" + std::to_string(ColNum) + ":" +
+          " expected number, got an empty string");
+  }
+
+  errno = 0;
+  char *end;
+  long ret = strtol(str, &end, 10);
+
+  if (errno != 0 || end == str || *end != '\0') {
+    throw std::runtime_error(std::string(FilePath) + ":" + 
+          std::to_string(LineNum) + ":" + std::to_string(ColNum) + ":" +
+          " expected number, got word '" + std::string(str) + "'");
+  }
+
+  ColNum += strlen(str);
+  return ret;
+}
+
 IpaClones::IpaDecision IpaClones::LexingState::Get_Decision(const char *str)
 {
+  if (str == nullptr) {
+    return IPA_INVALID;
+  }
+
   if (!strcmp(str, "Callgraph removal")) {
     return IPA_REMOVE;
   }
@@ -170,8 +221,8 @@ IpaClones::IpaDecision IpaClones::LexingState::Get_Decision(const char *str)
     return IPA_CLONE;
   }
 
-  /* Should never happen.  */
-  __builtin_unreachable();
+  /* Unknown decision: the file is ill-formed.  */
+  return IPA_INVALID;
 }
 
 IpaCloneNode *IpaClones::Get_Or_Create_Node(const std::string &name)
@@ -245,60 +296,72 @@ void IpaClones::Parse(const char *path)
     *  }
     */
 
-  while ((line = getline_easy(file)) != nullptr) {
-    LexingState lexer(line);
-    IpaDecision decision = IpaClones::LexingState::Get_Decision(lexer.Lex());
+  unsigned line_number = 0;
+
+  try {
+    while ((line = getline_easy(file)) != nullptr) {
+      LexingState lexer(line, ++line_number, path);
+
+      IpaDecision decision = IpaClones::LexingState::Get_Decision(lexer.Next_String());
+      if (decision == IPA_INVALID) {
+        throw std::runtime_error(std::string(path) + ":" +
+              std::to_string(line_number) + ":" + " unknown callgraph decision");
+      }
 
 // The IPA files contain things that we do not use but we need to parse them
 // anyway.  So disable the warning for those unused variables.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-    const char *original_asm_name = lexer.Lex();
-    long original_order = atol(lexer.Lex());
-    const char *original_filename = lexer.Lex();
-    unsigned original_line = atol(lexer.Lex());
-    unsigned original_column = atol(lexer.Lex());
+      const char *original_asm_name = lexer.Next_String();
+      long original_order = lexer.Next_Number();
+      const char *original_filename = lexer.Next_String();
+      unsigned original_line = lexer.Next_Number();
+      unsigned original_column = lexer.Next_Number();
 
-    if (decision == IPA_CLONE) {
-      const char *clone_asm_name = lexer.Lex();
-      long clone_order = atol(lexer.Lex());
-      const char *clone_filename = lexer.Lex();
-      unsigned clone_line = atol(lexer.Lex());
-      unsigned clone_column = atol(lexer.Lex());
+      if (decision == IPA_CLONE) {
+        const char *clone_asm_name = lexer.Next_String();
+        long clone_order = lexer.Next_Number();
+        const char *clone_filename = lexer.Next_String();
+        unsigned clone_line = lexer.Next_Number();
+        unsigned clone_column = lexer.Next_Number();
 #pragma GCC diagnostic pop
 
-      const char *happened = lexer.Lex();
+        const char *happened = lexer.Next_String();
 
-      const char *cleaned_caller_name = nullptr;
-      const char *cleaned_callee_name = nullptr;
+        const char *cleaned_caller_name = nullptr;
+        const char *cleaned_callee_name = nullptr;
 
-      if (!strcmp(happened, "inlining to")) {
-        cleaned_caller_name = Handle_GCC_Symbol_Quirks((char*)clone_asm_name);
-        cleaned_callee_name = Handle_GCC_Symbol_Quirks((char*)original_asm_name);
+        if (!strcmp(happened, "inlining to")) {
+          cleaned_caller_name = Handle_GCC_Symbol_Quirks((char*)clone_asm_name);
+          cleaned_callee_name = Handle_GCC_Symbol_Quirks((char*)original_asm_name);
 
-        /* Inlining a symbol to itself makes no sense.  Yet this can happen if
-           they were actually two symbols that we merged into one on
-           Handle_GCC_Symbol_Quirks.  */
-        if (strcmp(cleaned_callee_name, cleaned_caller_name) == 0) {
-          continue;
+          /* Inlining a symbol to itself makes no sense.  Yet this can happen if
+             they were actually two symbols that we merged into one on
+             Handle_GCC_Symbol_Quirks.  */
+          if (strcmp(cleaned_callee_name, cleaned_caller_name) == 0) {
+            continue;
+          }
+        } else if (!strcmp(happened, "isra") || !strcmp(happened, "part") || !strcmp(happened, "constprop")) {
+          cleaned_caller_name = Remove_Star_GI(clone_asm_name);
+          cleaned_callee_name = Remove_Star_GI(original_asm_name);
         }
-      } else if (!strcmp(happened, "isra") || !strcmp(happened, "part") || !strcmp(happened, "constprop")) {
-        cleaned_caller_name = Remove_Star_GI(clone_asm_name);
-        cleaned_callee_name = Remove_Star_GI(original_asm_name);
-      }
 
-      if (cleaned_caller_name && cleaned_callee_name) {
-        /* This node has been inlined into.  */
-        IpaCloneNode *callee = Get_Or_Create_Node(cleaned_callee_name);
-        IpaCloneNode *caller = Get_Or_Create_Node(cleaned_caller_name);
+        if (cleaned_caller_name && cleaned_callee_name) {
+          /* This node has been inlined into.  */
+          IpaCloneNode *callee = Get_Or_Create_Node(cleaned_callee_name);
+          IpaCloneNode *caller = Get_Or_Create_Node(cleaned_caller_name);
 
-        callee->InlinedInto.insert(caller);
-        caller->Inlines.insert(callee);
+          callee->InlinedInto.insert(caller);
+          caller->Inlines.insert(callee);
+        }
+      } else if (decision == IPA_REMOVE) {
+        IpaCloneNode *clone = Get_Or_Create_Node(Remove_Star_GI(original_asm_name));
+        clone->Removed = true;
       }
-    } else if (decision == IPA_REMOVE) {
-      IpaCloneNode *clone = Get_Or_Create_Node(Remove_Star_GI(original_asm_name));
-      clone->Removed = true;
     }
+  } catch (...) {
+    fclose(file);
+    throw;
   }
   fclose(file);
 }
