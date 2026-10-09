@@ -262,8 +262,8 @@ int main(int argc, char *argv[])
       return 0;
     }
   } catch (std::runtime_error &err) {
-    printf("ERROR: %s\n", err.what());
-    abort();
+    fprintf(stderr, "ERROR: %s\n", err.what());
+    return 1;
   }
 
   __builtin_unreachable();

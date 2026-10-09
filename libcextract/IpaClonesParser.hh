@@ -64,6 +64,7 @@ class IpaClones : public Parser
     */
   enum IpaDecision
   {
+    IPA_INVALID,
     IPA_REMOVE,
     IPA_CLONE,
   };
@@ -146,9 +147,13 @@ class IpaClones : public Parser
   class LexingState
   {
     public:
-    inline LexingState(char *line)
+    inline LexingState(char *line, unsigned linenum = 0, const char *path = nullptr)
       : CurrentStateString(line),
-        OriginalPtr(line)
+        OriginalPtr(line),
+        SavePtr(nullptr),
+        LineNum(linenum),
+        ColNum(0),
+        FilePath(path)
     {
     }
 
@@ -160,6 +165,12 @@ class IpaClones : public Parser
     /** Next token in file.  */
     const char *Lex(void);
 
+    /** Next integer.  */
+    long Next_Number(void);
+
+    /** Next word.  */
+    const char *Next_String(void);
+
     /** Parse the decision string into a IpaDecision.  */
     static IpaDecision Get_Decision(const char *);
 
@@ -168,6 +179,16 @@ class IpaClones : public Parser
 
     /** Original string returned by getline.  */
     char *OriginalPtr;
+
+    /* strtok_r save pointer.  */
+    char *SavePtr;
+
+    /* Current Line number.  */
+    unsigned LineNum;
+    unsigned ColNum;
+
+    /* File path.  */
+    const char *FilePath;
   };
 };
 
