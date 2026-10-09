@@ -79,6 +79,18 @@ const char *ElfSymbol::Bind_As_String(unsigned link)
   return tbl[link];
 }
 
+const char *ElfVerdef::Get_Version_Name(void)
+{
+  GElf_Verdaux verdaux;
+  /* The first verdaux entry contains the version name.  */
+  if (gelf_getverdaux(Section.Get_Data(), Offset + Verdef.vd_aux, &verdaux)) {
+    return elf_strptr(Section.Get_Elf_Object().Get_Wrapped_Object(),
+                      Section.Get_Link(), verdaux.vda_name);
+  }
+
+  return nullptr;
+}
+
 /* Build the ELF object from the given path.  */
 ElfObject::ElfObject(const char *path)
   : Parser(path),
@@ -303,6 +315,7 @@ void ElfSection::To_Next_Section(void)
 {
   Section = elf_nextscn(ElfObj.Get_Wrapped_Object(), Section);
   gelf_getshdr(Section, &SectionHeader);
+  Data = nullptr;
 }
 
 /** Get the name of the section.  */
@@ -334,6 +347,101 @@ void ElfSymbolCache::Insert_Symbols_Into_Hash(SymbolTableHash &map, ElfSection &
   }
 }
 
+/** Build a map from version index to version name using the .gnu.version_d
+    and .gnu.version_r sections.  */
+ElfObject::VersionNameHash ElfObject::Get_Version_Names(void)
+{
+  VersionNameHash names;
+
+  for (auto it = section_begin(); it != section_end(); ++it) {
+    ElfSection &section = *it;
+    Elf_Data *data;
+
+    if (section.Get_Section_Type() == SHT_GNU_verdef) {
+      data = section.Get_Data();
+      if (data == nullptr)
+        break;
+
+      for (auto it = section.verdef_begin(); it != section.verdef_end(); ++it) {
+        ElfVerdef &verdef = *it;
+
+        unsigned ndx = verdef.Get_Ndx();
+        const char *name = verdef.Get_Version_Name();
+
+        if (name)
+          names[ndx] = name;
+
+      }
+    }
+  }
+
+  return names;
+}
+
+/** Get the data of the symbol version section (SHT_GNU_versym), or nullptr
+    if the object has no symbol versioning.  */
+Elf_Data *ElfObject::Get_Versym_Data(void)
+{
+  for (auto it = section_begin(); it != section_end(); ++it) {
+    ElfSection &section = *it;
+    if (section.Get_Section_Type() == SHT_GNU_versym) {
+      return section.Get_Data();
+    }
+  }
+
+  return nullptr;
+}
+
+/** Check if the symbol at `index` in the dynsym has a private version.  */
+bool ElfSymbolCache::Is_Private_Symbol(Elf_Data *versym_data, size_t index)
+{
+  GElf_Versym versym;
+  if (gelf_getversym(versym_data, index, &versym) == nullptr) {
+    return false;
+  }
+
+  /* Remove the hidden bit.  */
+  auto found = VersionNames.find(versym & 0x7fff);
+  if (found == VersionNames.end()) {
+    return false;
+  }
+
+  /* Check if the symbol version have _PRIVATE suffix, from GLIBC_PRIVATE.  */
+  return suffix("_PRIVATE", found->second.c_str());
+}
+
+void ElfSymbolCache::Insert_Dynsym_Symbols(ElfObject &eo, ElfSection &dynsym)
+{
+  Elf_Data *versym_data = eo.Get_Versym_Data();
+
+  if (versym_data == nullptr) {
+    /* No symbol versioning.  Insert everything as public.  */
+    Insert_Symbols_Into_Hash(DynsymMap, dynsym);
+    return;
+  }
+
+  VersionNames = eo.Get_Version_Names();
+
+  size_t n = dynsym.Get_Num_Symbols();
+  for (size_t i = 0; i < n; i++) {
+    ElfSymbol symbol = dynsym.Get_Symbol(i);
+    if (symbol.Get_Type() == STT_FILE) {
+      /* Skip the file symbols, we don't need them.  */
+      continue;
+    }
+
+    std::string symbol_name(symbol.Get_Name());
+
+    if (Is_Private_Symbol(versym_data, i)) {
+      /* Symbols with private versions can't be referenced directly, so treat
+         them as if they were only available in the symtab.  */
+      SymtabMap[symbol_name] = symbol.Get_Info();
+    } else {
+      DynsymMap[symbol_name] = symbol.Get_Info();
+    }
+  }
+}
+
 ElfSymbolCache::ElfSymbolCache(ElfObject &eo)
   : ElfSymbolCache()
 {
@@ -348,7 +456,7 @@ void ElfSymbolCache::Analyze_ELF(ElfObject &eo)
     ElfSection &section = *it;
     switch (section.Get_Section_Type()) {
       case SHT_DYNSYM:
-        Insert_Symbols_Into_Hash(DynsymMap, section);
+        Insert_Dynsym_Symbols(eo, section);
 
         assert(ObjectPath == "" && "Multiple libraries passed as debuginfo?");
         ObjectPath = eo.Get_Path();
@@ -439,5 +547,10 @@ void ElfSymbolCache::Dump_Cache(void)
     std::cout << i.first << "    " << ElfSymbol::Type_As_String(ELF64_ST_TYPE(i.second))
                          << "    " << ElfSymbol::Bind_As_String(ELF64_ST_BIND(i.second))
                          << '\n';
+  }
+
+  std::cout << "VersionNameMap:\n";
+  for (auto const &i : VersionNames) {
+    std::cout << i.first << "    " << i.second << '\n';
   }
 }
