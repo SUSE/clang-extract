@@ -251,10 +251,19 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
 
     /* We must be careful to ensure that the reference we got is actually
        written cleanly, e.g. it doesn't come from a macro expansion.  */
-    if (!SE.ExternalizeWithMacros &&
-        sym_name == PrettyPrint::Get_Source_Text(range) && sym->Needs_Sym_Rename()) {
-      /* Issue a text modification.  */
-      SE.Replace_Text(range, sym->getUseName(), 100);
+    if (!SE.ExternalizeWithMacros && sym->Needs_Sym_Rename()) {
+      SourceManager &sm = SE.AST->getSourceManager();
+      SourceLocation spelling = sm.getSpellingLoc(expr->getLocation());
+
+      if (sym_name == PrettyPrint::Get_Source_Text(range)) {
+        /* Issue a text modification.  */
+        SE.Replace_Text(range, sym->getUseName(), 100);
+      } else if (sm.isWrittenInScratchSpace(spelling)) {
+        /* The identifier was built by token pasting (e.g. `ref##_it`), so it
+           is not written anywhere we can rewrite.  Fallback to redirecting
+           the symbol with a macro.  */
+        sym->NeedsMacro = true;
+      }
     }
 
     return VISITOR_CONTINUE;
@@ -1039,7 +1048,7 @@ void SymbolExternalizer::Late_Externalize(void)
 
     /* In case we can just emit a macro that references the new externalized
        symbol instead of rewriting every usage, do it right now.*/
-    if (ExternalizeWithMacros) {
+    if (ExternalizeWithMacros || sym->NeedsMacro) {
       outstr << "\n/** clang-extract: due to " << sym_name << " externalization */\n"
              << "#define " << sym_name << "\t" << sym->getUseName() << '\n';
     }
@@ -1072,7 +1081,7 @@ void SymbolExternalizer::Late_Externalize(void)
 
     /* In case we are emitting a macro, make sure there are no further
        redeclarations of given symbol.  */
-    if (ExternalizeWithMacros) {
+    if (ExternalizeWithMacros || sym->NeedsMacro) {
       Remove_Redecls_After(old_decl);
     }
 
