@@ -46,7 +46,8 @@ struct SymbolUpdateStatus
     FirstUse(nullptr),
     LateInsertLocation(SourceLocation()),
     Done(done),
-    Wrap(wrap)
+    Wrap(wrap),
+    NeedsMacro(false)
   {
   }
 
@@ -58,7 +59,8 @@ struct SymbolUpdateStatus
     FirstUse(nullptr),
     LateInsertLocation(SourceLocation()),
     Done(false),
-    Wrap(false)
+    Wrap(false),
+    NeedsMacro(false)
   {
   }
 
@@ -85,6 +87,11 @@ struct SymbolUpdateStatus
 
   /* Set when the symbol usage should be dereferenced when used. */
   bool Wrap;
+
+  /* Set when some reference to the symbol can not be rewritten in the source
+     text, e.g. it was built by token pasting in a macro expansion.  In this
+     case we must emit a macro redirecting the old name to the new one.  */
+  bool NeedsMacro;
 
   /* Get the correct name used when the code was transformed */
   inline std::string getUseName(void)
