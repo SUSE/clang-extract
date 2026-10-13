@@ -237,10 +237,9 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
        will not be removed by the Closure.  */
     if (sym->FirstUse == nullptr) {
       ClosureSet &closure = SE.ClosureVisitor.Get_Closure();
-      ASTUnit *ast = SE.AST.Get_ASTUnit();
-      SourceManager &sm = ast->getSourceManager();
+      SourceManager &sm = SE.AST.getSourceManager();
       SourceLocation loc = sm.getExpansionLoc(expr->getLocation());
-      Decl *topdecl = Get_Toplevel_Decl_At_Location(ast, loc);
+      Decl *topdecl = SE.AST.Get_Toplevel_Decl_At_Location(loc);
 
       /* If the declaration is reachable from the functions we want to extract,
          then we mark it as FirstUse.  */
@@ -912,7 +911,7 @@ void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<Sy
 
     SourceLocation loc_1stuse = SM.getExpansionLoc(first_use->getLocation());
 
-    Decl *topdecl = Get_Toplevel_Decl_At_Location(AST.Get_ASTUnit(), loc_1stuse);
+    Decl *topdecl = AST.Get_Toplevel_Decl_At_Location(loc_1stuse);
     assert(topdecl && "No Toplevel decl encapsulate given expr?");
 
     /* Check if the declaration have comments.  In this case we want to insert

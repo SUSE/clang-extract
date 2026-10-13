@@ -63,6 +63,18 @@ class ASTUnitWrapper
       Use get_source_text() for that.   */
   StringRef Get_Source_Text_Raw(const SourceRange &range);
 
+  /** Get the TopLevel Decl that contains the location loc.  */
+  Decl *Get_Toplevel_Decl_At_Location(const SourceLocation &loc);
+
+  /** Get Toplevel decls with same beginloc.  */
+  ArrayRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(const SourceLocation &loc);
+
+  /** Lookup in the symbol table for a declaration with given name passed by info.  */
+  DeclContextLookupResult Get_Decl_From_Symtab(const IdentifierInfo *info);
+
+  /** Lookup in the symbol table for a declaration with given name passed by name.  */
+  DeclContextLookupResult Get_Decl_From_Symtab(const StringRef &name);
+
   /* ---- Forwarders to the ASTUnit ---- */
 
   inline SourceManager &getSourceManager(void)

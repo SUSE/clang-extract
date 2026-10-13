@@ -724,8 +724,7 @@ public:
 
     for (const ExternalizerLogEntry &entry : ctx->NamesLog) {
       if (entry.Type == ExternalizationType::STRONG) {
-        DeclContextLookupResult decls = Get_Decl_From_Symtab(ctx->AST->Get_ASTUnit(),
-                                                             entry.NewName);
+        DeclContextLookupResult decls = ctx->AST->Get_Decl_From_Symtab(entry.NewName);
 
         for (auto decl : decls) {
           /* Make sure our declaration is a DeclaratorDecl (variable or function).  */
