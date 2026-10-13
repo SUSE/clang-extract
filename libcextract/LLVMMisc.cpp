@@ -218,6 +218,40 @@ bool Is_Decl_Equivalent_To(Decl *a, Decl *b)
   return a_str == b_str;
 }
 
+bool Is_Tag_Declared_In_Typedef(const TagDecl *tag, const TypedefNameDecl *td)
+{
+  /* The tag must be written inside of a declaration, rather than being free
+     standing as in `struct point { int a; int b; };`.  */
+  if (!tag->isEmbeddedInDeclarator()) {
+    return false;
+  }
+
+  /* The declarators of this declaration are the decls that comes right after
+     the tag in its DeclContext, so check if it is a typedef.  */
+  const Decl *first = tag->getNextDeclInContext();
+  if (first == nullptr || !isa<TypedefNameDecl>(first)) {
+    return false;
+  }
+
+  /* All the declarators of `typedef struct X { ... } A, *B;` starts at the
+     same location: the `typedef` keyword.  A later declaration such as
+     `typedef struct X *C;` starts elsewhere.  */
+  if (td->getDeclContext() != tag->getDeclContext() ||
+      td->getBeginLoc() != first->getBeginLoc()) {
+    return false;
+  }
+
+  /* Make sure the typedef is of the tag, e.g. not of a function type which
+     has the tag in its parameters.  */
+  const clang::Type *type = td->getUnderlyingType().getTypePtr();
+  while (type->isPointerType() || type->isArrayType()) {
+    type = type->getPointeeOrArrayElementType();
+  }
+
+  const TagDecl *typedecl = type->getAsTagDecl();
+  return typedecl && typedecl->getCanonicalDecl() == tag->getCanonicalDecl();
+}
+
 #define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|!\r\n\t"
 
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */

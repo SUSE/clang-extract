@@ -99,6 +99,14 @@ bool Have_Location_Comment(const SourceManager &sm, RawComment *comment);
 /** Check if two Decls are equivalent.  */
 bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
 
+/** Check if tag was declared inside the typedef declaration of td, e.g.
+
+      typedef struct point { int a; int b; } Point, *PPoint;
+
+    which clang breaks into `struct point { int a; int b; };` followed by
+    `typedef struct point Point;` and `typedef struct point *PPoint;`.  */
+bool Is_Tag_Declared_In_Typedef(const TagDecl *tag, const TypedefNameDecl *td);
+
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
 bool Has_Balanced_Ifdef(const StringRef &string);
 

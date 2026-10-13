@@ -97,39 +97,32 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         which is a redeclaration of enum Hand. Hence we have to remove the
         first `enum Hand` from the closure.  See typedef-7.c testcase.  */
     if (TypedefDecl *decl = dyn_cast<TypedefDecl>(*it)) {
-      SourceRange range = decl->getSourceRange();
+      /* We must be careful with pointers and arrays, the user can define
+         things like:
 
-      const clang::Type *type = (static_cast<TypeDecl *>(decl))->getTypeForDecl();
-      if (type) {
-        /* We must be careful with pointers, the user can define things like:
-         *
-         * typedef struct _fakestr {
-         *   struct _fakestr *pNext;
-         *   int type;
-         * } FAKE, *PFAKE;
-         *
-         * which in this case PFAKE is a pointer and we need to deference it
-         * to reach _fakestr.
-         */
-        while (type->isPointerType()) {
-          type = type->getPointeeOrArrayElementType();
-        }
+         typedef struct _fakestr {
+           struct _fakestr *pNext;
+           int type;
+         } FAKE, *PFAKE;
 
-        TagDecl *typedecl = type->getAsTagDecl();
+         which in this case PFAKE is a pointer and we need to deference it
+         to reach _fakestr.  */
+      const clang::Type *type = decl->getUnderlyingType().getTypePtr();
+      while (type->isPointerType() || type->isArrayType()) {
+        type = type->getPointeeOrArrayElementType();
+      }
 
-        if (typedecl && closure.Is_Decl_Marked(typedecl)) {
-          SourceRange type_range = typedecl->getSourceRange();
+      TagDecl *typedecl = type->getAsTagDecl();
 
-          /* Check if the strings regarding an decl empty. In that case we
-             can not delete the decl from list.  */
-          if (AST.Get_Source_Text(range) != "" &&
-              AST.Get_Source_Text(type_range) != "") {
-
-            /* Using .fullyContains() fails in some declarations.  */
-            if (PrettyPrint::Contains(range, type_range)) {
-              closure.Remove_Decl(typedecl);
-            }
-          }
+      if (typedecl && closure.Is_Decl_Marked(typedecl) &&
+          Is_Tag_Declared_In_Typedef(typedecl, decl)) {
+        /* Check if the strings regarding an decl empty. In that case they
+           are printed from the AST, which would not include the tag
+           definition in the typedef, hence we can not delete the decl from
+           the list.  */
+        if (AST.Get_Source_Text(decl->getSourceRange()) != "" &&
+            AST.Get_Source_Text(typedecl->getSourceRange()) != "") {
+          closure.Remove_Decl(typedecl);
         }
       }
     }
