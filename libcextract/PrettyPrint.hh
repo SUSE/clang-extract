@@ -96,8 +96,6 @@ class PrettyPrint
   /** Set output to file.  */
   static void Set_Output_To(const std::string &path);
 
-  static StringRef Get_Filename_From_Loc(const SourceLocation &loc);
-
   static SourceLocation Get_Expanded_Loc(Decl *decl);
 
   static OptionalFileEntryRef Get_FileEntry(const SourceLocation &loc);
