@@ -25,124 +25,31 @@
 
 using namespace clang;
 
-class RecursivePrint;
-
-/** @brief Wrapper class to printing clang AST nodes.
+/** @brief Print the Decls and macros marked for output.
  *
  * Clang AST pretty printer does a good job at printing declaration nodes. Just
  * calling decl->print(params) will also print its children. However there are
- * some caveats regarding some nodes, in which the methods `Print_Decl` and
- * `Print_Stmt` are used to detect and print them correctly.
+ * some caveats regarding some nodes, which are handled here.  Whenever
+ * possible the code is printed as written in the source code rather than
+ * dumped from the AST.
  */
-class PrettyPrint
-{
-  public:
-  /** Print a Decl node into ostream `Out`.  */
-  static void Print_Decl(Decl *decl, bool keep_includes = false);
-
-  /** Print Decl node as is, without any kind of processing.  */
-  static void Print_Decl_Raw(Decl *decl);
-
-  static inline void Print_Decl_Tree(Decl *decl)
-  { decl->print(*Out, PPolicy); *Out << '\n'; }
-
-  static inline void Debug_Decl_Tree(Decl *decl)
-  { decl->print(llvm::outs(), PPolicy); llvm::outs() << '\n'; }
-
-  static void Debug_Decl(Decl *decl);
-  static void Debug_Stmt(Stmt *stmt);
-  static void Debug_Macro_Def(MacroDefinitionRecord *rec);
-  static void Debug_Macro_Undef(MacroDirective *);
-  static void Debug_InclusionDirective(InclusionDirective *);
-
-  /** Print a Stmt node into ostream `Out`.  */
-  static void Print_Stmt(Stmt *stmt);
-
-  /** Print a Macro Defintion into ostream `Out`.  */
-  static void Print_Macro_Def(MacroDefinitionRecord *rec);
-
-  /** Print a Macro Undef into ostream `Out`.  */
-  static void Print_Macro_Undef(MacroDirective *directive);
-
-  static void Print_MacroInfo(MacroInfo *info);
-
-  static void Print_InclusionDirective(InclusionDirective *);
-
-  static void Print_Attr(Attr *attr);
-
-  static void Print_Comment(const std::string &comment);
-
-  static void Print_Raw(const std::string &string);
-
-  static void Print_RawComment(SourceManager &sm, RawComment *comment);
-
-  static void Debug_SourceLoc(const SourceLocation &loc);
-
-  static inline void Set_AST(ASTUnitWrapper *ast)
-  {
-    AST = ast;
-  }
-
-  static inline LangOptions &Get_Lang_Options(void)
-  {
-    return LangOpts;
-  }
-
-  static void Set_Output_Ostream(llvm::raw_ostream *out)
-  {
-    Out = out;
-  }
-
-  /** Set output to file.  */
-  static void Set_Output_To(const std::string &path);
-
-  static SourceLocation Get_Expanded_Loc(Decl *decl);
-
-  /* This class can not be initialized.  */
-  PrettyPrint() = delete;
-
-  private:
-
-  static bool Is_Range_Valid(const SourceRange &loc);
-
-  /** Output object to where this class will output to.  Current default is the
-      same as llvm::outs().  */
-  static raw_ostream *Out;
-
-  /** Language options used by clang's internal PrettyPrinter.  We use the
-      default options for now.  */
-  static LangOptions LangOpts;
-
-  /** Policy for printing.  We use the default for now.  */
-  static PrintingPolicy PPolicy;
-
-  /** ASTUnit object.  Must be set after constructing the ast by
-      calling Set_Source_Manager.  FIXME: This should not be a statc
-      class variable.  Refactor this class entirely.  */
-  static ASTUnitWrapper *AST;
-
-  friend class RecursivePrint;
-};
-
-/** Since writing PrettyPrint::Print_Decl can be bothering and result in
-    unecessary long code, we also provide those non-namespaced functions.  */
-static inline void Print_Decl(Decl *decl)
-{
-  PrettyPrint::Print_Decl(decl);
-}
-
-static inline void Print_Stmt(Stmt *stmt)
-{
-  PrettyPrint::Print_Stmt(stmt);
-}
-
 class RecursivePrint
 {
   public:
   RecursivePrint(ASTUnitWrapper &ast,
                  std::unordered_set<Decl *> &deps,
+                 raw_ostream &out,
                  IncludeTree &it,
                  bool keep_includes,
+                 bool no_duplicated_includes = false);
+
+  /** Same as above, but the IncludeTree is optional.  It can be nullptr in
+      case we don't keep the includes, as it is only used then.  */
+  RecursivePrint(ASTUnitWrapper &ast,
+                 std::unordered_set<Decl *> &deps,
+                 raw_ostream &out,
+                 IncludeTree *it = nullptr,
+                 bool keep_includes = false,
                  bool no_duplicated_includes = false);
 
   /* Print output to `Out`.  */
@@ -160,6 +67,18 @@ class RecursivePrint
   void Print_Macro_Undef(MacroDirective *directive);
 
   protected:
+
+  /** Print Decl node as is, without any kind of processing.  */
+  void Print_Decl_Raw(Decl *decl);
+
+  /** Print the macro defined in info.  */
+  void Print_MacroInfo(MacroInfo *info);
+
+  /** Get the furthest location of decl, including its attributes.  */
+  SourceLocation Get_Expanded_Loc(Decl *decl);
+
+  /** Check if range is valid and not empty.  */
+  bool Is_Range_Valid(const SourceRange &range);
 
   /** Print a clang-extract comment that is on top of each declaration.  */
   void Print_CE_Comment(Decl *decl);
@@ -192,10 +111,39 @@ class RecursivePrint
   TopLevelASTIterator ASTIterator;
   MacroWalker MW;
   std::unordered_set<Decl *> &Decl_Deps;
-  IncludeTree &IT;
+  /** The tree of includes.  Can be nullptr if we don't keep the includes.  */
+  IncludeTree *IT;
+
+  /** Output object to where this class will output to.  */
+  raw_ostream &Out;
+
+  /** Language options used by clang's internal PrettyPrinter.  We use the
+      default options for now.  */
+  LangOptions LangOpts;
+
+  /** Policy for printing.  We use the default for now.  */
+  PrintingPolicy PPolicy;
+
   bool KeepIncludes;
 
   /* Vector of MacroDirective of macros that needs to be undefined somewhere in
      the code.  */
   std::vector<MacroDirective*> NeedsUndef;
 };
+
+/* Functions designed to be called from gdb.  They take a void pointer because
+   gdb usually don't have the type information of clang classes, hence it can't
+   convert e.g. a `DeclRefExpr *` into a `Stmt *` when calling them.  Since
+   `Decl` and `Stmt` are always the leftmost base class, any pointer to a class
+   derived from them can be passed.  */
+extern "C" {
+
+/** Print the Decl pointed by decl to stderr the same way it would be printed
+    in the output, e.g. `call Debug_Decl(decl)`.  The decl must be in the last
+    created ASTUnitWrapper.  */
+void Debug_Decl(void *decl);
+
+/** Print the Stmt pointed by stmt to stderr, e.g. `call Debug_Stmt(expr)`.  */
+void Debug_Stmt(void *stmt);
+
+}

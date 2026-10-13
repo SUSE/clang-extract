@@ -68,8 +68,6 @@ bool Build_ASTUnit(PassManager::Context *ctx,
     return false;
   }
 
-  /* Set its SourceManager to the PrettyPrint class.  */
-  PrettyPrint::Set_AST(ctx->AST.get());
   return true;
 }
 
@@ -313,7 +311,8 @@ class BuildASTPass : public Pass
 
     for (it = ctx->AST->top_level_begin(); it != ctx->AST->top_level_end(); ++it) {
       Decl *decl = *it;
-      PrettyPrint::Print_Decl(decl);
+      decl->print(out);
+      out << '\n';
     }
 
     out.close();
@@ -429,24 +428,21 @@ class ClosurePass : public Pass
       ctx->CodeOutput = std::string();
       raw_string_ostream code_stream(ctx->CodeOutput);
 
-      PrettyPrint::Set_Output_Ostream(&code_stream);
-
       /* Compute closure and output the code.  */
       FunctionDependencyFinder fdf(ctx);
       if (fdf.Run_Analysis(ctx->FuncExtractNames) == false) {
         /* We should silently abort if we didn't find the names in CC mode.  */
         return (ctx->CCPath) ? PASS_ABORT_COMPILATION : PASS_ERROR;
       }
-      fdf.Print();
+      fdf.Print(code_stream);
 
       /* Add the temporary string with code to the filesystem.  */
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
 
-      /* Parse the temporary code to apply the changes by the externalizer
-         and set its new SourceManager to the PrettyPrint class.  In case we
-         must keep the includes, pass the overlayFS instead of the memoryFS
-         as we must access the headers in disk.  If we are expanding all
-         headers, pass the memoryFS so we can catch possible bugs where
+      /* Parse the temporary code to apply the changes by the externalizer.
+         In case we must keep the includes, pass the overlayFS instead of the
+         memoryFS as we must access the headers in disk.  If we are expanding
+         all headers, pass the memoryFS so we can catch possible bugs where
          #includes went through.  */
       if (ctx->KeepIncludes) {
         if (!Build_ASTUnit(ctx, ctx->OFS)) {
@@ -465,13 +461,17 @@ class ClosurePass : public Pass
       }
 
       /* Set output stream to a file if we set to print to a file.  */
+      raw_ostream *out = &code_stream;
+      std::unique_ptr<llvm::raw_fd_ostream> file_stream;
       if (PrintToFile) {
         std::string output_path = Get_Output_Path(ctx);
         Ensure_Path_Exists(output_path);
-        PrettyPrint::Set_Output_To(output_path);
+
+        std::error_code ec;
+        file_stream = std::make_unique<llvm::raw_fd_ostream>(output_path, ec);
+        out = file_stream.get();
       } else {
         ctx->CodeOutput = std::string();
-        PrettyPrint::Set_Output_Ostream(&code_stream);
       }
 
       /* Compute closure and output the code.  */
@@ -479,7 +479,7 @@ class ClosurePass : public Pass
       if (fdf2.Run_Analysis(ctx->FuncExtractNames) == false) {
         return PASS_ERROR;
       }
-      fdf2.Print();
+      fdf2.Print(*out);
 
       /* Add the temporary string with code to the filesystem.  */
       ctx->MFS->addFile(ctx->InputPath, 0, MemoryBuffer::getMemBufferCopy(ctx->CodeOutput));
@@ -604,10 +604,8 @@ class FunctionExternalizerPass : public Pass
         ctx->CodeOutput = externalizer.Get_Modifications_To_Main_File();
       }
 
-      /* Parse the temporary code to apply the changes by the externalizer
-         and set its new SourceManager to the PrettyPrint class.  */
+      /* Parse the temporary code to apply the changes by the externalizer.  */
       ctx->AST->Reparse(ctx->OFS);
-      PrettyPrint::Set_AST(ctx->AST.get());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
@@ -716,11 +714,20 @@ public:
 
   virtual PassRetType Run_Pass(PassManager::Context *ctx)
   {
-    PrettyPrint::Print_Raw(
-                "#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
-                "\tasm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \".\" #SYM_POS \"\\\"\")\n"
-                "#define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
-                "\tKLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n\n");
+    /* The ClosurePass only prints the output file if there are functions to
+       extract.  Otherwise there is nothing to append to.  */
+    if (ctx->FuncExtractNames.size() == 0) {
+      return PASS_OK;
+    }
+
+    /* Append to the file the ClosurePass printed to.  */
+    std::error_code ec;
+    llvm::raw_fd_ostream out(Get_Output_Path(ctx), ec, llvm::sys::fs::OF_Append);
+
+    out << "#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS) \\\n"
+           "\tasm(\"\\\".klp.sym.rela.\" #LP_OBJ_NAME \".\" #SYM_OBJ_NAME \".\" #SYM_NAME \".\" #SYM_POS \"\\\"\")\n"
+           "#define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME) \\\n"
+           "\tKLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)\n\n";
 
     for (const ExternalizerLogEntry &entry : ctx->NamesLog) {
       if (entry.Type == ExternalizationType::STRONG) {
@@ -745,7 +752,7 @@ public:
           outstr << " \\\n" << "\tKLP_RELOC_SYMBOL(" << ctx->PatchObject << ", " <<
                  sym_mod << ", " << entry.OldName << ");\n\n";
 
-          PrettyPrint::Print_Raw(o);
+          out << o;
         }
       }
     }
@@ -777,12 +784,10 @@ class HeaderGenerationPass : public Pass
   {
     std::error_code ec;
     llvm::raw_fd_ostream out(ctx->OutputFunctionPrototypeHeader, ec);
-    PrettyPrint::Set_Output_Ostream(&out);
 
     HeaderGeneration HGen(ctx);
-    HGen.Print();
+    HGen.Print(out);
 
-    PrettyPrint::Set_Output_Ostream(nullptr);
     return PASS_OK;
   }
 

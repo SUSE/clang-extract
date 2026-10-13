@@ -15,7 +15,6 @@
 
 #include "HeaderGenerate.hh"
 #include "FunctionDepsFinder.hh"
-#include "IncludeTree.hh"
 #include "PrettyPrint.hh"
 
 HeaderGeneration::HeaderGeneration(PassManager::Context *ctx)
@@ -24,10 +23,9 @@ HeaderGeneration::HeaderGeneration(PassManager::Context *ctx)
   Run_Analysis(ctx->NamesLog);
 }
 
-void HeaderGeneration::Print(void)
+void HeaderGeneration::Print(raw_ostream &out)
 {
-  IncludeTree IT(AST); // Not necessary, just to use the RecursivePrint class.
-  RecursivePrint(AST, Closure.Get_Set(), IT, false).Print();
+  RecursivePrint(AST, Closure.Get_Set(), out).Print();
 }
 
 static bool Contains(const std::vector<ExternalizerLogEntry> &v, const std::string &name)

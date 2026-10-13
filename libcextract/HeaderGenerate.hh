@@ -34,7 +34,7 @@ class HeaderGeneration
 
   bool Run_Analysis(const std::vector<ExternalizerLogEntry> &set);
 
-  void Print(void);
+  void Print(raw_ostream &out);
 
   protected:
   ASTUnitWrapper &AST;

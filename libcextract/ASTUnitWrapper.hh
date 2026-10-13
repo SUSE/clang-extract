@@ -106,12 +106,29 @@ class ASTUnitWrapper
   inline ASTUnit *Get_ASTUnit(void)
   { return AST.get(); }
 
+  /** Get the last created ASTUnitWrapper object which is still alive, or
+      nullptr.  Used by the functions designed to be called from gdb, which
+      have no other way of reaching it.  */
+  static inline ASTUnitWrapper *Get_Last_Created(void)
+  { return Last_Created; }
+
+  ~ASTUnitWrapper(void)
+  {
+    if (Last_Created == this) {
+      Last_Created = nullptr;
+    }
+  }
+
   private:
   ASTUnitWrapper(std::unique_ptr<ASTUnit> ast)
     : AST(std::move(ast))
   {
+    Last_Created = this;
   }
 
   /** The wrapped ASTUnit object.  */
   std::unique_ptr<ASTUnit> AST;
+
+  /** The last created ASTUnitWrapper object which is still alive.  */
+  static ASTUnitWrapper *Last_Created;
 };
