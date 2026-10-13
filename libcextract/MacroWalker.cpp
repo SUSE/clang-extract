@@ -46,7 +46,8 @@ MacroInfo *MacroWalker::Get_Macro_Info(const IdentifierInfo *id, const SourceLoc
        look into the previous definitions to find the last one that is defined
        before loc.  */
 
-    if (PrettyPrint::Is_Before(macroinfo->getDefinitionLoc(), loc))
+    if (PProcessor.getSourceManager()
+        .isBeforeInTranslationUnit(macroinfo->getDefinitionLoc(), loc))
       return macroinfo;
 
     directive = directive->getPrevious();

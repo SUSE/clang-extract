@@ -93,12 +93,6 @@ class PrettyPrint
     Out = out;
   }
 
-  /** Check if SourceLocation a is located before than b in the SourceCode.  */
-  static bool Is_Before(const SourceLocation &a, const SourceLocation &b);
-
-  /** Check if SourceLocation a is located after than b in the SourceCode.  */
-  static bool Is_After(const SourceLocation &a, const SourceLocation &b);
-
   /** Set output to file.  */
   static void Set_Output_To(const std::string &path);
 
@@ -144,11 +138,6 @@ static inline void Print_Decl(Decl *decl)
 static inline void Print_Stmt(Stmt *stmt)
 {
   PrettyPrint::Print_Stmt(stmt);
-}
-
-static inline bool Is_Loc_Before(const SourceLocation &a, const SourceLocation &b)
-{
-  return PrettyPrint::Is_Before(a, b);
 }
 
 class RecursivePrint
