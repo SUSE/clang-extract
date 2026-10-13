@@ -19,6 +19,7 @@
 #include "InlineAnalysis.hh"
 #include "SymbolExternalizer.hh"
 #include "ExpansionPolicy.hh"
+#include "ASTUnitWrapper.hh"
 #include "clang/Frontend/ASTUnit.h"
 
 #include <exception>
@@ -83,7 +84,7 @@ class PassManager {
         }
 
         /** The Abstract Syntax Tree.  */
-        std::unique_ptr<ASTUnit> AST;
+        std::unique_ptr<ASTUnitWrapper> AST;
 
         /** The Overlay File System between the real filesystem and the
             in-memory file system.  */
