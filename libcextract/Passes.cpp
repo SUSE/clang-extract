@@ -46,19 +46,10 @@ void Print_AST(ASTUnit *ast)
   }
 }
 
-/** Filesystem that will be used in our custom ASTUnit::create, so that way we
-  * don't break clang's API.  See ASTUnitHack.cpp.
-  */
-extern IntrusiveRefCntPtr<llvm::vfs::FileSystem> _Hack_VFS;
-
 bool Build_ASTUnit(PassManager::Context *ctx,
                    IntrusiveRefCntPtr<vfs::FileSystem> fs /*= nullptr*/)
 {
   ctx->AST.reset();
-
-  IntrusiveRefCntPtr<DiagnosticsEngine> Diags;
-  std::shared_ptr<CompilerInvocation> CInvok;
-  std::shared_ptr<PCHContainerOperations> PCHContainerOps;
 
   if (!fs) {
     /* Create a virtual file system.  */
@@ -72,73 +63,13 @@ bool Build_ASTUnit(PassManager::Context *ctx,
     fs = ctx->OFS;
   }
 
-  _Hack_VFS = fs;
-
-  /* Built the ASTUnit from the passed command line and set its SourceManager
-     to the PrettyPrint class.  */
-  auto diagopts = ClangCompat::createDiagnosticOptionsWithColor();
-
-  Diags = ClangCompat::createDiagnostics(*_Hack_VFS, diagopts);
-
-  if (ctx->IgnoreClangErrors) {
-    Diags->setWarningsAsErrors(false);
-    Diags->setErrorsAsFatal(false);
-    Diags->setIgnoreAllWarnings(true);
-  }
-
-  /* Create invocation object.  */
-  clang::CreateInvocationOptions CIOpts;
-  CIOpts.Diags = Diags;
-  CInvok = clang::createInvocation(ctx->ClangArgs, std::move(CIOpts));
-
-  /* Try no not crash if no input file is given.  */
-  if (CInvok == nullptr) {
-    _Hack_VFS = nullptr;
+  ctx->AST = ASTUnitWrapper::Create(ctx->ClangArgs, fs, ctx->IgnoreClangErrors);
+  if (ctx->AST == nullptr) {
     return false;
   }
 
-  PCHContainerOps = std::make_shared<PCHContainerOperations>();
-
-
-  /* Hacked function call, see ASTUnitHack.cpp.  */
-  auto AU = ASTUnit::create(ClangCompat_ASTUP(CInvok,
-                                              diagopts,
-                                              Diags,
-                                              CaptureDiagsKind::None,
-                                              false));
-  std::unique_ptr<ASTUnit> *ErrAST = nullptr;
-
-  ASTUnit::LoadFromCompilerInvocationAction(ClangCompat_ASTULFCIAP(
-                                            CInvok, PCHContainerOps,
-                                            diagopts,
-                                            Diags,
-                                            nullptr, AU.get(),
-                                            /*Persistent=*/true,
-                                            /*ResourceFilesPath=*/StringRef(),
-                                            /*OnlyLocalDecls=*/false,
-                                            /*CaptureDiagnostics=*/CaptureDiagsKind::None,
-                                            /*PrecompilePreambleAfterNParses=*/0,
-                                            /*CacheCodeCompletionResults=*/false,
-                                            /*UserFilesAreVolatile=*/false,
-                                            ErrAST));
-
-  _Hack_VFS = nullptr;
-
-  if (AU == nullptr) {
-    if (ctx->IgnoreClangErrors && ErrAST) {
-      PrettyPrint::Set_AST(ErrAST->get());
-      ctx->AST = std::move(*ErrAST);
-
-      return true;
-    }
-
-    throw std::runtime_error("Unable to create ASTUnit object.");
-    return false;
-  }
-
-  PrettyPrint::Set_AST(AU.get());
-  ctx->AST = std::move(AU);
-
+  /* Set its SourceManager to the PrettyPrint class.  */
+  PrettyPrint::Set_AST(ctx->AST->Get_ASTUnit());
   return true;
 }
 
@@ -358,13 +289,13 @@ class BuildASTPass : public Pass
     }
 
     /* Update the InlineAnalysis object with the source code information.  */
-    ctx->IA.Update_With_Source_Code_Info(ctx->AST.get());
+    ctx->IA.Update_With_Source_Code_Info(ctx->AST->Get_ASTUnit());
 
     /* Remove any unwanted arguments from command line.  */
     Update_Clang_Args(ctx);
 
     /* Get the input file path.  */
-    ctx->InputPath = Get_Input_File(ctx->AST.get());
+    ctx->InputPath = Get_Input_File(ctx->AST->Get_ASTUnit());
 
     const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
     return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
@@ -563,7 +494,7 @@ class ClosurePass : public Pass
       llvm::raw_fd_ostream out(Get_Dump_Name_From_Input(ctx), ec);
 
       /* Dump the IncludeTree.  */
-      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy,
+      IncludeTree IT(ctx->AST->Get_ASTUnit(), ctx->IncExpansionPolicy,
                      ctx->HeadersToExpand, ctx->HeadersToNotExpand);
       out << "/** IncludeTree: \n\n";
       IT.Dump(out);
@@ -599,7 +530,7 @@ class FunctionExternalizeFinderPass : public Pass
     virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       /* Find which symbols must be externalized.  */
-      FunctionExternalizeFinder fef(ctx->AST.get(),
+      FunctionExternalizeFinder fef(ctx->AST->Get_ASTUnit(),
           ctx->FuncExtractNames,
           ctx->Externalize,
           ctx->KeepIncludes,
@@ -642,7 +573,7 @@ class FunctionExternalizerPass : public Pass
     virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       /* Issue externalization.  */
-      SymbolExternalizer externalizer(ctx->AST.get(), ctx->IA, ctx->Ibt,
+      SymbolExternalizer externalizer(ctx->AST->Get_ASTUnit(), ctx->IA, ctx->Ibt,
                                       ctx->AllowLateExternalizations,
                                       ctx->PatchObject,
                                       ctx->FuncExtractNames,
@@ -675,9 +606,8 @@ class FunctionExternalizerPass : public Pass
 
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
-      ctx->AST->Reparse(std::make_shared<PCHContainerOperations>(),
-                        {}, ctx->OFS);
-      PrettyPrint::Set_AST(ctx->AST.get());
+      ctx->AST->Reparse(ctx->OFS);
+      PrettyPrint::Set_AST(ctx->AST->Get_ASTUnit());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;
@@ -700,7 +630,7 @@ class FunctionExternalizerPass : public Pass
       out << "*/\n";
 
       /* Dump the IncludeTree.  */
-      IncludeTree IT(ctx->AST.get(), ctx->IncExpansionPolicy,
+      IncludeTree IT(ctx->AST->Get_ASTUnit(), ctx->IncExpansionPolicy,
                      ctx->HeadersToExpand, ctx->HeadersToNotExpand);
       out << "/** IncludeTree: \n\n";
       IT.Dump(out);
@@ -739,7 +669,7 @@ class GenerateDscPass : public Pass
       Ensure_Path_Exists(ctx->DscOutputPath);
 
       DscFileGenerator DscGen(ctx->DscOutputPath,
-                              ctx->AST.get(),
+                              ctx->AST->Get_ASTUnit(),
                               ctx->FuncExtractNames,
                               ctx->NamesLog,
                               ctx->IA);
@@ -794,7 +724,7 @@ public:
 
     for (const ExternalizerLogEntry &entry : ctx->NamesLog) {
       if (entry.Type == ExternalizationType::STRONG) {
-        DeclContextLookupResult decls = Get_Decl_From_Symtab(ctx->AST.get(),
+        DeclContextLookupResult decls = Get_Decl_From_Symtab(ctx->AST->Get_ASTUnit(),
                                                              entry.NewName);
 
         for (auto decl : decls) {

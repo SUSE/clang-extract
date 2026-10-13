@@ -34,7 +34,7 @@ libcextract_sources = [
   'ExpansionPolicy.cpp',
   'HeaderGenerate.cpp',
   'Closure.cpp',
-  'ASTUnitHack.cpp',
+  'ASTUnitWrapper.cpp',
   'LaunchProcess.cpp',
 ]
 

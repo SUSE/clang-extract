@@ -23,7 +23,7 @@
 
 /** FunctionDependencyFinder class methods implementation.  */
 FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
-    : AST(ctx->AST.get()),
+    : AST(ctx->AST->Get_ASTUnit()),
       IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand, ctx->HeadersToNotExpand),
       KeepIncludes(ctx->KeepIncludes),
       Visitor(AST),

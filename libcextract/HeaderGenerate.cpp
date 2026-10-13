@@ -19,7 +19,7 @@
 #include "PrettyPrint.hh"
 
 HeaderGeneration::HeaderGeneration(PassManager::Context *ctx)
-  : AST(ctx->AST.get())
+  : AST(ctx->AST->Get_ASTUnit())
 {
   Run_Analysis(ctx->NamesLog);
 }

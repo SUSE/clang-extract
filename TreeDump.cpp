@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  IncludeTree IT(ctx.AST.get(), ctx.IncExpansionPolicy, ctx.HeadersToExpand,
+  IncludeTree IT(ctx.AST->Get_ASTUnit(), ctx.IncExpansionPolicy, ctx.HeadersToExpand,
                  ctx.HeadersToNotExpand);
   IT.Dump(llvm::outs());
 
