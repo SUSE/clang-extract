@@ -84,12 +84,6 @@ Decl           *Get_With_Body(Decl *decl);
 /** Get version of declarator with body or itself.  */
 DeclaratorDecl *Get_With_Body_Or_Itself(DeclaratorDecl *decl);
 
-/* Get the TopLevel Decl that contains the location loc.  */
-Decl *Get_Toplevel_Decl_At_Location(ASTUnit *ast, const SourceLocation &loc);
-
-/* Get Toplevel decls with same beginloc.  */
-ArrayRef<Decl *> Get_Toplev_Decls_With_Same_Beginloc(ASTUnit *ast, const SourceLocation &loc);
-
 /** Build a clang-extract location comment.  */
 std::string Build_CE_Location_Comment(SourceManager &sm, const SourceLocation &loc);
 
@@ -101,12 +95,6 @@ std::string Get_Or_Build_CE_Location_Comment(ASTContext &ctx, Decl *decl);
 
 /** Check if Decl have a Location comment.  */
 bool Have_Location_Comment(const SourceManager &sm, RawComment *comment);
-
-/** Lookup in the symbol table for a declaration with given name passed by info.  */
-DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const IdentifierInfo *info);
-
-/** Lookup in the symbol table for a declaration with given name passed by name.  */
-DeclContextLookupResult Get_Decl_From_Symtab(ASTUnit *ast, const StringRef &name);
 
 /** Check if two Decls are equivalent.  */
 bool Is_Decl_Equivalent_To(Decl *a, Decl *b);

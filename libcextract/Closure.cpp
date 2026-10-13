@@ -189,7 +189,7 @@ bool DeclClosureVisitor::VisitDeclaratorDecl(DeclaratorDecl *decl)
   StringRef text = AST.Get_Source_Text({tok_begin, tok_end});
 
   /* Lookup in the symbol table for any Decl matching it.  */
-  DeclContextLookupResult decls = Get_Decl_From_Symtab(AST.Get_ASTUnit(), text);
+  DeclContextLookupResult decls = AST.Get_Decl_From_Symtab(text);
   for (auto decl_it : decls) {
     TRY_TO(TraverseDecl(decl_it));
   }
@@ -556,7 +556,7 @@ bool DeclClosureVisitor::ParentRecordDeclHelper(TagDecl *decl)
 bool DeclClosureVisitor::AnalyzeDeclsWithSameBeginlocHelper(Decl *decl)
 {
   SourceManager &SM = AST.getSourceManager();
-  ArrayRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST.Get_ASTUnit(),
+  ArrayRef<Decl *> decls = AST.Get_Toplev_Decls_With_Same_Beginloc(
                            SM.getExpansionLoc(decl->getBeginLoc()));
 
   for (auto it = decls.begin(); it != decls.end(); ++it) {
