@@ -99,13 +99,19 @@ bool Have_Location_Comment(const SourceManager &sm, RawComment *comment);
 /** Check if two Decls are equivalent.  */
 bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
 
-/** Check if tag was declared inside the typedef declaration of td, e.g.
+/** Check if tag was declared inside the declaration of decl, which is either
+    a typedef or a variable, e.g.
 
       typedef struct point { int a; int b; } Point, *PPoint;
 
     which clang breaks into `struct point { int a; int b; };` followed by
-    `typedef struct point Point;` and `typedef struct point *PPoint;`.  */
-bool Is_Tag_Declared_In_Typedef(const TagDecl *tag, const TypedefNameDecl *td);
+    `typedef struct point Point;` and `typedef struct point *PPoint;`, or
+
+      static const struct mount_opts { int token; } ext4_mount_opts[] = { {1} };
+
+    which is broken into `struct mount_opts { int token; };` followed by
+    `static const struct mount_opts ext4_mount_opts[] = { {1} };`.  */
+bool Is_Tag_Declared_In_Decl(const TagDecl *tag, const Decl *decl);
 
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
 bool Has_Balanced_Ifdef(const StringRef &string);
