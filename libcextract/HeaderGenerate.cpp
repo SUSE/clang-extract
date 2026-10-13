@@ -19,7 +19,7 @@
 #include "PrettyPrint.hh"
 
 HeaderGeneration::HeaderGeneration(PassManager::Context *ctx)
-  : AST(ctx->AST->Get_ASTUnit())
+  : AST(*ctx->AST)
 {
   Run_Analysis(ctx->NamesLog);
 }
@@ -47,7 +47,7 @@ bool HeaderGeneration::Run_Analysis(const std::vector<ExternalizerLogEntry> &set
   ASTUnit::top_level_iterator it;
   std::unordered_set<std::string> nameset;
 
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+  for (it = AST.top_level_begin(); it != AST.top_level_end(); ++it) {
     Decl *decl = *it;
 
     if (FunctionDecl *fdecl = dyn_cast<FunctionDecl>(decl)) {
@@ -66,8 +66,8 @@ bool HeaderGeneration::Run_Analysis(const std::vector<ExternalizerLogEntry> &set
   }
 
   /* Do not output any macros.  */
-  MacroWalker mw(AST->getPreprocessor());
-  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  MacroWalker mw(AST.getPreprocessor());
+  PreprocessingRecord *rec = AST.getPreprocessor().getPreprocessingRecord();
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
       if (MacroInfo *info = mw.Get_Macro_Info(def)) {

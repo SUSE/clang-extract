@@ -53,7 +53,7 @@ void DeclClosureVisitor::Compute_Closure_Of_Symbols(const std::vector<std::strin
   std::unordered_set<std::string> setof_names(std::make_move_iterator(names.begin()),
                                               std::make_move_iterator(names.end()));
 
-  for (auto it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+  for (auto it = AST.top_level_begin(); it != AST.top_level_end(); ++it) {
     NamedDecl *decl = dyn_cast<NamedDecl>(*it);
 
     if (!decl) {
@@ -176,8 +176,8 @@ bool DeclClosureVisitor::VisitDeclaratorDecl(DeclaratorDecl *decl)
    *  decl that is in the symbol table with that name.
    */
 
-  SourceManager &sm = AST->getSourceManager();
-  const LangOptions &lo = AST->getLangOpts();
+  SourceManager &sm = AST.getSourceManager();
+  const LangOptions &lo = AST.getLangOpts();
 
   const TypeSourceInfo *typeinfo = decl->getTypeSourceInfo();
   const TypeLoc &tl = typeinfo->getTypeLoc();
@@ -186,10 +186,10 @@ bool DeclClosureVisitor::VisitDeclaratorDecl(DeclaratorDecl *decl)
   SourceLocation tok_begin = Lexer::GetBeginningOfToken(tl.getBeginLoc(), sm, lo);
   SourceLocation tok_end   = Lexer::getLocForEndOfToken(tl.getBeginLoc(), 0, sm, lo);
 
-  StringRef text = PrettyPrint::Get_Source_Text({tok_begin, tok_end});
+  StringRef text = AST.Get_Source_Text({tok_begin, tok_end});
 
   /* Lookup in the symbol table for any Decl matching it.  */
-  DeclContextLookupResult decls = Get_Decl_From_Symtab(AST, text);
+  DeclContextLookupResult decls = Get_Decl_From_Symtab(AST.Get_ASTUnit(), text);
   for (auto decl_it : decls) {
     TRY_TO(TraverseDecl(decl_it));
   }
@@ -555,8 +555,8 @@ bool DeclClosureVisitor::ParentRecordDeclHelper(TagDecl *decl)
 
 bool DeclClosureVisitor::AnalyzeDeclsWithSameBeginlocHelper(Decl *decl)
 {
-  SourceManager &SM = AST->getSourceManager();
-  ArrayRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST,
+  SourceManager &SM = AST.getSourceManager();
+  ArrayRef<Decl *> decls = Get_Toplev_Decls_With_Same_Beginloc(AST.Get_ASTUnit(),
                            SM.getExpansionLoc(decl->getBeginLoc()));
 
   for (auto it = decls.begin(); it != decls.end(); ++it) {

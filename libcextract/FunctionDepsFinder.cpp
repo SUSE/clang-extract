@@ -23,7 +23,7 @@
 
 /** FunctionDependencyFinder class methods implementation.  */
 FunctionDependencyFinder::FunctionDependencyFinder(PassManager::Context *ctx)
-    : AST(ctx->AST->Get_ASTUnit()),
+    : AST(*ctx->AST.get()),
       IT(AST, ctx->IncExpansionPolicy, ctx->HeadersToExpand, ctx->HeadersToNotExpand),
       KeepIncludes(ctx->KeepIncludes),
       Visitor(AST),
@@ -122,8 +122,8 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 
           /* Check if the strings regarding an decl empty. In that case we
              can not delete the decl from list.  */
-          if (PrettyPrint::Get_Source_Text(range) != "" &&
-              PrettyPrint::Get_Source_Text(type_range) != "") {
+          if (AST.Get_Source_Text(range) != "" &&
+              AST.Get_Source_Text(type_range) != "") {
 
             /* Using .fullyContains() fails in some declarations.  */
             if (PrettyPrint::Contains(range, type_range)) {
@@ -209,8 +209,8 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
        redundant, which means that have equivalent previous decl.  */
     Decl *decl = *it;
 
-    if (AST->isInMainFileID(decl->getBeginLoc()) &&
-        AST->isInMainFileID(decl->getEndLoc())) {
+    if (AST.isInMainFileID(decl->getBeginLoc()) &&
+        AST.isInMainFileID(decl->getEndLoc())) {
 
       for (Decl *prev = decl->getPreviousDecl();
            prev != nullptr;
@@ -227,7 +227,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 
   ASTUnit::top_level_iterator it;
   Decl *prev = nullptr;
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+  for (it = AST.top_level_begin(); it != AST.top_level_end(); ++it) {
     Decl *decl = *it;
     if (isa<TypedefDecl>(decl) || isa<DeclaratorDecl>(decl) || isa<TagDecl>(decl)) {
       if (!closure.Is_Decl_Marked(decl))
@@ -268,8 +268,8 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
        * based on the source text and not in AST dump.  In the later case
        * we don't want to remove it.
        */
-      if (PrettyPrint::Get_Source_Text(decl->getSourceRange()) != "" &&
-          PrettyPrint::Get_Source_Text(prev->getSourceRange()) != "" &&
+      if (AST.Get_Source_Text(decl->getSourceRange()) != "" &&
+          AST.Get_Source_Text(prev->getSourceRange()) != "" &&
           PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
                                               prev->getSourceRange())) {
         /*
@@ -288,7 +288,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
 void FunctionDependencyFinder::Insert_Decls_From_Non_Expanded_Includes(void)
 {
   ASTUnit::top_level_iterator it;
-  for (it = AST->top_level_begin(); it != AST->top_level_end(); ++it) {
+  for (it = AST.top_level_begin(); it != AST.top_level_end(); ++it) {
     Decl *decl = *it;
 
     const SourceLocation &loc = decl->getLocation();

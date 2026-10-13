@@ -28,8 +28,7 @@ using namespace clang;
  * This class owns clang's ASTUnit and is the place where clang-extract
  * extends it, as ASTUnit can not be subclassed: its constructor is private and
  * it is only created through static factories.  It also hides the hacks
- * required to create an ASTUnit with a virtual filesystem (see
- * ASTUnitHack.cpp).
+ * required to create an ASTUnit with a virtual filesystem.
  */
 class ASTUnitWrapper
 {
@@ -45,6 +44,24 @@ class ASTUnitWrapper
   /** Parse the source file again, accessing files through `fs`.  Returns true
       on success.  */
   bool Reparse(IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+
+  /** Gets the portion of the code that corresponds to given SourceRange, including the
+      last token. Returns expanded macros.  */
+  StringRef Get_Source_Text(const SourceRange &range);
+
+  /** Gets the portion of the code that corresponds to given SourceRange exactly as
+      the range is given.
+
+      @warning The end location of the SourceRange returned by some Clang functions
+      (such as clang::Expr::getSourceRange) might actually point to the first character
+      (the "location") of the last token of the expression, rather than the character
+      past-the-end of the expression like clang::Lexer::getSourceText expects.
+      get_source_text_raw() does not take this into account. Use get_source_text()
+      instead if you want to get the source text including the last token.
+
+      @warning This function does not obtain the source of a macro/preprocessor expansion.
+      Use get_source_text() for that.   */
+  StringRef Get_Source_Text_Raw(const SourceRange &range);
 
   /* ---- Forwarders to the ASTUnit ---- */
 
