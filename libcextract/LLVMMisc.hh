@@ -113,6 +113,11 @@ bool Is_Decl_Equivalent_To(Decl *a, Decl *b);
     `static const struct mount_opts ext4_mount_opts[] = { {1} };`.  */
 bool Is_Tag_Declared_In_Decl(const TagDecl *tag, const Decl *decl);
 
+/** Check if a and b are declared in the same declaration, e.g. `x` and `y` in
+    `typedef struct { int a; } x, y;`, or the struct and `s` in
+    `struct S { int a; } s;`.  */
+bool Is_Declared_Together(const Decl *a, const Decl *b);
+
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
 bool Has_Balanced_Ifdef(const StringRef &string);
 
