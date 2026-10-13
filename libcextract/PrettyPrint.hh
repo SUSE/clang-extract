@@ -98,8 +98,6 @@ class PrettyPrint
 
   static SourceLocation Get_Expanded_Loc(Decl *decl);
 
-  static OptionalFileEntryRef Get_FileEntry(const SourceLocation &loc);
-
   /* This class can not be initialized.  */
   PrettyPrint() = delete;
 

@@ -84,7 +84,8 @@ bool MacroWalker::Is_Builtin_Macro(MacroInfo *info)
 
   /* Some cases the isBuiltinMacro method fails on builtin macros.  Try to
      decide it using the FileInfo.  */
-  OptionalFileEntryRef ref = PrettyPrint::Get_FileEntry(info->getDefinitionLoc());
+  SourceManager &sm = PProcessor.getSourceManager();
+  OptionalFileEntryRef ref = sm.getFileEntryRefForID(sm.getFileID(info->getDefinitionLoc()));
   if (!ref.has_value()) {
     /* This doesn't come from any file, hence it was introduced by the compiler,
        therefore is a builtin macro.  */

@@ -452,12 +452,6 @@ void PrettyPrint::Set_Output_To(const std::string &path)
   Set_Output_Ostream(&out);
 }
 
-OptionalFileEntryRef PrettyPrint::Get_FileEntry(const SourceLocation &loc)
-{
-  SourceManager &SM = AST->getSourceManager();
-  return SM.getFileEntryRefForID(SM.getFileID(loc));
-}
-
 /* See PrettyPrint.hh for what they do.  */
 raw_ostream *PrettyPrint::Out = &llvm::outs();
 LangOptions PrettyPrint::LangOpts;

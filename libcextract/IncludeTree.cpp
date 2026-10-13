@@ -117,7 +117,7 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand,
 
       /* In which file this include was written?  */
       SourceRange range = id->getSourceRange();
-      OptionalFileEntryRef this_file = PrettyPrint::Get_FileEntry(range.getBegin());
+      OptionalFileEntryRef this_file = SM.getFileEntryRefForID(SM.getFileID(range.getBegin()));
 
       /* This is very confusing, but that is how clang handle things.
          -include HEADER can be passed as a command line argument to clang. in
@@ -213,7 +213,7 @@ void IncludeTree::Build_Header_Tree(std::vector<std::string> const &must_expand,
       MacroInfo *info = mw.Get_Macro_Info(def);
       if (info && info->isUsedForHeaderGuard()) {
         const SourceRange &range = def->getSourceRange();
-        OptionalFileEntryRef this_file = PrettyPrint::Get_FileEntry(range.getBegin());
+        OptionalFileEntryRef this_file = SM.getFileEntryRefForID(SM.getFileID(range.getBegin()));
 
         /* Pop the stack until we find which HeaderNode we currently are.  */
         IncludeNode *current = stack.top();
@@ -352,12 +352,12 @@ void IncludeTree::Cut_Non_Expandable_Trees(IncludeNode *node, bool cutting)
 
 IncludeNode *IncludeTree::Get(const SourceLocation &loc)
 {
-  OptionalFileEntryRef fileref = PrettyPrint::Get_FileEntry(loc);
+  OptionalFileEntryRef fileref = SM.getFileEntryRefForID(SM.getFileID(loc));
 
   /* In case we could not find a FileRef, then try the ExpansionLoc.  */
   if (!fileref.has_value()) {
     const SourceLocation &loc2 = SM.getExpansionLoc(loc);
-    fileref = PrettyPrint::Get_FileEntry(loc2);
+    fileref = SM.getFileEntryRefForID(SM.getFileID(loc2));
   }
 
   if (fileref.has_value()) {
