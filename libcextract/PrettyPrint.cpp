@@ -452,11 +452,6 @@ void PrettyPrint::Set_Output_To(const std::string &path)
   Set_Output_Ostream(&out);
 }
 
-StringRef PrettyPrint::Get_Filename_From_Loc(const SourceLocation &loc)
-{
-  return AST->getSourceManager().getFilename(loc);
-}
-
 OptionalFileEntryRef PrettyPrint::Get_FileEntry(const SourceLocation &loc)
 {
   SourceManager &SM = AST->getSourceManager();
