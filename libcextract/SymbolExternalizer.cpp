@@ -41,10 +41,10 @@
 /* Return the ranges for all identifiers on the ids vector */
 template <typename T>
 static std::vector<std::pair<std::string, SourceRange>>
-Get_Range_Of_Identifier(const SourceRange &range, const T &ids)
+Get_Range_Of_Identifier(ASTUnitWrapper &ast, const SourceRange &range, const T &ids)
 {
   std::vector< std::pair < std::string, SourceRange> > ret = {};
-  StringRef string = PrettyPrint::Get_Source_Text(range);
+  StringRef string = ast.Get_Source_Text(range);
 
   /* Create temporary buff, strtok modifies it.  */
   unsigned len = string.size();
@@ -76,10 +76,10 @@ Get_Range_Of_Identifier(const SourceRange &range, const T &ids)
 }
 
 static std::vector<std::pair<std::string, SourceRange>>
-Get_Range_Of_Identifier(const SourceRange &range, const StringRef &id)
+Get_Range_Of_Identifier(ASTUnitWrapper &ast, const SourceRange &range, const StringRef &id)
 {
   std::set<StringRef> ids = { id };
-  return Get_Range_Of_Identifier(range, ids);
+  return Get_Range_Of_Identifier(ast, range, ids);
 }
 
 #define EXTERNALIZED_PREFIX "klpe_"
@@ -180,9 +180,9 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
       }
     } else if (type == ExternalizationType::RENAME) {
       /* Get SourceRange where the function identifier is.  */
-      SourceRange range = Get_Range_For_Rewriter(SE.AST, decl->getSourceRange());
+      SourceRange range = Get_Range_For_Rewriter(SE.AST.Get_ASTUnit(), decl->getSourceRange());
 
-      auto ids = Get_Range_Of_Identifier(range, decl->getName());
+      auto ids = Get_Range_Of_Identifier(SE.AST, range, decl->getName());
       assert(ids.size() > 0 && "Decl name do not match required identifier?");
 
       SourceRange id_range = ids[0].second;
@@ -237,7 +237,7 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
        will not be removed by the Closure.  */
     if (sym->FirstUse == nullptr) {
       ClosureSet &closure = SE.ClosureVisitor.Get_Closure();
-      ASTUnit *ast = SE.AST;
+      ASTUnit *ast = SE.AST.Get_ASTUnit();
       SourceManager &sm = ast->getSourceManager();
       SourceLocation loc = sm.getExpansionLoc(expr->getLocation());
       Decl *topdecl = Get_Toplevel_Decl_At_Location(ast, loc);
@@ -252,10 +252,10 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
     /* We must be careful to ensure that the reference we got is actually
        written cleanly, e.g. it doesn't come from a macro expansion.  */
     if (!SE.ExternalizeWithMacros && sym->Needs_Sym_Rename()) {
-      SourceManager &sm = SE.AST->getSourceManager();
+      SourceManager &sm = SE.AST.getSourceManager();
       SourceLocation spelling = sm.getSpellingLoc(expr->getLocation());
 
-      if (sym_name == PrettyPrint::Get_Source_Text(range)) {
+      if (sym_name == SE.AST.Get_Source_Text(range)) {
         /* Issue a text modification.  */
         SE.Replace_Text(range, sym->getUseName(), 100);
       } else if (sm.isWrittenInScratchSpace(spelling)) {
@@ -278,9 +278,9 @@ class ExternalizerVisitor: public RecursiveASTVisitor<ExternalizerVisitor>
 bool SymbolExternalizer::Drop_Static(FunctionDecl *decl)
 {
   if (decl->isStatic()) {
-    SourceRange range = Get_Range_For_Rewriter(AST, decl->getSourceRange());
+    SourceRange range = Get_Range_For_Rewriter(AST.Get_ASTUnit(), decl->getSourceRange());
 
-    auto ids = Get_Range_Of_Identifier(range, StringRef("static"));
+    auto ids = Get_Range_Of_Identifier(AST, range, StringRef("static"));
     assert(ids.size() > 0 && "static decl without static keyword?");
 
     SourceRange static_range = ids[0].second;
@@ -299,9 +299,9 @@ template <typename DECL>
 bool SymbolExternalizer::Drop_Static_Add_Extern(DECL *decl)
 {
   if (decl->getStorageClass() == StorageClass::SC_Static) {
-    SourceRange range = Get_Range_For_Rewriter(AST, decl->getSourceRange());
+    SourceRange range = Get_Range_For_Rewriter(AST.Get_ASTUnit(), decl->getSourceRange());
 
-    auto ids = Get_Range_Of_Identifier(range, StringRef("static"));
+    auto ids = Get_Range_Of_Identifier(AST, range, StringRef("static"));
     assert(ids.size() > 0 && "static decl without static keyword?");
 
     SourceRange static_range = ids[0].second;
@@ -495,7 +495,7 @@ void TextModifications::Dump(unsigned num, const Delta &a)
   llvm::outs() << "Generating " + output_file + '\n';
 
   std::string note = std::to_string(num) + " Changing " +
-                PrettyPrint::Get_Source_Text_Raw(a.ToChange).str() +
+                Lexer::getSourceText(CharSourceRange::getCharRange(a.ToChange), SM, LO).str() +
                 " to " + a.NewText;
   note = "/*\n" + note + "*/\n";
   fputs(note.c_str(), file);
@@ -570,7 +570,7 @@ bool TextModifications::Intersects(const Delta &a, const Delta &b)
 
 void SymbolExternalizer::Replace_Text(const SourceRange &range, StringRef new_name, int prio)
 {
-  SourceRange rw_range = Get_Range_For_Rewriter(AST, range);
+  SourceRange rw_range = Get_Range_For_Rewriter(AST.Get_ASTUnit(), range);
   TextModifications::Delta delta(rw_range, new_name.str(), prio);
   TM.Insert(delta);
 }
@@ -585,7 +585,7 @@ void SymbolExternalizer::Insert_Text(const SourceLocation &loc, StringRef text)
   /* Ensure we got a SourceLocation with FileID.  */
   SourceLocation floc = loc;
   if (!floc.isFileID()) {
-    floc = AST->getSourceManager().getExpansionLoc(loc);
+    floc = AST.getSourceManager().getExpansionLoc(loc);
   }
 
   TM.Insert_Into_FileEntryMap(floc);
@@ -612,10 +612,10 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
         livepatches.  */
 
   /* Create a new identifier with name `name`.  */
-  IdentifierInfo *id = AST->getPreprocessor().getIdentifierInfo(name);
+  IdentifierInfo *id = AST.getPreprocessor().getIdentifierInfo(name);
 
   /* Get clang's ASTContext, needed to allocate the node.  */
-  ASTContext &astctx = AST->getASTContext();
+  ASTContext &astctx = AST.getASTContext();
 
   /* Create a type that is a pointer to the externalized object's type.  */
   QualType pointer_to = astctx.getPointerType(decl->getType());
@@ -670,7 +670,7 @@ VarDecl *SymbolExternalizer::Create_Externalized_Var(DeclaratorDecl *decl, const
 
 
       DiagsClass::Emit_Warn(msg, vdecl->getSourceRange(),
-                            AST->getSourceManager());
+                            AST.getSourceManager());
     }
   }
 
@@ -683,7 +683,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
                           IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> &mfs,
                           std::vector<std::string> &includes_to_expand)
 {
-  SourceManager &sm = AST->getSourceManager();
+  SourceManager &sm = AST.getSourceManager();
   bool modified = false;
   bool main_file_inserted = false;
 
@@ -743,7 +743,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
                             "due to either user or ExpansionPolicy request.";
           DiagsClass::Emit_Error(msg,
                                  node->Get_InclusionDirective()->getSourceRange(),
-                                 AST->getSourceManager());
+                                 AST.getSourceManager());
           throw std::runtime_error("SymbolExternalizer is unable to continue");
           return false;
         }
@@ -778,7 +778,7 @@ bool SymbolExternalizer::Commit_Changes_To_Source(
 std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 {
 
-  SourceManager &sm = AST->getSourceManager();
+  SourceManager &sm = AST.getSourceManager();
 
   /* Our updated file buffer for main file.  */
   FileID main_id = sm.getMainFileID();
@@ -796,7 +796,7 @@ std::string SymbolExternalizer::Get_Modifications_To_Main_File(void)
 std::vector<std::pair<std::string, SourceRange>>
 SymbolExternalizer::Get_Range_Of_Identifier_In_Macro_Expansion(const MacroExpansion *exp)
 {
-  return Get_Range_Of_Identifier(exp->getSourceRange(), SymbolsMap);
+  return Get_Range_Of_Identifier(AST, exp->getSourceRange(), SymbolsMap);
 }
 
 void SymbolExternalizer::Rewrite_Macros(void)
@@ -807,7 +807,7 @@ void SymbolExternalizer::Rewrite_Macros(void)
   if (ExternalizeWithMacros)
     return;
 
-  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  PreprocessingRecord *rec = AST.getPreprocessor().getPreprocessingRecord();
 
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
@@ -872,7 +872,7 @@ SymbolUpdateStatus *SymbolExternalizer::getSymbolsUpdateStatus(const StringRef &
 
 void SymbolExternalizer::Dump_SymbolsMap(void)
 {
-  SourceManager &sm = AST->getSourceManager();
+  SourceManager &sm = AST.getSourceManager();
 
   for (auto it = SymbolsMap.begin(); it != SymbolsMap.end(); ++it) {
     SymbolUpdateStatus &sym = it->getValue();
@@ -882,8 +882,8 @@ void SymbolExternalizer::Dump_SymbolsMap(void)
 
 void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array)
 {
-  SourceManager &SM = AST->getSourceManager();
-  ASTContext &ctx = AST->getASTContext();
+  SourceManager &SM = AST.getSourceManager();
+  ASTContext &ctx = AST.getASTContext();
 
   /* Insert into an array for the sole purpose of sorting in an ascending
      SourceLocation order.  */
@@ -912,7 +912,7 @@ void SymbolExternalizer::Compute_SymbolsMap_Late_Insert_Locations(std::vector<Sy
 
     SourceLocation loc_1stuse = SM.getExpansionLoc(first_use->getLocation());
 
-    Decl *topdecl = Get_Toplevel_Decl_At_Location(AST, loc_1stuse);
+    Decl *topdecl = Get_Toplevel_Decl_At_Location(AST.Get_ASTUnit(), loc_1stuse);
     assert(topdecl && "No Toplevel decl encapsulate given expr?");
 
     /* Check if the declaration have comments.  In this case we want to insert
@@ -936,7 +936,7 @@ void SymbolExternalizer::Drop_Var_Initializer(VarDecl *decl)
     SourceLocation init_loc = init->getSourceRange().getBegin();
     SourceLocation head = init_loc.getLocWithOffset(-1);
 
-    StringRef text = PrettyPrint::Get_Source_Text(init->getSourceRange());
+    StringRef text = AST.Get_Source_Text(init->getSourceRange());
     if (text.data() == nullptr) {
       std::string o;
       llvm::raw_string_ostream outstr(o);
@@ -951,7 +951,7 @@ void SymbolExternalizer::Drop_Var_Initializer(VarDecl *decl)
 
     /* Search for the '=' initializer token.  */
     while (true) {
-      StringRef text = PrettyPrint::Get_Source_Text({head, init_loc});
+      StringRef text = AST.Get_Source_Text({head, init_loc});
       if (*text.data() == '=') {
         break;
       }
@@ -1006,8 +1006,8 @@ void SymbolExternalizer::Remove_Redecls_After(Decl *decl)
 
 void SymbolExternalizer::Late_Externalize(void)
 {
-  SourceManager &sm = AST->getSourceManager();
-  ASTContext &astctx = AST->getASTContext();
+  SourceManager &sm = AST.getSourceManager();
+  ASTContext &astctx = AST.getASTContext();
   std::vector<SymbolUpdateStatus *> array;
   Compute_SymbolsMap_Late_Insert_Locations(array);
 
@@ -1106,7 +1106,7 @@ void SymbolExternalizer::Externalize_Symbols(std::vector<std::string> const &to_
 
   /* Start traversing the AST to find all references to the symbols that we want
    * to externalize or rename. */
-  ExternalizerVisitor(*this).TraverseDecl(AST->getASTContext().getTranslationUnitDecl());
+  ExternalizerVisitor(*this).TraverseDecl(AST.getASTContext().getTranslationUnitDecl());
   Late_Externalize();
 
   /* Search for all macros and macro expansions and rewrite them using the new

@@ -82,7 +82,7 @@ class PrettyPrint
 
   static bool Contains(const SourceRange &a, const SourceRange &b);
 
-  static inline void Set_AST(ASTUnit *ast)
+  static inline void Set_AST(ASTUnitWrapper *ast)
   {
     AST = ast;
   }
@@ -96,26 +96,6 @@ class PrettyPrint
   {
     Out = out;
   }
-
-  /** Gets the portion of the code that corresponds to given SourceRange, including the
-      last token. Returns expanded macros.
-
-      @see get_source_text_raw().  */
-  static StringRef Get_Source_Text(const SourceRange &range);
-
-  /** Gets the portion of the code that corresponds to given SourceRange exactly as
-      the range is given.
-
-      @warning The end location of the SourceRange returned by some Clang functions
-      (such as clang::Expr::getSourceRange) might actually point to the first character
-      (the "location") of the last token of the expression, rather than the character
-      past-the-end of the expression like clang::Lexer::getSourceText expects.
-      get_source_text_raw() does not take this into account. Use get_source_text()
-      instead if you want to get the source text including the last token.
-
-      @warning This function does not obtain the source of a macro/preprocessor expansion.
-      Use get_source_text() for that.   */
-  static StringRef Get_Source_Text_Raw(const SourceRange &range);
 
   /** Check if SourceLocation a is located before than b in the SourceCode.  */
   static bool Is_Before(const SourceLocation &a, const SourceLocation &b);
@@ -153,7 +133,7 @@ class PrettyPrint
   /** ASTUnit object.  Must be set after constructing the ast by
       calling Set_Source_Manager.  FIXME: This should not be a statc
       class variable.  Refactor this class entirely.  */
-  static ASTUnit *AST;
+  static ASTUnitWrapper *AST;
 
   friend class RecursivePrint;
 };
@@ -178,7 +158,7 @@ static inline bool Is_Loc_Before(const SourceLocation &a, const SourceLocation &
 class RecursivePrint
 {
   public:
-  RecursivePrint(ASTUnit *ast,
+  RecursivePrint(ASTUnitWrapper &ast,
                  std::unordered_set<Decl *> &deps,
                  IncludeTree &it,
                  bool keep_includes,
@@ -227,7 +207,7 @@ class RecursivePrint
   inline void Unmark_Macro(MacroInfo *x)
   { x->setIsUsed(false); }
 
-  ASTUnit *AST;
+  ASTUnitWrapper &AST;
   TopLevelASTIterator ASTIterator;
   MacroWalker MW;
   std::unordered_set<Decl *> &Decl_Deps;

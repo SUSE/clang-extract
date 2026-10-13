@@ -37,6 +37,6 @@ class HeaderGeneration
   void Print(void);
 
   protected:
-  ASTUnit *AST;
+  ASTUnitWrapper &AST;
   ClosureSet Closure;
 };

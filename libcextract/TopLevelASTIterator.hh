@@ -16,6 +16,7 @@
 #pragma once
 
 #include "MacroWalker.hh"
+#include "ASTUnitWrapper.hh"
 #include "clang/Frontend/ASTUnit.h"
 
 #include <vector>
@@ -25,7 +26,7 @@ using namespace clang;
 class TopLevelASTIterator
 {
   public:
-  TopLevelASTIterator(ASTUnit *ast, bool skip_macros_in_decls=true);
+  TopLevelASTIterator(ASTUnitWrapper &AST, bool skip_macros_in_decls=true);
 
   enum ReturnType
   {
@@ -122,7 +123,7 @@ class TopLevelASTIterator
   private:
   void Populate_Needs_Undef(void);
 
-  ASTUnit *AST;
+  ASTUnitWrapper &AST;
   SourceManager &SM;
   PreprocessingRecord &PrepRec;
 

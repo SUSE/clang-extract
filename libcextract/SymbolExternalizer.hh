@@ -211,9 +211,9 @@ class TextModifications
   };
 
   /** Constructor for the TextModification class.  */
-  TextModifications(ASTUnit *ast, bool dump = false)
-    : SM(ast->getSourceManager()),
-      LO(ast->getLangOpts()),
+  TextModifications(ASTUnitWrapper &ast, bool dump = false)
+    : SM(ast.getSourceManager()),
+      LO(ast.getLangOpts()),
       RW(SM, LO),
       DumpingEnabled(dump)
   {}
@@ -307,7 +307,7 @@ class TextModifications
 class SymbolExternalizer
 {
   public:
-  SymbolExternalizer(ASTUnit *ast, InlineAnalysis &ia, bool ibt,
+  SymbolExternalizer(ASTUnitWrapper &ast, InlineAnalysis &ia, bool ibt,
                      bool allow_late_externalize, std::string patch_object,
                      const std::vector<std::string> &functions_to_extract,
                      IncludeExpansionPolicy::Policy exp_policy,
@@ -316,7 +316,7 @@ class SymbolExternalizer
                      bool externalize_with_macro = false,
                      bool dump = false)
     : AST(ast),
-      MW(ast->getPreprocessor()),
+      MW(ast.getPreprocessor()),
       TM(ast, dump),
       IA(ia),
       Ibt(ibt),
@@ -426,7 +426,7 @@ class SymbolExternalizer
   void Handle_IBT_Ext(SymbolUpdateStatus *);
 
   /** AST in analysis.  */
-  ASTUnit *AST;
+  ASTUnitWrapper &AST;
 
   /** MacroWalker object which helps iterating on Macros.  */
   MacroWalker MW;

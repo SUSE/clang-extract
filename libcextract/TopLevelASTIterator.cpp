@@ -15,16 +15,16 @@
 
 #include "TopLevelASTIterator.hh"
 
-TopLevelASTIterator::TopLevelASTIterator(ASTUnit *ast, bool skip_macros_in_decls)
+TopLevelASTIterator::TopLevelASTIterator(ASTUnitWrapper &ast, bool skip_macros_in_decls)
   : AST(ast),
-    SM(AST->getSourceManager()),
-    PrepRec(*AST->getPreprocessor().getPreprocessingRecord()),
-    DeclIt(AST->top_level_begin()),
+    SM(AST.getSourceManager()),
+    PrepRec(*AST.getPreprocessor().getPreprocessingRecord()),
+    DeclIt(AST.top_level_begin()),
     MacroIt(PrepRec.begin()),
     UndefIt(0),
     NeedsUndef({}),
     BeforeClass(SM),
-    MW(AST->getPreprocessor()),
+    MW(AST.getPreprocessor()),
     SkipMacrosInDecls(skip_macros_in_decls),
     Ended(false),
     EndLocOfLastDecl(PrepRec.begin()->getSourceRange().getBegin())
@@ -58,7 +58,7 @@ SourceLocation TopLevelASTIterator::Return::Get_Location(void)
 
 void TopLevelASTIterator::Populate_Needs_Undef(void)
 {
-  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  PreprocessingRecord *rec = AST.getPreprocessor().getPreprocessingRecord();
 
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
@@ -101,10 +101,10 @@ void TopLevelASTIterator::Populate_Needs_Undef(void)
 
 bool TopLevelASTIterator::Advance(void)
 {
-  SourceManager &sm = AST->getSourceManager();
+  SourceManager &sm = AST.getSourceManager();
   const SourceLocation &end = sm.getLocForEndOfFile(sm.getMainFileID());
 
-#define NEXT_DECL_IF_EXISTS(DeclIt, end) ((DeclIt) != AST->top_level_end()) \
+#define NEXT_DECL_IF_EXISTS(DeclIt, end) ((DeclIt) != AST.top_level_end()) \
                                          ? (*(DeclIt))->getLocation() \
                                          : (end)
 #define NEXT_PREP_IF_EXISTS(MacroIt, end) ((MacroIt) != PrepRec.end()) \
@@ -187,7 +187,7 @@ bool TopLevelASTIterator::Skip_Until(const SourceLocation &loc)
 
 #include "PrettyPrint.hh"
 
-void Debug_TopLevelASTWalker(ASTUnit *ast)
+void Debug_TopLevelASTWalker(ASTUnitWrapper &ast)
 {
   TopLevelASTIterator it(ast);
   for (; !it.End(); ++it) {
@@ -205,7 +205,7 @@ void Debug_TopLevelASTWalker(ASTUnit *ast)
         {
           PrettyPrint::Debug_Macro_Def(def);
         } else {
-          llvm::outs() << PrettyPrint::Get_Source_Text(Current.AsPrep->getSourceRange());
+          llvm::outs() << ast.Get_Source_Text(Current.AsPrep->getSourceRange());
           llvm::outs() << '\n';
         }
         break;

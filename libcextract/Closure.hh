@@ -138,7 +138,7 @@ class ClosureSet
 class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
 {
   public:
-  DeclClosureVisitor(ASTUnit *ast)
+  DeclClosureVisitor(ASTUnitWrapper &ast)
     : RecursiveASTVisitor(),
       AST(ast),
       Closure(),
@@ -265,7 +265,7 @@ class DeclClosureVisitor : public RecursiveASTVisitor<DeclClosureVisitor>
   private:
 
   /** The ASTUnit object.  */
-  ASTUnit *AST;
+  ASTUnitWrapper &AST;
 
   /** Datastructure holding all Decls required for the functions. This is
       then used to mark which Decls we need to output.

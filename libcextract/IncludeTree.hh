@@ -24,6 +24,7 @@
 #pragma once
 
 #include "ExpansionPolicy.hh"
+#include "ASTUnitWrapper.hh"
 
 #include <clang/Tooling/Tooling.h>
 #include <vector>
@@ -214,6 +215,14 @@ class IncludeTree
               std::vector<std::string> const &must_not_expand = {})
     : IncludeTree(ast->getPreprocessor(), ast->getSourceManager(), p,
                   must_expand, must_not_expand)
+  {
+  }
+
+  IncludeTree(ASTUnitWrapper &ast,
+              IncludeExpansionPolicy::Policy p = IncludeExpansionPolicy::Policy::NOTHING,
+              std::vector<std::string> const &must_expand = {},
+              std::vector<std::string> const &must_not_expand = {})
+    : IncludeTree(ast.Get_ASTUnit(), p, must_expand, must_not_expand)
   {
   }
 

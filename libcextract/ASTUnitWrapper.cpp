@@ -103,6 +103,26 @@ bool ASTUnitWrapper::Reparse(IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs)
   return !AST->Reparse(std::make_shared<PCHContainerOperations>(), {}, fs);
 }
 
+StringRef ASTUnitWrapper::Get_Source_Text(const SourceRange &range)
+{
+    // NOTE: sm.getSpellingLoc() used in case the range corresponds to a macro/preprocessed source.
+    // NOTE2: getSpellingLoc() breaks in the case where a macro was asigned to be expanded to typedef.
+    SourceManager &SM = AST->getSourceManager();
+    const LangOptions &langopts = AST->getLangOpts();
+    auto start_loc = range.getBegin();//SM->getSpellingLoc(range.getBegin());
+    auto last_token_loc = range.getEnd();//SM->getSpellingLoc(range.getEnd());
+    auto end_loc = clang::Lexer::getLocForEndOfToken(last_token_loc, 0, SM, langopts);
+    auto printable_range = clang::SourceRange{start_loc, end_loc};
+    return Get_Source_Text_Raw(printable_range);
+}
+
+StringRef ASTUnitWrapper::Get_Source_Text_Raw(const SourceRange &range)
+{
+    SourceManager &SM = AST->getSourceManager();
+    const LangOptions &langopts = AST->getLangOpts();
+    return clang::Lexer::getSourceText(CharSourceRange::getCharRange(range), SM, langopts);
+}
+
 /* ---- Hacky code so we can create an ASTUnit with a custom filesystem. ---- */
 
 /** Common code for the ASTUnit::create functions.  */

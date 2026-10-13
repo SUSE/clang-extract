@@ -69,7 +69,7 @@ bool Build_ASTUnit(PassManager::Context *ctx,
   }
 
   /* Set its SourceManager to the PrettyPrint class.  */
-  PrettyPrint::Set_AST(ctx->AST->Get_ASTUnit());
+  PrettyPrint::Set_AST(ctx->AST.get());
   return true;
 }
 
@@ -573,7 +573,7 @@ class FunctionExternalizerPass : public Pass
     virtual PassRetType Run_Pass(PassManager::Context *ctx)
     {
       /* Issue externalization.  */
-      SymbolExternalizer externalizer(ctx->AST->Get_ASTUnit(), ctx->IA, ctx->Ibt,
+      SymbolExternalizer externalizer(*ctx->AST, ctx->IA, ctx->Ibt,
                                       ctx->AllowLateExternalizations,
                                       ctx->PatchObject,
                                       ctx->FuncExtractNames,
@@ -607,7 +607,7 @@ class FunctionExternalizerPass : public Pass
       /* Parse the temporary code to apply the changes by the externalizer
          and set its new SourceManager to the PrettyPrint class.  */
       ctx->AST->Reparse(ctx->OFS);
-      PrettyPrint::Set_AST(ctx->AST->Get_ASTUnit());
+      PrettyPrint::Set_AST(ctx->AST.get());
 
       const DiagnosticsEngine &de = ctx->AST->getDiagnostics();
       return de.hasErrorOccurred() ? PASS_ERROR : PASS_OK;

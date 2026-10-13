@@ -79,7 +79,7 @@ void PrettyPrint::Print_Decl(Decl *decl, bool keep_includes)
 
     /* FIXME: Why isCompleteDefinitionRequired does not work for EnumDecls?  */
     if (t && ((!e && t->isCompleteDefinitionRequired() == false)
-              || (!keep_includes && regex.match(Get_Source_Text(t->getSourceRange()))))) {
+              || (!keep_includes && regex.match(AST->Get_Source_Text(t->getSourceRange()))))) {
 
       /* FIXME: The Print_Decl_Raw class will attempt to write this declaration
          as the user wrote, that means WITH a body.  To avoid this, we set
@@ -154,7 +154,7 @@ void PrettyPrint::Print_Decl_Raw(Decl *decl)
 
     SourceLocation furthest = PrettyPrint::Get_Expanded_Loc(decl);
     decl_range = SourceRange(decl_range.getBegin(), furthest);
-    StringRef decl_source = Get_Source_Text(decl_range);
+    StringRef decl_source = AST->Get_Source_Text(decl_range);
 
     /* If for some reason Get_Source_Text is unable to find the source range
        which comes this declaration because it is very complex, then fall back
@@ -269,42 +269,43 @@ void PrettyPrint::Print_Stmt(Stmt *stmt)
 
 void PrettyPrint::Print_Macro_Def(MacroDefinitionRecord *rec)
 {
-  Out << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n\n";
+  Out << "#define " << AST->Get_Source_Text(rec->getSourceRange()) << "\n\n";
 }
 
 void PrettyPrint::Debug_Macro_Def(MacroDefinitionRecord *rec)
 {
-  llvm::outs() << "#define " << Get_Source_Text(rec->getSourceRange()) << "\n";
+  llvm::outs() << "#define " << AST->Get_Source_Text(rec->getSourceRange()) << "\n";
 }
 
 void PrettyPrint::Print_Macro_Undef(MacroDirective *directive)
 {
   SourceLocation loc = directive->getDefinition().getUndefLocation();
   assert(loc.isValid() && "Undefine location is invalid");
-  Out << "#undef " << Get_Source_Text(loc) << '\n';
+  Out << "#undef " << AST->Get_Source_Text(loc) << '\n';
 }
 
 void PrettyPrint::Debug_Macro_Undef(MacroDirective *directive)
 {
   SourceLocation loc = directive->getDefinition().getUndefLocation();
   assert(loc.isValid() && "Undefine location is invalid");
-  llvm::outs() << "#undef " << Get_Source_Text(loc) << '\n';
+  llvm::outs() << "#undef " << AST->Get_Source_Text(loc) << '\n';
 }
 
 void PrettyPrint::Print_InclusionDirective(InclusionDirective *include)
 {
-  Out << Get_Source_Text(include->getSourceRange()) << '\n';
+  Out << AST->Get_Source_Text(include->getSourceRange()) << '\n';
+
 }
 
 void PrettyPrint::Debug_InclusionDirective(InclusionDirective *include)
 {
-  llvm::outs() << Get_Source_Text(include->getSourceRange()) << '\n';
+  llvm::outs() << AST->Get_Source_Text(include->getSourceRange()) << '\n';
 }
 
 void PrettyPrint::Print_MacroInfo(MacroInfo *info)
 {
   SourceRange range(info->getDefinitionLoc(), info->getDefinitionEndLoc());
-  Out << "#define " << Get_Source_Text(range) << '\n';
+  Out << "#define " << AST->Get_Source_Text(range) << '\n';
 }
 
 void PrettyPrint::Print_Attr(Attr *attr)
@@ -329,24 +330,6 @@ void PrettyPrint::Print_RawComment(SourceManager &sm, RawComment *comment)
 }
 
 /** Private stuff.  */
-
-StringRef PrettyPrint::Get_Source_Text(const SourceRange &range)
-{
-    // NOTE: sm.getSpellingLoc() used in case the range corresponds to a macro/preprocessed source.
-    // NOTE2: getSpellingLoc() breaks in the case where a macro was asigned to be expanded to typedef.
-    SourceManager &SM = AST->getSourceManager();
-    auto start_loc = range.getBegin();//SM->getSpellingLoc(range.getBegin());
-    auto last_token_loc = range.getEnd();//SM->getSpellingLoc(range.getEnd());
-    auto end_loc = clang::Lexer::getLocForEndOfToken(last_token_loc, 0, SM, LangOpts);
-    auto printable_range = clang::SourceRange{start_loc, end_loc};
-    return Get_Source_Text_Raw(printable_range);
-}
-
-StringRef PrettyPrint::Get_Source_Text_Raw(const SourceRange &range)
-{
-    SourceManager &SM = AST->getSourceManager();
-    return clang::Lexer::getSourceText(CharSourceRange::getCharRange(range), SM, LangOpts);
-}
 
 /** Compare if SourceLocation a is before SourceLocation b in the source code.  */
 bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
@@ -488,7 +471,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
              this case by emiting the ';' that was there, which will result in
              two ';' being print.  This is visually not cute, but at least
              won't cause the compiler to cry.  */
-          StringRef endstr = PrettyPrint::Get_Source_Text({furthest, furthest});
+          StringRef endstr = AST->Get_Source_Text({furthest, furthest});
           if (const char *data_str = endstr.data()) {
             /* Check for newline.  */
             if (*data_str != '\0' && *data_str == '\n') {
@@ -543,20 +526,20 @@ OptionalFileEntryRef PrettyPrint::Get_FileEntry(const SourceLocation &loc)
 raw_ostream *PrettyPrint::Out = &llvm::outs();
 LangOptions PrettyPrint::LangOpts;
 PrintingPolicy PrettyPrint::PPolicy(LangOpts);
-ASTUnit *PrettyPrint::AST;
+ASTUnitWrapper *PrettyPrint::AST;
 
 
 
 /** --- New RecursivePrint class code.  */
 
-RecursivePrint::RecursivePrint(ASTUnit *ast,
+RecursivePrint::RecursivePrint(ASTUnitWrapper &ast,
                                std::unordered_set<Decl *> &deps,
                                IncludeTree &it,
                                bool keep_includes,
                                bool no_duplicated_includes)
   : AST(ast),
     ASTIterator(ast, /*skip_macros_in_decl=*/false),
-    MW(ast->getPreprocessor()),
+    MW(ast.getPreprocessor()),
     Decl_Deps(deps),
     IT(it),
     KeepIncludes(keep_includes)
@@ -571,10 +554,10 @@ void RecursivePrint::Analyze_Includes(bool no_duplicated_includes)
     return;
   }
 
-  MacroWalker mw(AST->getPreprocessor());
+  MacroWalker mw(AST.getPreprocessor());
 
   /* Remove any macros that are provided by an include that should be output.  */
-  PreprocessingRecord *rec = AST->getPreprocessor().getPreprocessingRecord();
+  PreprocessingRecord *rec = AST.getPreprocessor().getPreprocessingRecord();
   for (PreprocessedEntity *entity : *rec) {
     if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(entity)) {
       SourceLocation loc = def->getLocation();
@@ -620,7 +603,7 @@ void RecursivePrint::Analyze_Includes(bool no_duplicated_includes)
 
 void RecursivePrint::Print_CE_Comment(Decl *decl)
 {
-  ASTContext &ctx = AST->getASTContext();
+  ASTContext &ctx = AST.getASTContext();
   RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, decl);
   Print_CE_Comment(decl->getBeginLoc(), comment);
 }
@@ -629,7 +612,7 @@ void RecursivePrint::Print_CE_Comment([[maybe_unused]] MacroInfo *minfo)
 {
   /* This feature is not supported in clang version < 23.  */
 #if CLANG_VERSION_MAJOR >= 23
-  ASTContext &ctx = AST->getASTContext();
+  ASTContext &ctx = AST.getASTContext();
   RawComment *comment = ClangCompat::getRawCommentNoCache(ctx, minfo);
   Print_CE_Comment(minfo->getDefinitionLoc(), comment);
 #endif
@@ -637,7 +620,7 @@ void RecursivePrint::Print_CE_Comment([[maybe_unused]] MacroInfo *minfo)
 
 void RecursivePrint::Print_CE_Comment(const SourceLocation &loc, RawComment *comment)
 {
-  SourceManager &sm = AST->getSourceManager();
+  SourceManager &sm = AST.getSourceManager();
   if (loc.isValid()) {
     if (!Have_Location_Comment(sm, comment)) {
       std::string comment = Build_CE_Location_Comment(sm, loc);
