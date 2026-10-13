@@ -29,6 +29,8 @@
   */
 static IntrusiveRefCntPtr<llvm::vfs::FileSystem> _Hack_VFS;
 
+ASTUnitWrapper *ASTUnitWrapper::Last_Created = nullptr;
+
 std::unique_ptr<ASTUnitWrapper>
 ASTUnitWrapper::Create(const std::vector<const char *> &args,
                         IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,

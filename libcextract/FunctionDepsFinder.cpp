@@ -51,10 +51,10 @@ bool FunctionDependencyFinder::Find_Functions_Required(
   return true;
 }
 
-void FunctionDependencyFinder::Print(void)
+void FunctionDependencyFinder::Print(raw_ostream &out)
 {
   ClosureSet &closure = Visitor.Get_Closure();
-  RecursivePrint(AST, closure.Get_Set(), IT, KeepIncludes, NoDuplicatedIncludes).Print();
+  RecursivePrint(AST, closure.Get_Set(), out, IT, KeepIncludes, NoDuplicatedIncludes).Print();
 }
 
 void FunctionDependencyFinder::Remove_Redundant_Decls(void)

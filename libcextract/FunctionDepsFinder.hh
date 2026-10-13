@@ -58,7 +58,7 @@ class FunctionDependencyFinder
     FunctionDependencyFinder(PassManager::Context *);
 
     /** Print the marked nodes as they appear in the AST.  */
-    void Print(void);
+    void Print(raw_ostream &out);
 
     /** Run the analysis on function `function`*/
     bool Run_Analysis(std::vector<std::string> const &function);

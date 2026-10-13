@@ -198,19 +198,20 @@ void Debug_TopLevelASTWalker(ASTUnitWrapper &ast)
         assert(0 && "Invalid type.");
         break;
       case TopLevelASTIterator::ReturnType::TYPE_DECL:
-        PrettyPrint::Debug_Decl(Current.AsDecl);
+        Current.AsDecl->print(llvm::outs());
+        llvm::outs() << '\n';
         break;
       case TopLevelASTIterator::ReturnType::TYPE_PREPROCESSED_ENTITY:
-        if (MacroDefinitionRecord *def = dyn_cast<MacroDefinitionRecord>(Current.AsPrep))
-        {
-          PrettyPrint::Debug_Macro_Def(def);
-        } else {
-          llvm::outs() << ast.Get_Source_Text(Current.AsPrep->getSourceRange());
-          llvm::outs() << '\n';
+        if (isa<MacroDefinitionRecord>(Current.AsPrep)) {
+          llvm::outs() << "#define ";
         }
+        llvm::outs() << ast.Get_Source_Text(Current.AsPrep->getSourceRange());
+        llvm::outs() << '\n';
         break;
       case TopLevelASTIterator::ReturnType::TYPE_MACRO_UNDEF:
-        PrettyPrint::Debug_Macro_Undef(Current.AsUndef);
+        llvm::outs() << "#undef "
+                     << ast.Get_Source_Text(Current.AsUndef->getDefinition().getUndefLocation())
+                     << '\n';
         break;
     }
   }
