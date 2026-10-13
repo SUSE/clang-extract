@@ -199,10 +199,59 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
       }
     }
 
-    /* Try to remove any decls in the main file which are
-       redundant, which means that have equivalent previous decl.  */
     Decl *decl = *it;
 
+    /* Check if there is a later decl in the closure that is declared together
+       with this one.  Otherwise we might clash the types.  One example of how
+       this can happen is then we have something like
+
+       typedef struct {
+       ...
+       } x, y;
+
+       In the process of creating the closure we might reach the following
+       situation:
+
+       typedef struct {
+       ...
+       } x;
+
+       typedef struct {
+       ...
+       } x, y;
+
+       Which then breaks the one-definition-rule.  In such cases, remove the
+       previous declaration, since the later will contain both definitions
+       either way.
+
+       Also be careful to make sure those declarations will be print as based
+       on the source text and not in AST dump.  In the later case we don't
+       want to remove it.  */
+    if (isa<TagDecl>(decl) || isa<TypedefNameDecl>(decl) || isa<DeclaratorDecl>(decl)) {
+      /* Look for the next Declatations to figure out if any of them will be
+         print later.  */
+      for (Decl *next = decl->getNextDeclInContext();
+           next != nullptr && Is_Declared_Together(decl, next);
+           next = next->getNextDeclInContext()) {
+        if (closure.Is_Decl_Marked(next)) {
+          if (AST.Get_Source_Text(decl->getSourceRange()) != "" &&
+              AST.Get_Source_Text(next->getSourceRange()) != "") {
+            ++it;
+            inc = false;
+            closure.Remove_Decl(decl);
+          }
+          break; /* Found at least one.  */
+        }
+      }
+
+      /* In case decl was removed there is nothing else to do with it.  */
+      if (!inc) {
+        continue;
+      }
+    }
+
+    /* Try to remove any decls in the main file which are
+       redundant, which means that have equivalent previous decl.  */
     if (AST.isInMainFileID(decl->getBeginLoc()) &&
         AST.isInMainFileID(decl->getEndLoc())) {
 
@@ -216,65 +265,6 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
           break;
         }
       }
-    }
-  }
-
-  ASTUnit::top_level_iterator it;
-  Decl *prev = nullptr;
-  for (it = AST.top_level_begin(); it != AST.top_level_end(); ++it) {
-    Decl *decl = *it;
-    if (isa<TypedefDecl>(decl) || isa<DeclaratorDecl>(decl) || isa<TagDecl>(decl)) {
-      if (!closure.Is_Decl_Marked(decl))
-        continue;
-
-      // Set prev and exit, since we don't have anything to compare agains't
-      if (!prev) {
-        prev = decl;
-        continue;
-      }
-
-      /*
-       * Check if there wasn't any symbol that is being defined in the same
-       * interval and remove it. Otherwise we might clash the types.
-       *
-       * One example of how this can happen is then we have something like
-       *
-       * typedef struct {
-       * ...
-       * } x, y;
-       *
-       * In the process of creating the closure we might reach the following
-       * situation:
-       *
-       * typdef struct {
-       * ...
-       * } x;
-       *
-       * typedef struct {
-       *
-       * } x, y;
-       *
-       * Which then breaks the one-definition-rule. In such cases, remove the
-       * previous declaration in the same code range, since the later will
-       * contain both definitions either way.
-       *
-       * Also be careful to make sure those declarations will be print as
-       * based on the source text and not in AST dump.  In the later case
-       * we don't want to remove it.
-       */
-      if (AST.Get_Source_Text(decl->getSourceRange()) != "" &&
-          AST.Get_Source_Text(prev->getSourceRange()) != "" &&
-          PrettyPrint::Contains_From_LineCol(decl->getSourceRange(),
-                                              prev->getSourceRange())) {
-        /*
-         * If the prev and the current decl have the same start LoC, but
-         * different ending, remove the prev from the closure and set the
-         * new prev.
-         */
-        closure.Remove_Decl(prev);
-      }
-
-      prev = decl;
     }
   }
 }

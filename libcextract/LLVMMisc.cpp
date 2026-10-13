@@ -259,6 +259,38 @@ bool Is_Tag_Declared_In_Decl(const TagDecl *tag, const Decl *decl)
   return typedecl && typedecl->getCanonicalDecl() == tag->getCanonicalDecl();
 }
 
+bool Is_Declared_Together(const Decl *a, const Decl *b)
+{
+  /* A tag may not start at the same location as the declarators it is
+     declared together with, as in
+
+       static const struct mount_opts { int token; } ext4_mount_opts[];
+       typedef struct point { int a; } Point;
+
+     where the declarators starts at the `static` and `typedef` keywords,
+     while the tags starts at the `struct` keyword.  Hence we can't compare
+     their begin locations, but rather the begin location of the decl that
+     comes right after the tag, which Is_Tag_Declared_In_Decl does.  */
+  if (const TagDecl *tag = dyn_cast<TagDecl>(a)) {
+    return Is_Tag_Declared_In_Decl(tag, b);
+  }
+
+  /* Only declarators can be declared together, so restrict the begin
+     location comparison below to them.  Note that typedefs are not
+     DeclaratorDecls in clang, hence they are checked separately.  This is
+     mostly defensive: decls in the same DeclContext which starts at the same
+     location are part of the same declaration anyway.  */
+  if (!(isa<TypedefNameDecl>(a) || isa<DeclaratorDecl>(a)) ||
+      !(isa<TypedefNameDecl>(b) || isa<DeclaratorDecl>(b))) {
+    return false;
+  }
+
+  /* All the declarators of `int x, y;` starts at the same location: the
+     beginning of the declaration.  */
+  return a->getDeclContext() == b->getDeclContext() &&
+         a->getBeginLoc() == b->getBeginLoc();
+}
+
 #define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|!\r\n\t"
 
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
