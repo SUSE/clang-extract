@@ -115,7 +115,7 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
       TagDecl *typedecl = type->getAsTagDecl();
 
       if (typedecl && closure.Is_Decl_Marked(typedecl) &&
-          Is_Tag_Declared_In_Typedef(typedecl, decl)) {
+          Is_Tag_Declared_In_Decl(typedecl, decl)) {
         /* Check if the strings regarding an decl empty. In that case they
            are printed from the AST, which would not include the tag
            definition in the typedef, hence we can not delete the decl from
@@ -150,8 +150,6 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         tracking will correctly include the enum system_states.  */
 
     else if (DeclaratorDecl *decl = dyn_cast<DeclaratorDecl>(*it)) {
-      SourceRange range = decl->getSourceRange();
-
       const clang::Type *type = ClangCompat::getTypePtr(decl->getType());
       /* There are some cases where a variable is declared as follows:
 
@@ -182,17 +180,20 @@ void FunctionDependencyFinder::Remove_Redundant_Decls(void)
         of `struct mount_opts`, thus clang-extract fails because of a redeclaration
         error. But since `ext4_mount_opts` is an array, geting its type returns
         an array type, not the struct declaration itself, hence check for this
-        case as well.  */
-      if (type->isArrayType() || type->isPointerType()) {
-        type = type->getBaseElementTypeUnsafe();
+        case as well, and for pointers.  */
+      while (type && (type->isArrayType() || type->isPointerType())) {
+        type = type->getPointeeOrArrayElementType();
       }
 
       TagDecl *typedecl = type ? type->getAsTagDecl() : nullptr;
-      if (typedecl && closure.Is_Decl_Marked(typedecl)) {
-        SourceRange type_range = typedecl->getSourceRange();
-
-        /* Using .fullyContains() fails in some declarations.  */
-        if (PrettyPrint::Contains_From_LineCol(range, type_range)) {
+      if (typedecl && closure.Is_Decl_Marked(typedecl) &&
+          Is_Tag_Declared_In_Decl(typedecl, decl)) {
+        /* Check if the strings regarding an decl empty. In that case they
+           are printed from the AST, which would not include the tag
+           definition in the declaration, hence we can not delete the decl
+           from the list.  */
+        if (AST.Get_Source_Text(decl->getSourceRange()) != "" &&
+            AST.Get_Source_Text(typedecl->getSourceRange()) != "") {
           closure.Remove_Decl(typedecl);
         }
       }
