@@ -118,7 +118,7 @@ bool PrettyPrint::Is_Range_Valid(const SourceRange &range)
   if (!begin.isValid() || !end.isValid())
     return false;
 
-  return Is_Before(begin, end) && (begin != end);
+  return AST->getSourceManager().isBeforeInTranslationUnit(begin, end) && (begin != end);
 }
 
 bool Has_NoInline_Attr(Decl *decl)
@@ -331,27 +331,9 @@ void PrettyPrint::Print_RawComment(SourceManager &sm, RawComment *comment)
 
 /** Private stuff.  */
 
-/** Compare if SourceLocation a is before SourceLocation b in the source code.  */
-bool PrettyPrint::Is_Before(const SourceLocation &a, const SourceLocation &b)
-{
-  BeforeThanCompare<SourceLocation> is_before(AST->getSourceManager());
-
-  assert(a.isValid());
-  assert(b.isValid());
-
-  return is_before(a, b);
-}
-
 void PrettyPrint::Debug_SourceLoc(const SourceLocation &loc)
 {
   loc.dump(AST->getSourceManager());
-}
-
-/** Compare if SourceLocation a is after SourceLocation b in the source code.  */
-bool PrettyPrint::Is_After(const SourceLocation &a, const SourceLocation &b)
-{
-  BeforeThanCompare<SourceLocation> is_before(AST->getSourceManager());
-  return is_before(b, a);
 }
 
 SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
@@ -394,7 +376,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
         SourceLocation loc = attr->getRange().getEnd();
         loc = SM.getExpansionLoc(loc);
 
-        if (loc.isValid() && Is_Before(furthest, loc)) {
+        if (loc.isValid() && SM.isBeforeInTranslationUnit(furthest, loc)) {
           furthest = loc;
           has_attr = true;
         }
@@ -450,7 +432,7 @@ SourceLocation PrettyPrint::Get_Expanded_Loc(Decl *decl)
   if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {
     if (TagDecl *tag = typedecl->getAnonDeclWithTypedefName()) {
       SourceLocation tag_furthest = PrettyPrint::Get_Expanded_Loc(tag);
-      if (Is_Before(furthest, tag_furthest)) {
+      if (AST->getSourceManager().isBeforeInTranslationUnit(furthest, tag_furthest)) {
         furthest = tag_furthest;
       }
     }
