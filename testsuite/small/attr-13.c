@@ -1,5 +1,4 @@
 /* { dg-options "-DCE_EXTRACT_FUNCTIONS=f -DCE_NO_EXTERNALIZATION" }*/
-/* { dg-xfail } */
 
 enum MHD_Result {
     MHD_NO = 0,
@@ -11,4 +10,4 @@ enum MHD_Result f() {
 }
 
 
-/* { dg-final { scan-tree-dump "__attribute__\(\(enum_externsibility\(closed\)\)\)" } } */
+/* { dg-final { scan-tree-dump "__attribute__\(\(enum_extensibility\(closed\)\)\)" } } */
