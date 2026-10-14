@@ -200,6 +200,8 @@ void ArgvParser::Insert_Required_Parameters(void)
     "-Wno-duplicate-decl-specifier", // Disabled due to kernel issues. See more
                                      // at https://github.com/ClangBuiltLinux/linux/issues/2013
                                      // and https://github.com/llvm/llvm-project/issues/93449
+    "-fsyntax-only",     // Disable clang compiler backend, we don't need it.
+    "-Qunused-arguments", // Do not complain about unused compiler arugments.
   };
 
   for (const char *arg : priv_args) {
