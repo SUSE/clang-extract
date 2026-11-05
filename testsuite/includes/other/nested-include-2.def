@@ -1,0 +1,2 @@
+DEFINE_CATEGORY(a, "aa")
+DEFINE_CATEGORY(b, "bbb")

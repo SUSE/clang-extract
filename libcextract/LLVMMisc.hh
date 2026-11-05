@@ -121,6 +121,9 @@ bool Is_Declared_Together(const Decl *a, const Decl *b);
 /** Check if string has unmatched #if, #ifdef, #ifndef.  */
 bool Has_Balanced_Ifdef(const StringRef &string);
 
+/** Check if string contains an #include directive.  */
+bool Has_Include_Directive(const StringRef &string);
+
 
 /** Check if the VarDecl is declared as TLS.  */
 static inline bool Is_TLS(VarDecl *decl)

@@ -242,13 +242,13 @@ void RecursivePrint::Print_Decl(Decl *decl)
 
       /** Check if the output string has an include directive.  In that case, if we
           don't want to keep the includes, we must print the ast dump rather than
-          the source text to get rid of the #include directive.
-          FIXME:  regexes are slow.  */
-      static llvm::Regex regex("# *include *(<|\")");
+          the source text to get rid of the #include directive.  Declarations
+          which are not TagDecls (e.g. `extern struct S { ... } var;`) are
+          handled in Print_Decl_Raw.  */
 
       /* FIXME: Why isCompleteDefinitionRequired does not work for EnumDecls?  */
       if (t && ((!e && t->isCompleteDefinitionRequired() == false)
-                || (!KeepIncludes && regex.match(AST.Get_Source_Text(t->getSourceRange()))))) {
+                || (!KeepIncludes && Has_Include_Directive(AST.Get_Source_Text(t->getSourceRange()))))) {
 
         /* FIXME: The Print_Decl_Raw class will attempt to write this declaration
            as the user wrote, that means WITH a body.  To avoid this, we set
@@ -430,7 +430,29 @@ void RecursivePrint::Print_Decl_Raw(Decl *decl)
          from struct rtld_global_ro and below, which would only include the
          #endif, and not the #ifdef.  In case its not balanced we fallback to
          AST dumping.  */
-      if (Has_Balanced_Ifdef(decl_source)) {
+      if (!KeepIncludes && Has_Include_Directive(decl_source)) {
+        /* The declaration has an #include directive in the middle of it, e.g.
+
+           extern const struct catnamestr_t
+           {
+           #define DEFINE_CATEGORY(category, category_name, items, a) \
+             char CATNAMEMF (__LINE__)[sizeof (category_name)];
+           #include "categories.def"
+           #undef DEFINE_CATEGORY
+           } _nl_category_names;
+
+           Copying the source text verbatim would carry the #include into the
+           output file, where it may not be found anymore because quoted
+           includes are searched relative to the file they are written in.
+           Fall back to AST dump, which has the included content expanded.
+           Since the TagDecl defined together with this declaration is skipped
+           by the ASTIterator, we must ask for its definition to be printed as
+           well.  */
+        PrintingPolicy policy(PPolicy);
+        policy.IncludeTagDefinition = true;
+        Attr_Order_Fix(decl);
+        decl->print(Out, policy);
+      } else if (Has_Balanced_Ifdef(decl_source)) {
         Out << decl_source;
       } else {
         /* In case its not balanced, fallback to AST dump.  */
