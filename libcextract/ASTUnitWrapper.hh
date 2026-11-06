@@ -63,6 +63,14 @@ class ASTUnitWrapper
       Use get_source_text() for that.   */
   StringRef Get_Source_Text_Raw(const SourceRange &range);
 
+  /** Get the furthest location of decl, including its attributes, which are
+      not covered by decl->getSourceRange().  The returned location is right
+      before the `;` token in case decl has attributes.  */
+  SourceLocation Get_Expanded_Loc(Decl *decl);
+
+  /** Check if range is valid and not empty.  */
+  bool Is_Range_Valid(const SourceRange &range);
+
   /** Get the TopLevel Decl that contains the location loc.  */
   Decl *Get_Toplevel_Decl_At_Location(const SourceLocation &loc);
 

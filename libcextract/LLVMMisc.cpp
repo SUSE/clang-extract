@@ -20,6 +20,7 @@
 #include "ClangCompat.hh"
 
 #include <llvm/Support/Path.h>
+#include <llvm/Support/Regex.h>
 
 /** Check if Decl is a builtin.  */
 bool Is_Builtin_Decl(const Decl *decl)
@@ -289,6 +290,14 @@ bool Is_Declared_Together(const Decl *a, const Decl *b)
      beginning of the declaration.  */
   return a->getDeclContext() == b->getDeclContext() &&
          a->getBeginLoc() == b->getBeginLoc();
+}
+
+/** Check if string contains an #include directive.  */
+bool Has_Include_Directive(const StringRef &string)
+{
+  /* FIXME: regexes are slow.  */
+  static llvm::Regex regex("# *include *(<|\")");
+  return regex.match(string);
 }
 
 #define TOKEN_VECTOR " ().,;+-*/^|&{}[]<>^&|!\r\n\t"

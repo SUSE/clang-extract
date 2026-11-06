@@ -242,13 +242,13 @@ void RecursivePrint::Print_Decl(Decl *decl)
 
       /** Check if the output string has an include directive.  In that case, if we
           don't want to keep the includes, we must print the ast dump rather than
-          the source text to get rid of the #include directive.
-          FIXME:  regexes are slow.  */
-      static llvm::Regex regex("# *include *(<|\")");
+          the source text to get rid of the #include directive.  Declarations
+          which are not TagDecls (e.g. `extern struct S { ... } var;`) are
+          handled in Print_Decl_Raw.  */
 
       /* FIXME: Why isCompleteDefinitionRequired does not work for EnumDecls?  */
       if (t && ((!e && t->isCompleteDefinitionRequired() == false)
-                || (!KeepIncludes && regex.match(AST.Get_Source_Text(t->getSourceRange()))))) {
+                || (!KeepIncludes && Has_Include_Directive(AST.Get_Source_Text(t->getSourceRange()))))) {
 
         /* FIXME: The Print_Decl_Raw class will attempt to write this declaration
            as the user wrote, that means WITH a body.  To avoid this, we set
@@ -340,7 +340,7 @@ void RecursivePrint::Print_Decl_Raw(Decl *decl)
 
   /* If a SourceManager was specified and the decl source range seems valid,
      then output based on the original source code.  */
-  if (Is_Range_Valid(decl_range)) {
+  if (AST.Is_Range_Valid(decl_range)) {
 
     /* The range given by getSourceRange ignores attributes. Example :
 
@@ -353,7 +353,7 @@ void RecursivePrint::Print_Decl_Raw(Decl *decl)
     Therefore we must check for the attributes of this declaration and compute
     the furthest location.  */
 
-    SourceLocation furthest = Get_Expanded_Loc(decl);
+    SourceLocation furthest = AST.Get_Expanded_Loc(decl);
     decl_range = SourceRange(decl_range.getBegin(), furthest);
     StringRef decl_source = AST.Get_Source_Text(decl_range);
 
@@ -430,7 +430,29 @@ void RecursivePrint::Print_Decl_Raw(Decl *decl)
          from struct rtld_global_ro and below, which would only include the
          #endif, and not the #ifdef.  In case its not balanced we fallback to
          AST dumping.  */
-      if (Has_Balanced_Ifdef(decl_source)) {
+      if (!KeepIncludes && Has_Include_Directive(decl_source)) {
+        /* The declaration has an #include directive in the middle of it, e.g.
+
+           extern const struct catnamestr_t
+           {
+           #define DEFINE_CATEGORY(category, category_name, items, a) \
+             char CATNAMEMF (__LINE__)[sizeof (category_name)];
+           #include "categories.def"
+           #undef DEFINE_CATEGORY
+           } _nl_category_names;
+
+           Copying the source text verbatim would carry the #include into the
+           output file, where it may not be found anymore because quoted
+           includes are searched relative to the file they are written in.
+           Fall back to AST dump, which has the included content expanded.
+           Since the TagDecl defined together with this declaration is skipped
+           by the ASTIterator, we must ask for its definition to be printed as
+           well.  */
+        PrintingPolicy policy(PPolicy);
+        policy.IncludeTagDefinition = true;
+        Attr_Order_Fix(decl);
+        decl->print(Out, policy);
+      } else if (Has_Balanced_Ifdef(decl_source)) {
         Out << decl_source;
       } else {
         /* In case its not balanced, fallback to AST dump.  */
@@ -443,122 +465,6 @@ void RecursivePrint::Print_Decl_Raw(Decl *decl)
     Attr_Order_Fix(decl);
     decl->print(Out, LangOpts);
   }
-}
-
-bool RecursivePrint::Is_Range_Valid(const SourceRange &range)
-{
-  const SourceLocation begin = range.getBegin();
-  const SourceLocation end = range.getEnd();
-
-  if (!begin.isValid() || !end.isValid())
-    return false;
-
-  return AST.getSourceManager().isBeforeInTranslationUnit(begin, end) && (begin != end);
-}
-
-SourceLocation RecursivePrint::Get_Expanded_Loc(Decl *decl)
-{
-  SourceRange decl_range = decl->getSourceRange();
-  SourceLocation furthest = decl_range.getEnd();
-
-  /* If a SourceManager was specified and the decl source range seems valid,
-     then output based on the original source code.  */
-  if (Is_Range_Valid(decl_range)) {
-
-    /* The range given by getSourceRange ignores attributes. Example :
-
-    int a __attribute__((aligned (8)));
-
-    outputs:
-
-    int a;
-
-    Therefore we must check for the attributes of this declaration and compute
-    the furthest location.  */
-
-    bool has_attr = false;
-    SourceManager &SM = AST.getSourceManager();
-
-    /* Vector type attributes are not encoded in the AttrVec structure, hence
-       we have to check for its existence and expand until we match the ';'
-       token.  See small/attr-11.c testcase.  */
-    if (TypedefDecl *tdecl = dyn_cast<TypedefDecl>(decl)) {
-      if (isa<clang::VectorType>(tdecl->getTypeSourceInfo()->getType().getTypePtr())) {
-        has_attr = true;
-      }
-    }
-
-    /* Get atttributes vector if it exists.  */
-    if(decl->hasAttrs()) {
-      AttrVec &attrvec = decl->getAttrs();
-      for (size_t i = 0; i < attrvec.size(); i++) {
-        const Attr *attr = attrvec[i];
-        SourceLocation loc = attr->getRange().getEnd();
-        loc = SM.getExpansionLoc(loc);
-
-        if (loc.isValid() && SM.isBeforeInTranslationUnit(furthest, loc)) {
-          furthest = loc;
-          has_attr = true;
-        }
-      }
-    }
-
-    /* Find the last ';' token, once there are attributes right after the last
-       '}'.  On __attribute__((unused)), the previous code reach until
-       __attribute__((unused), ignoring the last parenthesis. On macros, like
-       __aligned(32), the code would skip (32).  */
-    if (has_attr) {
-      tok::TokenKind semicolon(tok::semi);
-      SourceLocation head = furthest;
-
-      /* Keep fetching tokens.  */
-      while (true) {
-        auto maybe_next_tok = Lexer::findNextToken(head, SM, LangOpts);
-
-        if (!maybe_next_tok.has_value()) {
-          break;
-        }
-
-        const Token &tok = maybe_next_tok.value();
-        head = tok.getLastLoc();
-
-        /* Stop when we find the ';' token.  */
-        if (tok.is(semicolon)) {
-          /* Found the ';', now go back a character to *not* include the ';'.  */
-          furthest = head.getLocWithOffset(-1);
-
-          /* There is a bizarre case where a decl have an #endif at the end of
-             it, just before the ';' (see small/attr-14.c).  Try to workaround
-             this case by emiting the ';' that was there, which will result in
-             two ';' being print.  This is visually not cute, but at least
-             won't cause the compiler to cry.  */
-          StringRef endstr = AST.Get_Source_Text({furthest, furthest});
-          if (const char *data_str = endstr.data()) {
-            /* Check for newline.  */
-            if (*data_str != '\0' && *data_str == '\n') {
-              /* Set 'furthest' back to where it was.  */
-              furthest = furthest.getLocWithOffset(1);
-            }
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  /* In case this decl is a TypedefNameDecl, we also need to check for the
-     struct definition for extra attributes.  See small/attr-10.c testscase
-     for an example where this happens.  */
-  if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {
-    if (TagDecl *tag = typedecl->getAnonDeclWithTypedefName()) {
-      SourceLocation tag_furthest = Get_Expanded_Loc(tag);
-      if (AST.getSourceManager().isBeforeInTranslationUnit(furthest, tag_furthest)) {
-        furthest = tag_furthest;
-      }
-    }
-  }
-
-  return furthest;
 }
 
 /** Print the macro defined in info.  */
