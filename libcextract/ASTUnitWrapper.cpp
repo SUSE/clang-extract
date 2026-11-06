@@ -282,3 +282,121 @@ ASTUnit::create(std::shared_ptr<CompilerInvocation> CI,
   return AST;
 }
 #endif
+
+bool ASTUnitWrapper::Is_Range_Valid(const SourceRange &range)
+{
+  const SourceLocation begin = range.getBegin();
+  const SourceLocation end = range.getEnd();
+
+  if (!begin.isValid() || !end.isValid())
+    return false;
+
+  return getSourceManager().isBeforeInTranslationUnit(begin, end) && (begin != end);
+}
+
+SourceLocation ASTUnitWrapper::Get_Expanded_Loc(Decl *decl)
+{
+  /* Use the default options, as clang's internal PrettyPrinter does.  */
+  LangOptions lang_opts;
+  SourceRange decl_range = decl->getSourceRange();
+  SourceLocation furthest = decl_range.getEnd();
+
+  /* If a SourceManager was specified and the decl source range seems valid,
+     then output based on the original source code.  */
+  if (Is_Range_Valid(decl_range)) {
+
+    /* The range given by getSourceRange ignores attributes. Example :
+
+    int a __attribute__((aligned (8)));
+
+    outputs:
+
+    int a;
+
+    Therefore we must check for the attributes of this declaration and compute
+    the furthest location.  */
+
+    bool has_attr = false;
+    SourceManager &SM = getSourceManager();
+
+    /* Vector type attributes are not encoded in the AttrVec structure, hence
+       we have to check for its existence and expand until we match the ';'
+       token.  See small/attr-11.c testcase.  */
+    if (TypedefDecl *tdecl = dyn_cast<TypedefDecl>(decl)) {
+      if (isa<clang::VectorType>(tdecl->getTypeSourceInfo()->getType().getTypePtr())) {
+        has_attr = true;
+      }
+    }
+
+    /* Get atttributes vector if it exists.  */
+    if(decl->hasAttrs()) {
+      AttrVec &attrvec = decl->getAttrs();
+      for (size_t i = 0; i < attrvec.size(); i++) {
+        const Attr *attr = attrvec[i];
+        SourceLocation loc = attr->getRange().getEnd();
+        loc = SM.getExpansionLoc(loc);
+
+        if (loc.isValid() && SM.isBeforeInTranslationUnit(furthest, loc)) {
+          furthest = loc;
+          has_attr = true;
+        }
+      }
+    }
+
+    /* Find the last ';' token, once there are attributes right after the last
+       '}'.  On __attribute__((unused)), the previous code reach until
+       __attribute__((unused), ignoring the last parenthesis. On macros, like
+       __aligned(32), the code would skip (32).  */
+    if (has_attr) {
+      tok::TokenKind semicolon(tok::semi);
+      SourceLocation head = furthest;
+
+      /* Keep fetching tokens.  */
+      while (true) {
+        auto maybe_next_tok = Lexer::findNextToken(head, SM, lang_opts);
+
+        if (!maybe_next_tok.has_value()) {
+          break;
+        }
+
+        const Token &tok = maybe_next_tok.value();
+        head = tok.getLastLoc();
+
+        /* Stop when we find the ';' token.  */
+        if (tok.is(semicolon)) {
+          /* Found the ';', now go back a character to *not* include the ';'.  */
+          furthest = head.getLocWithOffset(-1);
+
+          /* There is a bizarre case where a decl have an #endif at the end of
+             it, just before the ';' (see small/attr-14.c).  Try to workaround
+             this case by emiting the ';' that was there, which will result in
+             two ';' being print.  This is visually not cute, but at least
+             won't cause the compiler to cry.  */
+          StringRef endstr = Get_Source_Text({furthest, furthest});
+          if (const char *data_str = endstr.data()) {
+            /* Check for newline.  */
+            if (*data_str != '\0' && *data_str == '\n') {
+              /* Set 'furthest' back to where it was.  */
+              furthest = furthest.getLocWithOffset(1);
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  /* In case this decl is a TypedefNameDecl, we also need to check for the
+     struct definition for extra attributes.  See small/attr-10.c testscase
+     for an example where this happens.  */
+  if (TypedefNameDecl *typedecl = dyn_cast<TypedefNameDecl>(decl)) {
+    if (TagDecl *tag = typedecl->getAnonDeclWithTypedefName()) {
+      SourceLocation tag_furthest = Get_Expanded_Loc(tag);
+      if (getSourceManager().isBeforeInTranslationUnit(furthest, tag_furthest)) {
+        furthest = tag_furthest;
+      }
+    }
+  }
+
+  return furthest;
+}

@@ -401,6 +401,10 @@ class SymbolExternalizer
       of the variable that is valid, so we can put our externalized symbol there.  */
   void Compute_SymbolsMap_Late_Insert_Locations(std::vector<SymbolUpdateStatus *> &array);
 
+  /** Get the SourceRange to remove in order to drop decl from source,
+      including the attributes after its declarator.  */
+  SourceRange Get_Decl_Removal_Range(Decl *decl);
+
   /** Remove redeclarations of the same Decl that appears after loc.  */
   void Remove_Redecls_After(Decl *decl);
 
