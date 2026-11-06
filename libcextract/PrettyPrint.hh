@@ -74,12 +74,6 @@ class RecursivePrint
   /** Print the macro defined in info.  */
   void Print_MacroInfo(MacroInfo *info);
 
-  /** Get the furthest location of decl, including its attributes.  */
-  SourceLocation Get_Expanded_Loc(Decl *decl);
-
-  /** Check if range is valid and not empty.  */
-  bool Is_Range_Valid(const SourceRange &range);
-
   /** Print a clang-extract comment that is on top of each declaration.  */
   void Print_CE_Comment(Decl *decl);
 
