@@ -992,13 +992,36 @@ void SymbolExternalizer::Handle_IBT_Ext(SymbolUpdateStatus *sym)
   }
 }
 
+/** Check if decl was declared inside a function body.  Notice that block-scope
+    `extern` declarations have the TranslationUnit as its semantic DeclContext,
+    hence we must look at the lexical one.  */
+static bool Is_Block_Scope_Decl(const Decl *decl)
+{
+  return decl->getLexicalDeclContext()->isFunctionOrMethod();
+}
+
+/** Get the SourceRange that must be removed in order to drop `decl` from the
+    source.  The range of the Decl itself does not cover attributes written
+    after the declarator, e.g.:
+
+      extern int x __attribute__((visibility("hidden")));
+
+    Removing only decl->getSourceRange() would leave a dangling
+    `__attribute__((visibility("hidden")));` behind, which is invalid inside
+    a function body.  Expand the range to cover those attributes.  */
+SourceRange SymbolExternalizer::Get_Decl_Removal_Range(Decl *decl)
+{
+  return SourceRange(decl->getBeginLoc(),
+                     AST.Get_Expanded_Loc(decl));
+}
+
 /** Remove redeclarations of the same Decl that appears after loc.  */
 void SymbolExternalizer::Remove_Redecls_After(Decl *decl)
 {
   Decl *recent = decl->getMostRecentDecl();
 
   while (recent && recent != decl) {
-    Remove_Text(recent->getSourceRange(), 1000);
+    Remove_Text(Get_Decl_Removal_Range(recent), 1000);
     recent = recent->getPreviousDecl();
   }
 }
@@ -1029,15 +1052,37 @@ void SymbolExternalizer::Late_Externalize(void)
       continue;
     }
 
+    /* glibc likes doing cute things like:
+
+       int f()
+       {
+        extern int foo __attribute__((visibility("hidden")));
+       }
+
+       which we then need to strongly externalize foo. We can't rewrite it in
+       place: the new `static` pointer would end up being a function-local
+       static variable, which the compiler emits with a mangled name
+       (`klpe_x.0` on gcc, `f.klpe_x` on clang) that the livepatch tooling
+       can't find.  Therefore hoist it right before the toplevel declaration
+       that encloses it instead.  */
+    SourceLocation insert_loc = sym->LateInsertLocation;
+    if (insert_loc.isInvalid() && Is_Block_Scope_Decl(sym->OldDecl)) {
+      SourceLocation loc = sm.getExpansionLoc(sym->OldDecl->getBeginLoc());
+      Decl *topdecl = AST.Get_Toplevel_Decl_At_Location(loc);
+      if (topdecl) {
+        insert_loc = Get_Begin_Loc_Of_Decl_Or_Comment(astctx, topdecl);
+      }
+    }
+
     /* Create a string with the new variable type and name.  */
     std::string o;
     llvm::raw_string_ostream outstr(o);
 
     /*
      * Get the location of the original decl so we can output the right comment
-     * location when LateExternalization is active.
+     * location when the new decl is not emitted in its place.
      */
-    if (sym->LateInsertLocation.isValid()) {
+    if (insert_loc.isValid()) {
       outstr << Get_Or_Build_CE_Location_Comment(astctx, sym->OldDecl);
     }
     sym->NewDecl->print(outstr);
@@ -1056,20 +1101,20 @@ void SymbolExternalizer::Late_Externalize(void)
        there.  */
     DeclaratorDecl *old_decl;
 
-    if (sym->LateInsertLocation.isValid()) {
-      Insert_Text(sym->LateInsertLocation, outstr.str());
+    if (insert_loc.isValid()) {
+      Insert_Text(insert_loc, outstr.str());
 
       /* In case the symbol is in the main file already, we must delete it.  */
       old_decl = Get_With_Body_Or_Itself(sym->OldDecl);
 
       SourceLocation loc = sm.getExpansionLoc(old_decl->getBeginLoc());
       if (sm.getFileID(loc) == sm.getMainFileID()) {
-        Remove_Text(old_decl->getSourceRange(), 1000);
+        Remove_Text(Get_Decl_Removal_Range(old_decl), 1000);
       }
     } else {
       /* Fallback to the old method of rewriting the declaration.  */
       old_decl = sym->OldDecl;
-      Replace_Text(old_decl->getSourceRange(), outstr.str(), 1000);
+      Replace_Text(Get_Decl_Removal_Range(old_decl), outstr.str(), 1000);
 
       /* Emit a warning for debuging purposes for now.  */
       if (AllowLateExternalization) {
